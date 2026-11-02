@@ -68,7 +68,7 @@
     -webkit-mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%); mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
     -webkit-mask-size:min(78vmin, 720px) min(78vmin, 720px); mask-size:min(78vmin, 720px) min(78vmin, 720px);
     -webkit-mask-position:50% 50%; mask-position:50% 50%; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
-  #empty p.live-line { max-width:none; font-family:var(--ui-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
+  #empty p.live-line { max-width:none; font-family:var(--ui-mono); font-size:11px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim); }
   #empty p { margin:0; max-width:34em; font-family:var(--ui-sans); font-size:16px; line-height:1.5; letter-spacing:0; text-transform:none; color:var(--ui-fg2); }
 
   /* the honesty line: one short sentence above the pulse */
@@ -156,7 +156,7 @@ function fit(){
 if ("ResizeObserver" in window) new ResizeObserver(fit).observe($("panel")); else addEventListener("resize", fit);
 
 const isRem = st => String(st || "").toUpperCase() === "REM";
-const stageName = (st, gloss) => isRem(st) ? (gloss ? "DREAM SLEEP (REM)" : "DREAM SLEEP") : String(st || "").toUpperCase();   // (the gloss once, on the first such frame)
+const stageName = (st, gloss) => isRem(st) ? (gloss ? "DREAM SLEEP (REM)" : "dream sleep") : String(st || "").toUpperCase();   // (the gloss once, on the first such frame)
 function paint(i, smooth){
   if (!frames.length) return;
   at = Math.max(0, Math.min(frames.length - 1, i));

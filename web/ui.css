@@ -1,3 +1,6 @@
+/* fonts: Geist and Geist Mono (Vercel, SIL Open Font License; web/fonts/LICENSE-Geist.txt), self-hosted, no CDN */
+@font-face { font-family:"Geist"; src:url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight:100 900; font-style:normal; font-display:swap; }
+@font-face { font-family:"Geist Mono"; src:url("/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight:100 900; font-style:normal; font-display:swap; }
 /* SUB-01 · shared design tokens and page chrome (2026-11: the "decoded" redesign).
    Black ground, bold white grotesk headlines, monospace data labels, one red for anything LIVE and one teal for
    anything PROJECTED (estimated by the model, not read from it). Pages load this before their own styles and use
@@ -8,8 +11,8 @@
   --ui-line: rgba(255,255,255,.1);                     --ui-line2: rgba(255,255,255,.18);
   --ui-live: #ff2d55;       --ui-live2: #ff6b8a;       --ui-proj: #2ee6c5;        --ui-warn: #ffb020;
   --ui-attn: #ffffff;       --ui-arousal: #5aa9ff;     --ui-load: #ffd166;        --ui-neural: #2ee6c5;
-  --ui-sans: "Helvetica Neue", Helvetica, Inter, "Segoe UI", Arial, system-ui, sans-serif;
-  --ui-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ui-sans: "Geist", "Helvetica Neue", Helvetica, Inter, "Segoe UI", Arial, system-ui, sans-serif;
+  --ui-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ui-r: 6px;              --ui-r2: 12px;             --ui-gap: 12px;            --ui-pad: 16px;
   --ui-ease: cubic-bezier(.2,.7,.2,1);
 }
@@ -385,3 +388,57 @@ body:not([data-pulse]) .ui-toast { bottom:16px; }
 .ui-nav.has-pill > a:hover { transform:translateY(-1px); }
 .ui-nav.has-pill:hover > .ui-nav-pill { background:rgba(255,255,255,.16); }
 @media (prefers-reduced-motion: reduce) { .ui-nav.has-pill > a:hover { transform:none; } }
+
+/* ============================================================================================================
+   v4 · the look, from the owner's references read again (2 November, late): Geist everywhere, Geist Mono only for numbers
+   and times; labels in sentence case with no tracking; 10 px rounded rectangles instead of pills; translucent fills with a
+   hairline and a top highlight; layered panel surfaces. These rules come last and win over the v1–v3 ones above. */
+:root { --ui-r: 8px; --ui-r2: 12px; --ui-r3: 14px; --ui-fill: rgba(255,255,255,.06); --ui-fill2: rgba(255,255,255,.1);
+  --ui-hair: rgba(255,255,255,.1); --ui-hair2: rgba(255,255,255,.18); --ui-top: inset 0 1px 0 rgba(255,255,255,.07); }
+body { font-family:var(--ui-sans); -webkit-font-smoothing:antialiased; }
+
+/* labels and captions: sentence case, 12 px, medium, no tracking (the mono stays for numbers and times) */
+.ui-label, .ui-caption, .ui-lockup small, .ui-title p, #ui-pulse, #ui-pulse .ui-pulse-vals, .ui-chip, .ui-btn, .ui-seg > button, .ui-input, .ui-honest,
+.ui-clock, .ui-tip, .ui-toast, .ui-skip, .ui-delta, .ui-word {
+  font-family:var(--ui-sans); text-transform:none; letter-spacing:-.01em; }
+.ui-label, .ui-caption, .ui-lockup small { font-size:12px; font-weight:500; color:var(--ui-dim); }
+.ui-clock, .ui-delta, #ui-pulse .ui-pulse-vals, .ui-big, .ui-num .ui-big { font-family:var(--ui-mono); letter-spacing:0; font-variant-numeric:tabular-nums; }
+.ui-honest { font-size:12.5px; }
+.ui-lockup b { font-size:16px; letter-spacing:-.03em; }
+
+/* buttons: a 10 px rounded rectangle, a translucent fill, a hairline, a top highlight; the primary a white gradient */
+.ui-btn, .ui-seg > button, .ui-skip, .ui-toast, .ui-tip { border-radius:var(--ui-r); }
+.ui-btn { font-size:13px; font-weight:500; padding:7px 12px; color:var(--ui-fg2); background:var(--ui-fill); border:1px solid var(--ui-hair);
+  box-shadow:var(--ui-top); line-height:1.2; min-height:32px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+.ui-btn:hover:not(:disabled):not(.primary):not(.on) { background:var(--ui-fill2); border-color:var(--ui-hair2); color:var(--ui-fg); box-shadow:var(--ui-top); }
+.ui-btn.on { background:#fff; color:#000; border-color:#fff; box-shadow:none; }
+.ui-btn.primary { background:linear-gradient(180deg, #fff, #e4e4e8); color:#000; border-color:#fff; font-weight:600;
+  box-shadow:inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.5); }
+.ui-btn.primary:hover:not(:disabled) { background:#fff; border-color:#fff; box-shadow:inset 0 1px 0 #fff, 0 2px 6px rgba(0,0,0,.5); }
+.ui-seg { border-radius:10px; padding:3px; gap:2px; background:rgba(255,255,255,.03); border:1px solid var(--ui-hair); }
+.ui-seg > button { font-size:13px; font-weight:500; padding:5px 11px; border-radius:7px; min-height:28px; color:var(--ui-dim); }
+.ui-seg > .ui-seg-thumb { border-radius:7px; box-shadow:0 1px 2px rgba(0,0,0,.4); }
+.ui-seg > button.on, .ui-seg > button[aria-pressed="true"] { color:#000; }
+.ui-chip { border-radius:7px; font-size:12px; font-weight:500; padding:3px 8px; border-color:var(--ui-hair2); color:var(--ui-fg2); background:var(--ui-fill); }
+.ui-chip.live { background:#d1002c; border-color:transparent; color:#fff; }
+.ui-chip.proj { background:transparent; }
+.ui-input { font-size:13px; border-radius:var(--ui-r); padding:8px 12px; background:#0b0b0e; border:1px solid var(--ui-hair);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.5); color:var(--ui-fg); }
+.ui-input:focus:not(:focus-visible) { border-color:var(--ui-hair2); box-shadow:inset 0 1px 2px rgba(0,0,0,.5), 0 0 0 3px rgba(255,255,255,.06); }
+
+/* the nav: 13 px medium, 8 px pill */
+.ui-nav a, .ui-nav > .ui-nav-pill { border-radius:var(--ui-r); }
+.ui-nav a { font-family:var(--ui-sans); font-size:13px; font-weight:500; letter-spacing:-.01em; text-transform:none; padding:5px 10px; }
+.ui-nav > .ui-nav-pill { background:var(--ui-fill2); }
+.ui-lockup { border-radius:var(--ui-r); }
+
+/* panels and docks: a layered surface, a hairline, a top highlight */
+.ui-panel { background:linear-gradient(180deg, #121216, #0d0d10); border:1px solid rgba(255,255,255,.08); border-radius:var(--ui-r3); box-shadow:var(--ui-top); }
+.ui-panel.has-spot:hover { border-color:rgba(255,255,255,.14); }
+.ui-dock { border-radius:var(--ui-r3); background:linear-gradient(180deg, #121216, #0d0d10); border:1px solid rgba(255,255,255,.1); box-shadow:var(--ui-top), 0 8px 30px rgba(0,0,0,.5); }
+.ui-tip { font-family:var(--ui-sans); font-size:12px; background:#151519; box-shadow:0 4px 16px rgba(0,0,0,.5); }
+.ui-toast { font-family:var(--ui-sans); font-size:13px; font-weight:500; }
+
+/* the pulse strip row: sentence case words, mono numbers */
+#ui-pulse { font-family:var(--ui-sans); font-size:12px; letter-spacing:0; text-transform:none; }
+#ui-pulse .ui-pulse-stage { font-family:var(--ui-sans); font-size:12px; letter-spacing:0; text-transform:none; border-radius:7px; }

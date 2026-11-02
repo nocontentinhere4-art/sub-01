@@ -17,8 +17,8 @@
   a { color:inherit; }
   button { font:inherit; }
   .mono { font-family:var(--ui-mono); }
-  .tag { font-family:var(--ui-mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-dim);
-    border:1px solid var(--ui-line2); border-radius:999px; padding:1px 6px; white-space:nowrap; vertical-align:1px; }
+  .tag { font-family:var(--ui-mono); font-size:9.5px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim);
+    border:1px solid var(--ui-line2); border-radius:10px; padding:1px 6px; white-space:nowrap; vertical-align:1px; }
   .tag.red { color:var(--ui-live2); border-color:rgba(255,45,85,.45); }
   .tag.teal { color:var(--ui-proj); border-color:rgba(46,230,197,.45); }
   .tag.vi { color:var(--rp); border-color:rgba(167,139,250,.5); }
@@ -28,7 +28,7 @@
     border-bottom:1px solid var(--ui-line); flex-wrap:wrap; row-gap:8px; }
   #hdr .ui-lockup { display:block; text-decoration:none; color:var(--ui-fg); line-height:1; white-space:nowrap; }
   #hdr .ui-lockup b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
-  #hdr .ui-lockup small { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim); }
+  #hdr .ui-lockup small { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim); }
   #hdr .ui-nav { flex-wrap:wrap; }
   #ui-live.off { background:transparent; border-color:var(--ui-line2); color:var(--ui-dim); }
   #ui-live.off .ui-dot { animation:none; }
@@ -85,11 +85,11 @@
     -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%); mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%); }
   .bcv.drawn .poster { opacity:0; }
   .bcv.loading::after { content:"loading the wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
-    font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint);
+    font-family:var(--ui-mono); font-size:10px; letter-spacing:-.01em; text-transform:none; color:var(--ui-faint);
     background:linear-gradient(90deg, var(--ui-faint) 0 38%, #fff 50%, var(--ui-faint) 62% 100%); background-size:200% 100%; color:transparent;
     -webkit-background-clip:text; background-clip:text; animation:ui-shimmer 1.8s linear infinite; }
   @media (prefers-reduced-motion: reduce) { .bcv.loading::after { animation:none; background:none; color:var(--ui-faint); -webkit-background-clip:border-box; background-clip:border-box; } }
-  .bcv .orient { position:absolute; top:4px; left:50%; transform:translateX(-50%); font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
+  .bcv .orient { position:absolute; top:4px; left:50%; transform:translateX(-50%); font-family:var(--ui-mono); font-size:9px; letter-spacing:-.01em; color:var(--ui-faint); text-transform:none; }
   .bfoot { padding:0 16px 14px; }
   .bnum { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
   .bnum .ui-big { font-size:clamp(44px, 4.4vw, 64px); display:inline-block; transform-origin:0 80%; min-width:2ch; font-variant-numeric:tabular-nums; }
@@ -151,9 +151,9 @@
   #legend i { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px; }
   #legend b { color:var(--ui-fg); font-weight:600; display:inline-block; min-width:2ch; text-align:right; }
   .tright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
-  .capred { font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-live); white-space:nowrap; }
+  .capred { font-family:var(--ui-mono); font-size:10px; letter-spacing:-.01em; text-transform:none; color:var(--ui-live); white-space:nowrap; }
   .tcv { position:relative; flex:1; min-height:150px; margin:0 6px; }
-  .yax { position:absolute; top:0; left:8px; z-index:2; pointer-events:none; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:.08em; color:var(--ui-dim); }
+  .yax { position:absolute; top:0; left:8px; z-index:2; pointer-events:none; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:-.01em; color:var(--ui-dim); }
   .tcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
   #tip { position:absolute; top:6px; pointer-events:none; background:rgba(14,14,17,.94); border:1px solid var(--ui-line2); border-radius:8px;
     padding:7px 9px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-fg2); white-space:nowrap; display:none; z-index:3; }
@@ -187,7 +187,7 @@
   #f-chat { flex:1; min-height:0; overflow-y:auto; padding:0 14px 6px; scrollbar-width:thin; scrollbar-color:#333 transparent; }
   .cl { display:flex; gap:9px; padding:5px 0; font-size:12.5px; line-height:1.4; color:var(--ui-fg2); animation:ui-in .45s var(--ui-ease) both; }
   .cl .av { flex:0 0 20px; height:20px; border-radius:50%; background:var(--ui-panel2); border:1px solid var(--ui-line2); color:var(--ui-dim);
-    font-family:var(--ui-mono); font-size:9.5px; display:flex; align-items:center; justify-content:center; text-transform:uppercase; margin-top:1px; }
+    font-family:var(--ui-mono); font-size:9.5px; display:flex; align-items:center; justify-content:center; text-transform:none; margin-top:1px; }
   .cl .tx { min-width:0; overflow-wrap:anywhere; }
   .cl .nk { color:var(--ui-fg); font-weight:600; margin-right:5px; }
   .cl .nets { font-family:var(--ui-mono); font-size:10px; color:var(--ui-dim); }
@@ -204,14 +204,14 @@
   #f-ack.ok { color:var(--ui-proj); } #f-ack.err { color:var(--ui-live2); }
 
   /* controls: pills, 1px hairline, mono 11px. One primary on the page (send); grouped choices as one segmented pill */
-  .btn-primary { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; text-transform:lowercase; font-weight:600;
-    color:#000; background:#fff; border:1px solid #fff; border-radius:999px; padding:5px 14px; cursor:pointer;
+  .btn-primary { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:-.01em; text-transform:lowercase; font-weight:600;
+    color:#000; background:#fff; border:1px solid #fff; border-radius:10px; padding:5px 14px; cursor:pointer;
     transition:background .15s var(--ui-ease), border-color .15s var(--ui-ease), transform .15s var(--ui-ease); }
   .btn-primary:hover { background:#fff; border-color:#fff; color:#000; transform:translateY(-1px); }
   .btn-primary:active { transform:none; transition-duration:0s; }
-  .seg { display:inline-flex; padding:2px; gap:0; border:1px solid var(--ui-line2); border-radius:999px; }
+  .seg { display:inline-flex; padding:2px; gap:0; border:1px solid var(--ui-line2); border-radius:10px; }
   .seg button { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.06em; color:var(--ui-dim); background:transparent;
-    border:0; border-radius:999px; padding:2px 10px; cursor:pointer; transition:color .15s var(--ui-ease), background .15s var(--ui-ease); }
+    border:0; border-radius:10px; padding:2px 10px; cursor:pointer; transition:color .15s var(--ui-ease), background .15s var(--ui-ease); }
   .seg button:hover { color:var(--ui-fg); }
   .seg button[aria-pressed="true"] { background:var(--ui-fg); color:#000; }
   a:focus-visible, button:focus-visible { outline:1px solid var(--ui-fg); outline-offset:2px; }
@@ -288,7 +288,7 @@
   #intro:focus { outline:none; }
   .i-mark { position:absolute; top:26px; left:32px; z-index:2; line-height:1; }
   .i-mark b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
-  .i-mark span { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim); }
+  .i-mark span { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim); }
   .i-slide { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:84px 48px 104px;
     opacity:0; visibility:hidden; transition:opacity .4s var(--ui-ease), visibility 0s linear .4s; }
   .i-slide.on { opacity:1; visibility:visible; transition:opacity .4s var(--ui-ease), visibility 0s; }
@@ -349,7 +349,7 @@
   .i-dots button[aria-current="true"]::before { background:var(--ui-fg); transform:scale(1.25); }
   .i-dots button:focus-visible { outline-offset:0; }
   /* the header's way back in */
-  #i-replay { font:inherit; color:var(--ui-dim); background:none; border:0; padding:5px 9px; border-radius:999px; cursor:pointer; text-transform:lowercase;
+  #i-replay { font:inherit; color:var(--ui-dim); background:none; border:0; padding:5px 9px; border-radius:10px; cursor:pointer; text-transform:lowercase;
     transition:color .2s var(--ui-ease), background .2s var(--ui-ease); }
   #i-replay:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
   #i-replay.flash { color:var(--ui-fg); background:rgba(255,255,255,.14); }
@@ -397,11 +397,11 @@
   <div id="brains">
     <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's reaction to the last event">
       <div class="fill">
-        <div class="bhead"><span class="ui-label" id="r-head"><b>RESPONSE</b></span><span class="tag" id="r-kind" hidden></span></div>
+        <div class="bhead"><span class="ui-label" id="r-head"><b>Response</b></span><span class="tag" id="r-kind" hidden></span></div>
         <div class="bcv loading" id="r-cv"><img class="poster" src="/intro_brain_top.webp" alt="" aria-hidden="true" width="1200" height="1748" decoding="async"><i class="bloom" aria-hidden="true"></i><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="r-num">—</span><span class="ui-delta" id="r-delta"></span></div>
-          <div class="ui-label bcap" id="r-cap">REACTION · WAITING</div>
+          <div class="ui-label bcap" id="r-cap">reaction · waiting</div>
           <div class="bline"><div id="r-after"></div><div id="r-line">waiting for an event</div></div>
         </div>
       </div>
@@ -1349,7 +1349,7 @@ function renderLive(){
       const ttl = c ? "the last value this browser saw; the live value replaces it on the first tick" : "";
       $("r-num").title = ttl;
     }
-    put("l-cap", "ATTENTION · LIVE"); putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
+    put("l-cap", "attention · live"); putH("l-head", `<b>Live</b> · ${esc(S.clock || "--:--")}`);
     return;
   }
   if (staleOn !== false) {
@@ -1359,8 +1359,8 @@ function renderLive(){
   }
   const v = S.readS.a; tweenTo("l-num", v);
   const [w, cls] = level(v); put("l-word", w);
-  put("l-cap", S.stage && S.stage !== "AWAKE" ? `ATTENTION · ASLEEP · ${S.stage}` : "ATTENTION · LIVE");
-  putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
+  put("l-cap", S.stage && S.stage !== "AWAKE" ? `attention · asleep · ${S.stage}` : "attention · live");
+  putH("l-head", `<b>Live</b> · ${esc(S.clock || "--:--")}`);
   put("lg-r", String(Math.round(S.readS.r))); put("lg-l", String(Math.round(S.readS.l))); put("lg-n", String(Math.round(S.readS.n)));
 }
 function renderResp(){
@@ -1368,19 +1368,19 @@ function renderResp(){
   if (!mk) {                                     // before the first event: the live brain, dimmed, and the attention now in grey
     num.classList.add("dim");
     if (S.lastTickAt) tweenTo("r-num", S.readS.a);
-    putH("r-head", "<b>RESPONSE</b>"); put("r-delta", ""); put("r-cap", "REACTION · WAITING"); put("r-after", "");
+    putH("r-head", "<b>Response</b>"); put("r-delta", ""); put("r-cap", "reaction · waiting"); put("r-after", "");
     put("r-line", "waiting for an event"); $("r-kind").hidden = true;
     return;
   }
   num.classList.remove("dim");
   const asleep = mk.stage && mk.stage !== "AWAKE";
-  putH("r-head", `<b>RESPONSE</b> AT <b>${esc(mk.clock)}</b>`);
+  putH("r-head", `<b>Response</b> AT <b>${esc(mk.clock)}</b>`);
   put("r-kind", mk.kind === "da" ? "reward burst" : mk.kind === "replay" ? "sleep replay" : "chat stimulus");
   $("r-kind").className = "tag " + (mk.kind === "da" ? "red" : mk.kind === "replay" ? "vi" : ""); $("r-kind").hidden = false;
   tweenTo("r-num", mk.peak);
   const d = Math.round(mk.peak - mk.pre), del = $("r-delta");
   put("r-delta", d >= 0 ? `↑ +${d}` : `↓ ${d}`); del.className = "ui-delta " + (d >= 0 ? "up" : "down");
-  put("r-cap", asleep ? `REACTION · ATTENTION · ${mk.stage}` : "REACTION · ATTENTION");
+  put("r-cap", asleep ? `reaction · attention · ${mk.stage}` : "reaction · attention");
   put("r-after", `after: ${mk.label}`);
   putH("r-line", `what lit up: <b>${esc((mk.top && mk.top.length ? mk.top : ["…"]).join(" · "))}</b>`);
 }

@@ -87,7 +87,7 @@ Page crossfade 320 ms; panels enter with the `.ui-in` stagger; big numbers tween
 ## Hard rules (unchanged)
 A model, not a mind. The character, his room and his life are fiction. Never name the scanned person (credit on
 /about.html only). No coin promotion beyond the address line, no trade tape. Keep the password gate and every API.
-No new third-party scripts or fonts beyond the CDNs already used. No "AI" wording on any page.
+No new third-party scripts beyond the CDNs already used. Fonts: Geist and Geist Mono, self-hosted in web/fonts (SIL OFL; owner, 2 November, late: "improve the font"); nothing from a font CDN. No "AI" wording on any page.
 
 ## v3 · controls that answer (11-02, from the owner's five component references)
 Rare UI, Kobra, EasyUI, Pin UI and Aceternity UI, translated into black and white; no library, no font, nothing new under
@@ -106,3 +106,16 @@ a class or a call.
   the send buttons read "sent ✓" (white) or "not sent" (red hairline) for 1.2 s. `SUB01UI.swap(el, fn)`: a changing
   headline comes in from a 6 px blur (brain and room `#story`, once per change). `.ui-shimmer`: a light passes along a
   loader caption (the room's boot line, the live page's "loading the wiring…").
+
+## v4 · the look (2 November, late; the owner: "it still feels made with AI, the buttons are the same, improve the font")
+The references read again (Kobra, Aceternity, EasyUI): Geist or Inter type, sentence-case labels, rounded rectangles, translucent
+fills with a hairline and a top highlight, layered surfaces. The v4 block at the end of ui.css wins over v1–v3:
+- Type: Geist everywhere (`--ui-sans`), Geist Mono (`--ui-mono`) only for numbers, times and the pulse row. Labels and captions
+  (`.ui-label`, `.ui-caption`, the lock-up's small line) are 12 px medium sentence case with no tracking; the pages' own captions
+  were converted the same way (no `text-transform:uppercase` left in web/). Headlines keep the tight negative tracking.
+- Shapes: `--ui-r` 8 px (buttons, inputs, nav, chips 7 px), `--ui-r2` 12, `--ui-r3` 14 (panels, docks). No 999 px pills left in web/.
+- Buttons: `.ui-btn` 13 px medium, fill `--ui-fill` (white 6 %), hairline `--ui-hair` (10 %), top highlight `--ui-top`, 32 px tall;
+  hover fill 10 % and hairline 18 %; `.primary` a white-to-#e4e4e8 gradient with a white top line and a soft drop. `.ui-seg` a 10 px
+  box with 7 px buttons and a thumb with a 1 px drop. `.ui-input` 13 px on #0b0b0e with an inset shadow.
+- Surfaces: `.ui-panel` and `.ui-dock` a #121216→#0d0d10 gradient, an 8–10 % hairline, the top highlight.
+- The v3 behaviours (the light round a pill, the sliding thumb and nav pill, the panel light, tooltips, toast) are unchanged.

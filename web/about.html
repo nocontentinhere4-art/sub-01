@@ -11,7 +11,7 @@
   /* SUB-01 · about: slide 06 of the deck, a column of numbered slides. Tokens and chrome come from /ui.css. */
   * { box-sizing:border-box; }
   html,body { margin:0; background:var(--ui-bg); color:var(--ui-fg); }
-  body { font-family:var(--ui-mono); -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+  body { font-family:var(--ui-sans); -webkit-font-smoothing:antialiased; overflow-x:hidden; }
   a { color:inherit; }
   code { font-size:12px; color:var(--ui-fg2); background:var(--ui-panel); border:1px solid var(--ui-line); padding:0 4px; border-radius:3px;
     overflow-wrap:anywhere; }
@@ -49,8 +49,8 @@
   .body > .src { margin:0 0 10px; }
 
   /* outlined mono tags, as on the front page */
-  .tag { display:inline-block; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-dim);
-    border:1px solid var(--ui-line2); border-radius:999px; padding:1px 7px; margin:0 6px 0 0; white-space:nowrap; vertical-align:1px; }
+  .tag { display:inline-block; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim);
+    border:1px solid var(--ui-line2); border-radius:10px; padding:1px 7px; margin:0 6px 0 0; white-space:nowrap; vertical-align:1px; }
   .tag.neg, .tag.red { color:var(--ui-live2); border-color:rgba(255,45,85,.45); }
 
   /* the results: one tile per claim, figure on the left, text on the right, hairlines between */
@@ -71,7 +71,7 @@
 
   table { width:100%; border-collapse:collapse; font-size:13px; margin:0 0 12px; }
   th, td { text-align:left; padding:9px 8px 9px 0; border-bottom:1px solid var(--ui-line); vertical-align:top; color:var(--ui-fg2); }
-  th { color:var(--ui-dim); font-weight:400; font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+  th { color:var(--ui-dim); font-weight:400; font-family:var(--ui-mono); font-size:10px; letter-spacing:-.01em; text-transform:none; }
   td.ph { color:var(--ui-dim); font-style:italic; white-space:nowrap; }
 
   .box { border:1px solid var(--ui-line2); border-radius:var(--ui-r2); padding:14px 16px; background:var(--ui-panel); }
