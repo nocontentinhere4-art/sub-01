@@ -112,6 +112,8 @@
   /* his screen */
   #p-view { display:flex; flex-direction:column; }
   #stage { position:relative; flex:1 1 auto; min-height:0; background:#040406; overflow:hidden; }
+  #stage::before { content:""; position:absolute; inset:0; background:#000 url(/room_poster.webp) center/cover no-repeat; opacity:0; transition:opacity .3s var(--ui-ease); pointer-events:none; }
+  #stage.wait::before { opacity:.6; }   /* (the room poster shows until the embed says he is drawn) */
   #stage > img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; opacity:0; transition:opacity .7s var(--ui-ease); }
   #stage > img.on { opacity:1; }
   /* the 3D room (/room?embed), made once and kept: shown with opacity, so it never reloads; a shield above it takes the clicks */
@@ -430,7 +432,7 @@
           <span title="Brain activity = 50 + 40·log2(mean of the 214 regions vs their own 25 s baseline). A model readout."><i style="background:var(--ui-neural)"></i>Brain activity <b id="lg-n">—</b>%</span>
         </div>
         <div class="tright"><span class="capred">● model readouts</span>
-          <span class="seg" id="wins" role="group" aria-label="time window"><button type="button" data-w="60" aria-pressed="false">1m</button><button type="button" data-w="300" aria-pressed="true">5m</button><button type="button" data-w="900" aria-pressed="false">15m</button></span></div>
+          <span class="ui-seg" id="wins" role="group" aria-label="time window"><button type="button" data-w="60" aria-pressed="false">1m</button><button type="button" data-w="300" aria-pressed="true">5m</button><button type="button" data-w="900" aria-pressed="false">15m</button></span></div>
       </div>
       <div class="tcv"><span class="yax" aria-hidden="true">0–100 · model index</span><canvas id="tl" aria-label="timeline of the four readouts with event markers"></canvas><div id="tip"></div></div>
       <div class="tfoot"><div id="evbtns" role="group" aria-label="events"></div></div>
@@ -1271,6 +1273,7 @@ function renderView(){
   view.roomWant = mode === "away"; roomSync();
   const showAway = (mode === "away" && !view.roomReady) || (mode === "shot" && !view.front.classList.contains("on"));
   $("away").classList.toggle("hide", !showAway);
+  $("stage").classList.toggle("wait", mode === "away" && !view.roomReady);
   if (showAway) {
     put("away-h", placeText());
     const L = S.life || {};

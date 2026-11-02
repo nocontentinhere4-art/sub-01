@@ -280,7 +280,7 @@
   #poster { position:fixed; inset:0; z-index:1; display:block; width:100%; height:100%; object-fit:cover; object-position:50% 50%;
     pointer-events:none; background:#08080b; transition:opacity .6s var(--ui-ease); }
   #poster.off { opacity:0; }
-  @media (max-aspect-ratio:1/1) { #poster { object-position:38% 50%; } }   /* (portrait: the crop keeps him at the window and the bed) */
+  @media (max-aspect-ratio:1/1) { #poster { object-fit:contain; object-position:50% 42%; background:#000; } }   /* (portrait: the whole room, fitted, never a crop that cuts him) */
   #main:focus { outline:none; }                                 /* (the skip link's target: focus lands here, no ring round the whole room) */
   /* the loader: one small line over the poster, above the fiction caption (not a black screen) */
   #boot { position:fixed; inset:0; display:grid; place-items:end center; z-index:3; pointer-events:none; color:var(--fg2);
@@ -3778,6 +3778,7 @@ function showCheck(){
   showSteps = playing || now - boyAt > 90000 ? showSteps + 1 : 0;
   return showSteps >= 2;
 }
+if (SMALL) setTimeout(() => { const b = $("boot"); if (b && !b.classList.contains("err") && !b.classList.contains("nogl")) b.classList.add("off"); }, 3000);   // (a phone: the poster is the view; the pill leaves after 3 s, the scene arrives when it arrives)
 function unveil(){
   window.__roomShown = true;
   const b = $("boot"), p = $("poster");
