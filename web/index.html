@@ -4,284 +4,394 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · brain</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="description" content="A brain model on one person's real MRI wiring, drawn in 3D as it runs. Not measured from anyone.">
 <link rel="stylesheet" href="/ui.css">
+<link rel="stylesheet" href="/neurons.css">
 <style>
-  :root { --bg:#030305; --fg:#ececf2; --dim:#8a8a9c; --faint:#55556a; --line:rgba(255,255,255,.08); --or:#ff6a00;
-          --card:rgba(10,10,16,.74); --st:#ff9a3c;
-          --panel-w:clamp(340px, 22vw, 420px); --dock-h:150px; }   /* --dock-h: the dock's real height, set by a ResizeObserver */
+  /* SUB-01 · brain (deck 02): the brain full-bleed, a quiet HUD around it. Tokens, the header and the .ui-* look come
+     from /ui.css (v2). The :where() rules are zero-specificity fallbacks for the v2 classes, so ui.css always wins
+     where it defines them; the layout itself is set here, on ids. */
+  :root { --gut:20px; --hdr-h:56px; --pulse-h:28px; --rail-w:164px; --left-w:300px; --dock-h:150px;
+          --rem:#a78bfa; --ease:var(--ui-ease, cubic-bezier(.2,.7,.2,1)); }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  [hidden] { display:none !important; }
+  html, body { margin:0; height:100%; background:var(--ui-bg, #000); color:var(--ui-fg, #fff); overflow:hidden; }
+  body { font-family:var(--ui-sans); -webkit-font-smoothing:antialiased; }
   a { color:inherit; }
+  button { font:inherit; }
+  a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible { outline:1px solid var(--ui-fg); outline-offset:2px; }
+
+  /* ---- fallbacks for the ui.css v2 classes ---- */
+  :where(.ui-lockup) { display:flex; flex-direction:column; line-height:1; text-decoration:none; color:var(--ui-fg); white-space:nowrap; }
+  :where(.ui-lockup) b { font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
+  :where(.ui-lockup) small { margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim); }
+  :where(.ui-state) { display:flex; align-items:center; gap:12px; }
+  :where(.ui-clock) { color:var(--ui-fg2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  :where(.ui-caption) { font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
+  :where(.ui-seg) { display:inline-flex; padding:2px; border:1px solid var(--ui-line2); border-radius:999px; }
+  :where(.ui-seg) button { font-family:var(--ui-mono); font-size:11px; letter-spacing:.04em; color:var(--ui-dim); background:transparent; border:0;
+    border-radius:999px; padding:4px 11px; cursor:pointer; white-space:nowrap; transition:color .15s var(--ease), background .15s var(--ease); }
+  :where(.ui-seg) button:hover { color:var(--ui-fg); }
+  :where(.ui-seg) button.on { background:var(--ui-fg); color:#000; }
+  .ui-btn:where(.primary) { background:var(--ui-fg); color:#000; border-color:var(--ui-fg); font-weight:600; }
+  .ui-btn:where(.primary):hover { background:#dcdce2; border-color:#dcdce2; color:#000; }
+  :where(.ui-num) { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  :where(.ui-word) { font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); margin-left:6px; letter-spacing:.02em; }
+  :where(.ui-sheet) { display:grid; gap:1px; background:var(--ui-line); }
+
+  /* ---- the scene ---- */
   #scene { position:fixed; inset:0; }
   #vignette { position:fixed; inset:0; pointer-events:none;
-    background: radial-gradient(ellipse at 50% 48%, transparent 40%, rgba(0,0,0,.75) 100%); }
+    background:radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(0,0,0,.72) 100%); }
+  /* orientation marks: front / back / left / right / top, pinned to the brain as it turns */
+  #orient { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1; }
+  #orient span { position:absolute; left:0; top:0; display:flex; align-items:center; gap:6px; font-family:var(--ui-mono); font-size:9.5px;
+    letter-spacing:.18em; text-transform:uppercase; color:var(--ui-dim); white-space:nowrap; opacity:0; will-change:transform, opacity; }
+  #orient span i { width:5px; height:5px; border:1px solid var(--ui-dim); border-radius:50%; flex:none; }
+  body.mini #orient, body.zooming #orient, body.closeup #orient { display:none; }
 
-  #top { position:fixed; left:28px; top:24px; max-width:min(640px, 58vw); pointer-events:none; }
-  #top a, #top nav { pointer-events:auto; }
-  #brand { display:flex; align-items:center; gap:14px; }
-  #brand h1 { margin:0; font-size:20px; letter-spacing:.16em; background:var(--or); color:#0a0a0a; padding:3px 10px 2px; border-radius:2px; }
-  #brand nav { font-size:12px; color:var(--dim); display:flex; gap:2px; }
-  #brand nav a { color:inherit; text-decoration:none; padding:4px 7px; border-radius:4px; transition:color .2s, background .2s; }
-  #brand nav a:hover { color:var(--fg); background:rgba(255,255,255,.06); }
-  #brand nav a.on { color:var(--fg); }
-  #brand nav a.on::after { content:""; display:block; height:1px; margin-top:2px; background:var(--or); }
-  #state { margin-top:22px; display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--dim); flex-wrap:wrap; text-shadow:0 1px 8px #000; }
-  #chip { color:#0a0a0a; background:var(--st); padding:3px 9px 2px; letter-spacing:.14em; font-size:11px; border-radius:2px; transition:background 1.5s; }
-  /* the connection's state, as a word (#88 follow-up: no unexplained dots) */
-  #live { font-size:11px; letter-spacing:.08em; color:var(--faint); }
-  #live::after { content:"offline"; }
-  #live.on { color:#39f5a0; } #live.on::after { content:"live"; }
-  #story { margin-top:12px; font-size:28px; line-height:1.3; letter-spacing:-.01em; text-shadow:0 2px 24px #000; min-height:1.3em; }
-  #story em { font-style:normal; color:var(--st); transition:color 1.5s; }
-  #sub { margin-top:8px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; }
+  /* ---- header (markup and look from ui.css; here only where it sits) ---- */
+  #hdr { position:fixed; top:0; left:0; right:0; z-index:30; padding:12px var(--gut); gap:18px;
+    background:linear-gradient(rgba(0,0,0,.78), rgba(0,0,0,.35) 70%, rgba(0,0,0,0)); }
 
-  #honest { position:fixed; left:28px; bottom:128px; font-size:11px; color:var(--faint); max-width:520px; line-height:1.5;
-    text-shadow:0 1px 6px #000; }
-  #ticker { position:fixed; left:28px; bottom:22px; right:calc(var(--panel-w) + 56px); font-size:12px; color:var(--dim); display:flex; flex-direction:column; gap:5px;
-    text-shadow:0 1px 6px #000; }
-  #ticker div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #ticker div:first-child { color:var(--fg); }
-  #ticker b { color:var(--st); font-weight:normal; }
+  /* ---- the HUD ---- */
+  #hud { position:fixed; inset:0; z-index:5; pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  /* the state line: what he does, big; one mono line under it */
+  #st { position:absolute; left:var(--gut); top:calc(var(--hdr-h) + 22px); max-width:min(760px, calc(100vw - var(--rail-w) - 4 * var(--gut)));
+    pointer-events:none !important; }
+  #st .ui-caption { display:block; margin-bottom:12px; }
+  #story { margin:0; font-family:var(--ui-sans); font-weight:800; font-size:clamp(28px, min(3.8vw, 6.4vh), 56px); letter-spacing:-.045em;
+    line-height:.98; text-wrap:balance; text-shadow:0 2px 30px rgba(0,0,0,.9); }
+  #story em { font-style:normal; font-weight:600; color:var(--ui-fg2); }
+  #sub { margin:12px 0 0; font-family:var(--ui-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-fg2);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 10px #000; }
+  #sub .s-awake { color:var(--ui-fg); } #sub .s-nrem { color:var(--ui-blue2, #8fb3ff); } #sub .s-rem { color:var(--rem); }
+  #story, #sub { transition:opacity .2s var(--ease), transform .2s var(--ease); }
+  #st.swap #story { opacity:0; transform:translateY(-10px); }
+  #st.swap #sub { opacity:0; transform:translateY(-6px); }
 
-  /* the right column: the cards end 14 px above the dock, however tall the dock grows (layer row, close-up row, caption) */
-  #cards { position:fixed; right:24px; top:24px; width:var(--panel-w); display:flex; flex-direction:column; gap:12px;
-    max-height:calc(100vh - var(--dock-h) - 60px); overflow-y:auto; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:blur(14px) saturate(1.2);
-    -webkit-backdrop-filter:blur(14px) saturate(1.2); text-decoration:none; display:block;
-    box-shadow:0 10px 30px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05); transition:border-color .25s; }
-  a.card:hover { border-color:rgba(255,255,255,.22); }
-  .card .k { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:9px; display:flex; justify-content:space-between; }
-  .card .t { font-size:14.5px; line-height:1.4; }
-  .card img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:7px; margin-bottom:10px; display:block;
-    background:radial-gradient(ellipse at 50% 60%, #15151d, #08080b); box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
-  .card .m { font-size:11px; color:var(--dim); margin-top:6px; line-height:1.5; }
-  .card .q { font-style:italic; }
-  #music .mu { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
-  #music .mu img { width:52px; height:52px; aspect-ratio:1/1; margin:0; border-radius:6px; flex:none; }
-  #music iframe { width:100%; height:80px; border:0; border-radius:12px; display:block; background:#111; }
-  #music ul { list-style:none; margin:8px 0 0; padding:0; font-size:11px; color:var(--dim); }
-  #music li { display:flex; justify-content:space-between; gap:8px; padding:2px 0; }
-  #music li.c { color:var(--fg); }
-  /* the meters card (a viewer's wish: "extra meters in the brain section, dopamine spikes etc"): the model's simulated
-     neuromodulator levels, tiredness, sync, the busiest networks. A name and a plain hint left, the number right, a thin
-     bar under both; the tick on a bar marks the model's resting-wake level (1.0). Nothing of it in the room's mini. */
-  #meters .mt { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; row-gap:3px; align-items:center; padding:4px 0 5px; font-size:11px; }
-  #meters .mt .n { color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #meters .mt .n i { font-style:normal; color:var(--faint); margin-left:7px; }
-  #meters .mt .v { color:var(--fg); font-variant-numeric:tabular-nums; text-align:right; min-width:3.6em; }
-  #meters .mt .b { grid-column:1 / -1; position:relative; height:4px; border-radius:2px; background:rgba(255,255,255,.07); overflow:hidden; }
-  #meters .mt .b i { display:block; height:100%; width:0; border-radius:2px; background:#9aa3c4; transition:width .35s; }
-  #meters .mt .b.ref::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(255,255,255,.3); }
-  #meters .mt.da .b i { background:var(--or); } #meters .mt.sl .b i { background:#4d7cff; } #meters .mt.sy .b i { background:#39f5a0; }
-  #meters .sub { font-size:10.5px; color:var(--dim); letter-spacing:.08em; text-transform:uppercase; margin:8px 0 1px; }
-  #meters .m { margin-top:3px; }
-  @media (max-width: 900px) { #meters { min-width:min(340px, calc(100vw - 32px)); } }   /* the hints fit on a 390 px phone */
+  /* the right rail: the model's levels as big numbers */
+  #rail { position:absolute; right:var(--gut); top:calc(var(--hdr-h) + 22px); width:var(--rail-w);
+    max-height:calc(100vh - var(--hdr-h) - var(--pulse-h) - 48px); overflow-y:auto; scrollbar-width:none;
+    display:flex; flex-direction:column; text-align:left; }
+  #rail::-webkit-scrollbar { display:none; }
+  #rail .rail-k { padding-bottom:8px; color:var(--ui-faint); letter-spacing:.12em; }
+  #rail .ui-num { padding:min(9px, 1.1vh) 0 min(10px, 1.2vh); border-top:1px solid var(--ui-line); row-gap:min(4px, .5vh); }
+  #rail .ui-big { font-size:clamp(26px, min(2.3vw, 4.2vh), 36px); line-height:.95; transition:color .4s var(--ease); }
+  #rail .ui-num > .ui-caption:first-child { color:var(--ui-fg2); }
+  #rail .ui-num > .ui-caption:last-child { color:var(--ui-faint); letter-spacing:.12em; }
+  #rail .b { position:relative; display:block; height:2px; margin:3px 0 1px; background:rgba(255,255,255,.08); }
+  #rail .b i { display:block; height:100%; width:0; background:var(--ui-fg2); transition:width .35s var(--ease); }
+  #rail .b.ref::after { content:""; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:rgba(255,255,255,.5); }
+  #rail .sl .b i { background:var(--ui-blue, #3f7bff); }
+  #da { display:block; width:100%; height:28px; margin:2px 0 1px; }
+  #mt-dab { color:var(--ui-faint); font-size:9px; letter-spacing:.1em; }
 
-  #dock { position:fixed; right:24px; bottom:22px; width:var(--panel-w); display:flex; flex-direction:column; gap:10px; }
-  #layers { display:flex; flex-wrap:wrap; gap:6px; }
-  #layers button { flex:1 1 auto; background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 7px; font:inherit; font-size:11px;
-    border-radius:5px; cursor:pointer; white-space:nowrap; }
-  #layers button.on { color:var(--fg); border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.05); }
-  #layers button[data-l="neurons"].on { color:var(--or); border-color:rgba(255,106,0,.55); }
-  #layers button[data-l="neurons"].off { color:var(--faint); }
-  #n3cap { font-size:10px; line-height:1.5; color:var(--dim); max-height:min(22vh, 200px); overflow-y:auto; }
-  #n3cap b { color:var(--fg); font-weight:normal; } #n3cap .s { display:block; color:var(--faint); }
-  #n3mini { display:none; position:fixed; left:6px; right:6px; top:4px; font-size:8px; line-height:1.3; color:#8a8a9c; pointer-events:none;
-    text-shadow:0 1px 4px #000; }
-  body.mini.n3 #n3mini { display:block; }
-  /* brain_anatomy hook (G9, #99): the view row and its provenance caption */
-  #anat { display:flex; gap:6px; align-items:center; font-size:10px; color:var(--dim); flex-wrap:wrap; }
-  #anat button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:4px 8px; font:inherit; font-size:10.5px;
-    border-radius:5px; cursor:pointer; }
-  #anat button.on { color:var(--fg); border-color:rgba(255,255,255,.3); background:rgba(255,255,255,.05); }
-  #anat button[data-a].on { color:#e8a090; border-color:rgba(232,160,144,.5); }
-  #anat input[type=range] { flex:1 1 80px; min-width:80px; accent-color:#e8a090; }
-  #anat [hidden] { display:none !important; }
-  #anatcap { font-size:10px; line-height:1.5; color:var(--dim); max-height:min(18vh, 160px); overflow-y:auto; }
-  #anatcap b { color:var(--fg); font-weight:normal; }
-  body.mini #anat, body.mini #anatcap { display:none !important; }
-  #n3close { display:none; gap:6px; align-items:center; font-size:10px; color:var(--dim); flex-wrap:wrap; }
+  /* bottom-left: the busiest network, the honesty line, the way into his day */
+  #foot { position:absolute; left:var(--gut); bottom:calc(var(--pulse-h) + 18px); width:var(--left-w); transition:opacity .4s var(--ease); }
+  #busy .ui-big { font-size:clamp(34px, 3vw, 48px); }
+  #rail .ui-word { font-size:12px; }
+  #busy-w { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #mt-top { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:.1em; }
+  #honest { margin:16px 0 0; font-family:var(--ui-mono); font-size:10px; line-height:1.5; letter-spacing:.04em; color:var(--ui-dim); }
+  #day-t { margin-top:12px; }
+
+  /* bottom-centre: the dock (layer, specimen, the stimulus) */
+  #dock { position:absolute; bottom:calc(var(--pulse-h) + 16px); left:calc(var(--gut) + var(--left-w) + 24px); right:calc(var(--gut) + var(--rail-w) + 24px);
+    width:auto; max-width:920px; margin:0 auto; padding:12px 14px 10px; display:flex; flex-direction:column; gap:9px;
+    background:rgba(8,8,10,.72); border:1px solid var(--ui-line); border-radius:var(--ui-r3, 16px);
+    -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  .dk-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; min-width:0; }
+  .grp { display:flex; align-items:center; gap:9px; min-width:0; }
+  .grp > .ui-caption { flex:none; width:68px; white-space:nowrap; }
+  .ui-seg { max-width:100%; overflow-x:auto; scrollbar-width:none; }
+  .ui-seg::-webkit-scrollbar { display:none; }
+  .ui-seg .sep { width:1px; align-self:stretch; margin:3px 4px; background:var(--ui-line2); flex:none; }
+  #layers button.off { color:var(--ui-faint); }
+  #layers button.on.off { background:var(--ui-fg2); color:#000; }
+  .capline { display:flex; align-items:center; gap:10px; min-width:0; font-family:var(--ui-mono); font-size:10.5px; letter-spacing:.03em;
+    color:var(--ui-dim); line-height:1.5; }
+  .capline > span { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .linkb { flex:none; font-family:var(--ui-mono); font-size:10px; letter-spacing:.06em; color:var(--ui-dim); background:none; border:0; padding:2px 0;
+    cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--ui-line2); }
+  .linkb:hover { color:var(--ui-fg); }
+  #cutrow { display:flex; align-items:center; gap:10px; }
+  #cutrow input[type=range] { flex:1 1 120px; min-width:80px; accent-color:#fff; }
+  #anatcap, #n3cap { font-family:var(--ui-mono); font-size:10px; line-height:1.55; color:var(--ui-dim); }
+  #anatcap b, #n3cap b { color:var(--ui-fg2); font-weight:500; }
+  #anatcap { max-height:min(22vh, 180px); overflow-y:auto; padding:8px 10px; border:1px solid var(--ui-line); border-radius:var(--ui-r, 6px); }
+  #n3cap { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  #n3cap .s { display:none; color:var(--ui-faint); }
+  #n3cap.open { white-space:normal; max-height:min(24vh, 200px); overflow-y:auto; cursor:default; }
+  #n3cap.open .s { display:block; }
+  #n3close { display:none; }
   body.n3:not(.mini) #n3close { display:flex; }
-  #n3close button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:4px 8px; font:inherit; font-size:10.5px;
-    border-radius:5px; cursor:pointer; }
-  #n3close button.on { color:var(--or); border-color:rgba(255,106,0,.55); }
-  #n3scale { position:absolute; left:28px; bottom:200px; font-size:10px; color:var(--dim); pointer-events:none; text-shadow:0 1px 4px #000; }
-  #n3scale i { display:block; height:2px; margin-bottom:4px; background:rgba(236,236,242,.7); }
-  #n3labels span { position:absolute; transform:translate(-100%, -50%); font-size:9.5px; color:#8fa3a0; pointer-events:none;
+  #chat { display:flex; gap:8px; }
+  #chat .ui-input { flex:1; min-width:0; padding:9px 14px; }
+  #chat .ui-btn { padding:6px 18px; }
+  #note { font-family:var(--ui-mono); font-size:10px; letter-spacing:.06em; color:var(--ui-proj); min-height:0; opacity:0; transition:opacity .6s var(--ease); }
+  #note:empty { display:none; }
+  #note.show { opacity:1; transition:none; }
+  #note.err { color:var(--ui-live2); }
+  #n3mini { display:none; position:fixed; left:6px; right:6px; top:4px; font-size:8px; line-height:1.3; color:#8a8a9c; pointer-events:none;
+    font-family:var(--ui-mono); text-shadow:0 1px 4px #000; }
+  body.mini.n3 #n3mini { display:block; }
+  #n3scale { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(var(--dock-h) + var(--pulse-h) + 34px); font-family:var(--ui-mono);
+    font-size:10px; color:var(--ui-dim); pointer-events:none; text-shadow:0 1px 4px #000; text-align:center; }
+  #n3scale i { display:block; height:1px; margin:0 auto 5px; background:rgba(255,255,255,.75); }
+  #n3labels span { position:absolute; transform:translate(-100%, -50%); font-family:var(--ui-mono); font-size:9.5px; color:var(--ui-fg2); pointer-events:none;
     padding-right:6px; text-shadow:0 1px 4px #000; white-space:nowrap; }
-  body.zooming #honest, body.zooming #ticker { opacity:.35; }
-  @media (min-width: 901px) { body.closeup #cards { display:none; } }
-  body.closeup #dock { background:rgba(3,3,5,.74); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); padding:12px 14px;
-    margin:-12px -14px; border-radius:10px; }                   /* a close-up's neurons fill the screen: a scrim behind the panel (#88 A follow-up) */
-  #chat { display:flex; gap:6px; }
-  #chat input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
-    font:inherit; font-size:13px; border-radius:8px; transition:border-color .2s; }
-  #chat input:focus { outline:none; border-color:rgba(255,154,60,.6); }
-  #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:8px; cursor:pointer; }
-  #chat button:hover { background:#fff; }
-  #note { font-size:10px; color:var(--faint); min-height:1.2em; }
-  #note.err { color:#ff8a8a; }
+  body.zooming #foot { opacity:.35; }
+  body.closeup #rail, body.closeup #st { opacity:0; pointer-events:none; }
+  body.closeup #dock { background:rgba(0,0,0,.86); }
 
+  /* ---- his day: a drawer of tiles (what the model did today), contact-sheet seams ---- */
+  #day { position:fixed; z-index:20; left:0; top:var(--hdr-h); bottom:var(--pulse-h); width:min(420px, 100vw); display:flex; flex-direction:column;
+    background:rgba(0,0,0,.9); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border-right:1px solid var(--ui-line);
+    transform:translateX(-102%); visibility:hidden; transition:transform .45s var(--ease), visibility 0s linear .45s; }
+  #day.open { transform:none; visibility:visible; transition:transform .45s var(--ease), visibility 0s; }
+  .day-h { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; border-bottom:1px solid var(--ui-line); }
+  .day-h b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:22px; letter-spacing:-.04em; color:var(--ui-fg); margin-bottom:4px; }
+  .day-sheet { flex:1; min-height:0; overflow-y:auto; grid-template-columns:minmax(0, 1fr); align-content:start; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+  .tile { display:block; min-width:0; padding:16px; background:#000; color:inherit; text-decoration:none; transition:background .2s var(--ease); }
+  a.tile:hover { background:#08080b; }
+  .tile .k { display:flex; justify-content:space-between; gap:10px; margin-bottom:10px; font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--ui-dim); }
+  .tile .k > span:last-child { color:var(--ui-faint); text-align:right; }
+  .tile .t { font-size:15px; line-height:1.35; font-weight:600; letter-spacing:-.01em; }
+  .tile .m { margin-top:6px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-dim); overflow-wrap:anywhere; }
+  .tile .m.err, #t-note.err { color:var(--ui-live2); }
+  .tile .q { font-style:italic; font-weight:500; }
+  .tile img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; margin-bottom:10px; border-radius:var(--ui-r, 6px); background:#0a0a0c; }
+  .tile ul { list-style:none; margin:8px 0 0; padding:0; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-dim); }
+  #music .mu { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  #music .mu img { width:52px; height:52px; aspect-ratio:1/1; margin:0; flex:none; }
+  #music iframe { width:100%; height:80px; border:0; border-radius:12px; display:block; background:#111; }
+  #music li, #desk li { display:flex; justify-content:space-between; gap:8px; }
+  #music li.c, #desk li.c { color:var(--ui-fg); }
+  #desk li.c span:first-child::before { content:"▸ "; color:var(--ui-fg); }
+  #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; overflow:hidden; margin-bottom:10px;
+    border-radius:var(--ui-r, 6px); box-shadow:inset 0 0 0 1px var(--ui-line); }
+  #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1; color:#111; background:#cfcfd4; }
+  #desk .board div.d { background:#7d7d8a; }
+  #desk .board div.l { box-shadow:inset 0 0 0 100px rgba(63,123,255,.38); }
+  #desk .board div.w { color:#fff; text-shadow:0 0 2px #000, 0 0 1px #000; }
   #teach form { display:flex; flex-direction:column; gap:6px; }
   #teach .row { display:flex; gap:6px; }
-  #teach input { flex:1; min-width:0; background:rgba(12,12,18,.86); color:var(--fg); border:1px solid rgba(255,255,255,.14);
-    padding:8px 10px; font:inherit; font-size:12.5px; border-radius:7px; }
-  #teach input:focus { outline:none; border-color:rgba(255,154,60,.6); }
-  #teach input#t-nick { flex:0 0 38%; }
-  #teach button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12.5px; border-radius:7px; cursor:pointer; }
-  #teach ul { list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.5; }
-  #teach li { margin-bottom:6px; }
-  #teach li .r { display:block; color:var(--dim); font-size:11px; }
-  #teach .ok { color:#39f5a0; } #teach .no { color:#ff8a8a; }
-  #t-note.err { color:#ff8a8a; }
-  #desk [hidden], #cards [hidden] { display:none !important; }   /* .card's display:block beat [hidden] (#89) */
-  #desk .board { display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); aspect-ratio:1; border-radius:6px; overflow:hidden;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-bottom:10px; }
-  #desk .board div { display:flex; align-items:center; justify-content:center; font-size:min(5.4vw, 26px); line-height:1;
-    color:#111; background:#cdb999; }
-  #desk .board div.d { background:#8a6f4e; }
-  #desk .board div.l { box-shadow:inset 0 0 0 100px rgba(255,154,60,.38); }
-  #desk .board div.w { color:#fffaf0; text-shadow:0 0 2px #000, 0 0 1px #000; }
-  #desk ul { list-style:none; margin:8px 0 0; padding:0; font-size:12px; line-height:1.55; }
-  #desk li { display:flex; justify-content:space-between; gap:8px; color:var(--dim); }
-  #desk li.c { color:var(--fg); }
-  #desk li.c span:first-child::before { content:"▸ "; color:var(--or); }
+  #teach .ui-input { flex:1; min-width:0; }
+  #teach #t-nick { flex:0 0 40%; }
+  #teach li { margin-bottom:6px; color:var(--ui-fg2); }
+  #teach li .r { display:block; color:var(--ui-dim); }
+  #teach .ok { color:var(--ui-proj); } #teach .no { color:var(--ui-live2); }
+  #ticker { display:flex; flex-direction:column; gap:6px; margin-top:8px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
+  #ticker div:first-child { color:var(--ui-fg2); }
+  #ticker b { color:var(--ui-fg); font-weight:500; }
   #neurons { min-width:0; }
-  #neurons .nx { background:var(--card); border-color:var(--line); border-radius:10px; padding:12px 14px;
-    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
-  body.mini #top, body.mini #cards, body.mini #meters, body.mini #dock, body.mini #ticker, body.mini #honest, body.mini #vignette { display:none !important; }
+  #neurons .nx { background:transparent; border:0; padding:0; font-family:var(--ui-mono); }
+  #neurons .nx summary { font-size:10px; letter-spacing:.16em; color:var(--ui-dim); }
+  #neurons .nx[data-live="1"] summary b, #neurons .nx-row i { color:var(--ui-fg); }
 
-  @media (max-width: 900px) {
-    html,body { overflow:auto; }
-    #top { left:16px; top:14px; max-width:calc(100vw - 32px); } #story { font-size:19px; }
-    #honest { position:static; padding:0 16px; margin-top:8px; }
-    #cards { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:0 16px; margin-top:66vh; }
-    .card, #neurons { min-width:240px; }
-    #ticker { position:static; padding:12px 16px 0; }
-    #dock { position:sticky; bottom:0; width:auto; padding:10px 16px 14px; background:linear-gradient(rgba(3,3,5,0), #030305 24px); }
-    #n3cap { max-height:16vh; }
-    #layers button[data-l="sci"] { display:none; }
-    #n3scale { left:16px; bottom:12px; }
-    #scene, #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:72vh; }
-    #top { position:absolute; }
+  /* ---- the room's mini (/brain?mini): the brain only ---- */
+  body.mini #hdr, body.mini #hud, body.mini #day, body.mini #vignette, body.mini #ui-pulse { display:none !important; }
+
+  /* ---- motion: the HUD enters in a stagger ---- */
+  /* .ui-in with --i (ui.css v2): state line, rail, foot, dock enter 70 ms apart */
+
+  /* ≤ 1100: the busiest-network block sits above the dock; the dock spans the left */
+  @media (max-width:1100px) {
+    :root { --gut:16px; --rail-w:140px; }
+    #dock { left:var(--gut); right:calc(2 * var(--gut) + var(--rail-w)); max-width:none; }
+    #foot { bottom:calc(var(--pulse-h) + var(--dock-h) + 34px); }
+    #honest { display:none; }
+    #hdr .ui-counter { display:none; }
   }
-  /* ui.css header look (2026-11): black wordmark, mono pill links, current page highlighted */
-  #brand { flex-wrap:wrap; }
-  #brand h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
-  #brand nav.ui-nav { font-size:12px; color:var(--ui-dim); gap:2px; flex-wrap:wrap; }
-  #brand nav.ui-nav a { color:var(--ui-dim); padding:6px 9px; border-radius:999px; text-transform:lowercase; }
-  #brand nav.ui-nav a:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
-  #brand nav.ui-nav a.on { color:var(--ui-fg); background:rgba(255,255,255,.1); }
-  #brand nav.ui-nav a.on::after { content:none; }
-  #brand nav.ui-nav a.ext::after { content:" \2197"; display:inline; height:auto; margin:0; background:none; color:var(--ui-faint); }
-  @media (max-width:900px) { #brand h1.ui-wordmark { font-size:16px; } #brand nav.ui-nav a { padding:8px 7px; } }
+  /* ≤ 720 (phones): the page scrolls; the brain, then the levels as a row, the controls, his day */
+  @media (max-width:720px) {
+    :root { --gut:14px; }
+    html, body { overflow:auto; height:auto; }
+    #hdr { position:sticky; flex-wrap:wrap; row-gap:6px; padding:10px var(--gut); gap:8px 12px; background:rgba(0,0,0,.88);
+      -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border-bottom:1px solid var(--ui-line); }
+    #hdr .ui-nav { order:5; width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+    #hdr .ui-nav::-webkit-scrollbar { display:none; }
+    #hdr .ui-clock { display:none; }
+    body { display:flex; flex-direction:column; }
+    #hdr { order:0; } #st { order:1; } #scene { order:2; } #rail { order:3; } #dock { order:4; } #foot { order:5; } #day { order:6; }
+    #scene { position:relative; inset:auto; height:56vh; height:56svh; flex:none; }
+    #vignette { display:none; }
+    #hud { display:contents; }
+    #st { position:relative; left:auto; top:auto; max-width:none; padding:18px var(--gut) 0; }
+    #st .ui-caption { margin-bottom:8px; }
+    .ui-seg { flex-wrap:wrap; border-radius:16px; }
+    .ui-seg .sep { display:none; }
+    #story { font-size:clamp(24px, 7.4vw, 32px); }
+    #sub { font-size:10px; }
+    #rail { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:6px var(--gut) 4px; gap:0;
+      border-top:1px solid var(--ui-line); border-bottom:1px solid var(--ui-line); scroll-snap-type:x proximity; }
+    #rail .rail-k { display:none; }
+    #rail .ui-num { flex:0 0 auto; width:126px; border-top:0; border-left:1px solid var(--ui-line); padding:8px 12px; scroll-snap-align:start; }
+    #rail .ui-num:first-of-type { border-left:0; padding-left:0; }
+    #rail .ui-big { font-size:30px; }
+    #dock { position:static; margin:12px var(--gut) 0; max-width:none; padding:12px; }
+    .grp { flex-wrap:wrap; width:100%; }
+    .grp > .ui-caption { width:100%; }
+    #foot { position:static; width:auto; padding:18px var(--gut) 8px; }
+    #honest { display:block; }
+    #day-t { display:none; }
+    #day { position:static; width:auto; transform:none; visibility:visible; background:transparent; border-right:0; border-top:1px solid var(--ui-line);
+      -webkit-backdrop-filter:none; backdrop-filter:none; margin-top:14px; transition:none; }
+    #day-x { display:none; }
+    .day-sheet { overflow:visible; }
+    #n3scale { bottom:12px; }
+    body.closeup #rail, body.closeup #st { opacity:1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #story, #sub, #day, #note, #foot, #rail .ui-big, #rail .b i { transition:none !important; }
+  }
 </style>
-<link rel="stylesheet" href="/neurons.css">
 </head>
-<body>
-<script>if (new URLSearchParams(location.search).has("mini")) document.body.classList.add("mini");</script>
-<div id="scene"></div><div id="vignette"></div>
+<body data-deck="02" data-pulse="feed">
+<script>
+  // /brain?mini: the room's thumbnail. The brain only: no chrome, no pulse strip, and the deck's arrow keys stay out of the iframe
+  if (new URLSearchParams(location.search).has("mini")) {
+    document.body.classList.add("mini"); document.body.removeAttribute("data-pulse");
+    addEventListener("keydown", e => { if (/^(ArrowLeft|ArrowRight|\[|\])$/.test(e.key)) e.stopImmediatePropagation(); }, true);
+  }
+</script>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain" class="on">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">02 / 06</span>
+  </div>
+</header>
 
-<div id="top">
-  <div id="brand"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a class="on" href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
-  <div id="state"><span id="live" title="live connection"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
-  <div id="story">connecting…</div>
-  <div id="sub"></div>
+<div id="scene"><div id="orient" aria-hidden="true"></div></div><div id="vignette"></div>
+
+<div class="ui-hud" id="hud">
+  <!-- the state line: what he does, in one big line; the stage, Tokyo time and place in one mono line -->
+  <div class="ui-title ui-in" style="--i:1" id="st" aria-live="polite">
+    <span class="ui-caption">02 · the brain model, now</span>
+    <h1 id="story">connecting…</h1>
+    <p id="sub"></p>
+  </div>
+
+  <!-- the levels in the model, read from the tick (no extra request); written by metersTick() -->
+  <aside class="ui-rail right ui-in" style="--i:2" id="rail" aria-label="levels in the model">
+    <div class="ui-caption rail-k">100 = awake, at rest</div>
+    <div class="ui-num" id="mt-da"><span class="ui-caption">dopamine</span><span class="ui-big v">—</span><span class="b ref"><i></i></span>
+      <canvas id="da" width="328" height="56" aria-label="dopamine over the last two minutes"></canvas>
+      <span class="ui-caption" id="mt-dab">no burst in 10 min</span><span class="ui-caption">reward · wanting</span></div>
+    <div class="ui-num" id="mt-5ht"><span class="ui-caption">serotonin</span><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">mood · patience</span></div>
+    <div class="ui-num" id="mt-ne"><span class="ui-caption">noradrenaline</span><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">alertness · arousal</span></div>
+    <div class="ui-num" id="mt-ach"><span class="ui-caption">acetylcholine</span><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">attention · learning</span></div>
+    <div class="ui-num sl" id="mt-tired"><span class="ui-caption">tiredness</span><span class="ui-big v">—</span><span class="ui-word">%</span><span class="b"><i></i></span><span class="ui-caption">sleep pressure</span></div>
+    <div class="ui-num sl" id="mt-debt"><span class="ui-caption">sleep debt</span><span class="ui-big v">—</span><span class="ui-word">h</span><span class="b"><i></i></span><span class="ui-caption">hours owed</span></div>
+    <div class="ui-num" id="mt-sync"><span class="ui-caption">sync</span><span class="ui-big v">—</span><span class="ui-word">%</span><span class="b"><i></i></span><span class="ui-caption">regions in step</span></div>
+  </aside>
+
+  <!-- bottom-left: the busiest network vs its own baseline, the honesty line, his day -->
+  <div class="ui-in" style="--i:3" id="foot">
+    <div class="ui-num" id="busy">
+      <span class="ui-caption">busiest network · vs its own baseline</span>
+      <span class="ui-big" id="busy-v">—</span><span class="ui-word" id="busy-w"></span>
+      <span class="ui-caption" id="mt-top">reading the regions…</span>
+    </div>
+    <p id="honest">a model on one person's real wiring · not measured from anyone</p>
+    <button class="ui-btn" id="day-t" aria-controls="day" aria-expanded="false">his day · diary, screens, sleep</button>
+  </div>
+
+  <!-- bottom-centre: what is drawn, and the stimulus -->
+  <div class="ui-dock ui-in" style="--i:4" id="dock">
+    <div class="dk-row">
+      <div class="grp"><span class="ui-caption">layer</span>
+        <div class="ui-seg" id="layers" role="group" aria-label="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">colours</button><button data-l="neurons" title="his spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div></div>
+      <!-- brain_anatomy hook (G9, #99): the brain as a real specimen (web/brain_anatomy.js, loaded on the first click) -->
+      <div class="grp"><span class="ui-caption">specimen</span>
+        <div class="ui-seg" id="anat" role="group" aria-label="specimen"><button data-v="glow" class="on" title="the model's own look: additive fibres and a rim-lit cortex">glow</button><button data-v="fresh" title="a fresh specimen: pinkish-grey cortex, glistening pia">fresh</button><button data-v="fixed" title="fixed and cut open: his own T1 scan on the cut, grey and white matter">dissected</button><button data-v="bundles" title="his real fibres as muted white-matter bundles, coloured by direction">bundles</button><i class="sep"></i><button data-a="vessels" title="cerebral arteries (atlas, fitted to his brain)">vessels</button><button data-a="nerves" title="the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button></div></div>
+    </div>
+    <div class="dk-row" id="n3close"><div class="grp"><span class="ui-caption">close-up</span>
+      <div class="ui-seg" role="group" aria-label="close-up"><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button><button id="n3dive" title="one continuous zoom: the brain, a cortical column at true size, the tissue">dive ↓</button></div></div></div>
+    <div class="capline"><span id="viewcap">the model's own look · his real fibres, lit by simulated activity</span><button class="linkb" id="capmore-t" aria-expanded="false" aria-controls="anatcap">sources</button></div>
+    <div id="cutrow" hidden><span class="ui-caption">cut</span><button class="ui-btn" id="anat-axis" title="which way the cut runs">coronal</button><input id="anat-cut" type="range" min="0" max="1" step="0.005" value="0.5" title="where the cut is" aria-label="where the cut is"></div>
+    <div id="anatcap" hidden></div>
+    <div id="n3cap" hidden title="click for the details"></div>
+    <form id="chat"><input class="ui-input" id="msg" placeholder="say something to the model…" autocomplete="off" maxlength="200"
+      aria-label="a stimulus for the model" title="each message reaches the model as a stimulus · 200 characters · no links, addresses or tickers"><button class="ui-btn primary">send</button></form>
+    <div id="note" role="status"></div>
+  </div>
 </div>
 
-<div id="cards">
-  <!-- the meters: simulated levels in the model, read from the tick (no extra request); updated by metersTick() -->
-  <div class="card" id="meters">
-    <div class="k"><span>Meters</span><span>simulated levels in the model</span></div>
-    <div class="mt da" id="mt-da"><span class="n">dopamine <i>reward signal, wanting</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
-    <div class="m" id="mt-dab">no burst in the last 10 min</div>
-    <canvas id="da" width="300" height="64" style="width:100%;height:64px;margin:6px 0 2px"></canvas>
-    <div class="m" id="da-l">simulated dopamine-like reward signal in the model</div>
-    <div class="mt" id="mt-5ht"><span class="n">serotonin 5HT <i>mood, patience</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
-    <div class="mt" id="mt-ne"><span class="n">noradrenaline NE <i>alertness, arousal</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
-    <div class="mt" id="mt-ach"><span class="n">acetylcholine ACh <i>attention, learning</i></span><span class="v">—</span><span class="b ref"><i></i></span></div>
-    <div class="sub" id="mt-stage">sleep</div>
-    <div class="mt sl" id="mt-tired"><span class="n">tiredness <i>from the sleep circuit</i></span><span class="v">—</span><span class="b"><i></i></span></div>
-    <div class="mt sl" id="mt-debt"><span class="n">sleep debt <i>hours owed</i></span><span class="v">—</span><span class="b"><i></i></span></div>
-    <div class="sub">networks</div>
-    <div class="mt sy" id="mt-sync"><span class="n">sync <i>regions beating together</i></span><span class="v">—</span><span class="b"><i></i></span></div>
-    <div class="m" id="mt-top">busiest vs own baseline: …</div>
-    <div class="m">the tick on a bar: the model's resting-wake level (1.0). These are a model's variables, not feelings.</div>
+<!-- his day: what the model did today (his screens, desk, music, sleep, diary, what he sees, teach, the spiking network) -->
+<aside id="day" aria-label="his day">
+  <div class="day-h"><div><b>His day</b><span class="ui-caption">what the model did · fiction around a real wiring</span></div><button class="ui-btn" id="day-x">close</button></div>
+  <div class="ui-sheet day-sheet">
+    <section class="tile" id="c-night">
+      <div class="k"><span id="n-k">Sleep</span><span id="n-date"></span></div>
+      <div class="t" id="n-t">no night recorded yet</div>
+      <div class="m" id="n-m"></div>
+    </section>
+    <a class="tile" href="/diary" id="c-diary">
+      <div class="k"><span>Last night</span><span>diary →</span></div>
+      <img id="d-img" alt="" hidden>
+      <div class="t" id="d-title">The first diary entry is written the morning after his first night of REM sleep.</div>
+      <div class="m" id="d-meta"></div>
+    </a>
+    <a class="tile" href="/world.html" id="c-eye" hidden>
+      <div class="k"><span>What it sees</span><span id="e-t"></span></div>
+      <img id="e-img" alt="">
+      <div class="t q" id="e-thought"></div>
+    </a>
+    <section class="tile" id="music" hidden>
+      <div class="k"><span>Now playing</span><span id="mu-k"></span></div>
+      <div class="mu"><img id="mu-art" alt="" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
+      <iframe id="mu-embed" title="Spotify player" allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <div class="m" id="mu-card"></div>
+      <ul id="mu-opts"></ul>
+      <div class="m" id="mu-why"></div>
+    </section>
+    <section class="tile" id="desk" hidden>
+      <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
+      <div id="desk-board" class="board" hidden></div>
+      <img id="desk-img" alt="" hidden>
+      <div class="t" id="desk-t"></div>
+      <ul id="desk-opts"></ul>
+      <div class="m" id="desk-m"></div>
+    </section>
+    <section class="tile" id="screens">
+      <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
+      <div class="m" id="sc-b"></div>
+      <div class="m" id="sc-share"></div>
+      <div class="m" id="sc-src"></div>
+      <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
+      <div id="sc-tt"></div>
+      <ul id="sc-last"></ul>
+    </section>
+    <section class="tile" id="teach">
+      <div class="k"><span>Teach him something</span><span id="t-left"></span></div>
+      <form id="t-form">
+        <input class="ui-input" id="t-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80" aria-label="a word or a short phrase">
+        <div class="row"><input class="ui-input" id="t-nick" placeholder="nickname" autocomplete="off" maxlength="16" aria-label="nickname"><button class="ui-btn primary">teach</button></div>
+      </form>
+      <div class="m" id="t-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
+      <div class="k" style="margin:14px 0 0"><span>Taught today</span></div>
+      <ul id="t-today"><li><span class="m">nothing yet today</span></li></ul>
+      <div id="t-yday" hidden><div class="k" style="margin:14px 0 0"><span id="t-yk">Remembered from yesterday</span></div><ul id="t-ylist"></ul></div>
+      <div class="m" id="t-honest"></div>
+    </section>
+    <section class="tile" id="events">
+      <div class="k"><span>Events</span><span>stimuli, replays, reward bursts</span></div>
+      <div class="m" id="da-l">no reward burst yet</div>
+      <div id="ticker"></div>
+    </section>
+    <section class="tile"><div id="neurons"></div></section>
   </div>
-  <div class="card" id="screens">
-    <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
-    <div class="m" id="sc-b"></div>
-    <div class="m" id="sc-share"></div>
-    <div class="m" id="sc-src"></div>
-    <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
-    <div id="sc-tt"></div>
-    <ul id="sc-last"></ul>
-  </div>
-  <div class="card" id="desk" hidden>
-    <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
-    <div id="desk-board" class="board" hidden></div>
-    <img id="desk-img" alt="" hidden>
-    <div class="t" id="desk-t"></div>
-    <ul id="desk-opts"></ul>
-    <div class="m" id="desk-m"></div>
-  </div>
-  <div class="card" id="music" hidden>
-    <div class="k"><span>Now playing</span><span id="mu-k"></span></div>
-    <div class="mu"><img id="mu-art" alt="" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
-    <iframe id="mu-embed" title="Spotify player" allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-      loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
-    <div class="m" id="mu-card"></div>
-    <ul id="mu-opts"></ul>
-    <div class="m" id="mu-why"></div>
-  </div>
-  <a class="card" href="/diary" id="c-diary">
-    <div class="k"><span>Last night</span><span>diary →</span></div>
-    <img id="d-img" alt="" hidden>
-    <div class="t" id="d-title">The first diary entry is written the morning after his first night of REM sleep.</div>
-    <div class="m" id="d-meta"></div>
-  </a>
-  <a class="card" href="/world.html" id="c-eye" hidden>
-    <div class="k"><span>What it sees</span><span id="e-t"></span></div>
-    <img id="e-img" alt="">
-    <div class="t q" id="e-thought"></div>
-  </a>
-  <div class="card" id="c-night">
-    <div class="k"><span id="n-k">Sleep</span><span id="n-date"></span></div>
-    <div class="t" id="n-t">no night recorded yet</div>
-    <div class="m" id="n-m"></div>
-  </div>
-  <div class="card" id="teach">
-    <div class="k"><span>Teach him something</span><span id="t-left"></span></div>
-    <form id="t-form">
-      <input id="t-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
-      <div class="row"><input id="t-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
-    </form>
-    <div class="m" id="t-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
-    <div class="k" style="margin:12px 0 0"><span>Taught today</span></div>
-    <ul id="t-today"><li><span class="m">nothing yet today</span></li></ul>
-    <div id="t-yday" hidden><div class="k" style="margin:12px 0 0"><span id="t-yk">Remembered from yesterday</span></div><ul id="t-ylist"></ul></div>
-    <div class="m" id="t-honest"></div>
-  </div>
-  <div id="neurons"></div>
-</div>
-
-<div id="honest">Simulated activity built from one real person's public MRI: real fibres, real cortex.
-  Messages are stimuli, not conversation. Signals are drawn ~100× slower than real conduction.
-  A model of brain activity, not a mind, and not the person.</div>
-<div id="ticker"></div>
+</aside>
 <div id="n3mini"></div>
-
-<div id="dock">
-  <div id="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">science colours</button><button data-l="neurons" title="his live spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div>
-  <!-- brain_anatomy hook (G9, #99): the brain as a real specimen (web/brain_anatomy.js, loaded on the first click) -->
-  <div id="anat"><span>view:</span><button data-v="glow" class="on" title="the page's own look: additive fibres and a rim-lit cortex (the look before #99)">glow</button><button data-v="fresh" title="a fresh specimen: pinkish-grey cortex, glistening pia, red arteries">fresh brain</button><button data-v="fixed" title="fixed and cut open: his own T1 scan on the cut, grey and white matter">dissected</button><button data-v="bundles" title="his real fibres as muted white-matter bundles, coloured by direction">bundles</button><button data-a="vessels" title="cerebral arteries (atlas, fitted to his brain)">vessels</button><button data-a="nerves" title="the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button><button id="anat-axis" title="which way the cut runs" hidden>coronal</button><input id="anat-cut" type="range" min="0" max="1" step="0.005" value="0.5" title="where the cut is" hidden></div>
-  <div id="anatcap" hidden></div>
-  <div id="n3close"><span>close-up:</span><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button><button id="n3dive" title="one continuous zoom: the brain, a cortical column at true size, the tissue">dive ↓</button></div>
-  <div id="n3cap" hidden></div>
-  <form id="chat"><input id="msg" placeholder="send a stimulus…" autocomplete="off" maxlength="200"><button>send</button></form>
-  <div id="note">every message is a stimulus · max 200 characters · no links, addresses or tickers</div>
-</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -310,19 +420,25 @@ controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSp
 let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, cortexIdx = null, n3wall = -1e9, n3net = null;
 function resize(){
   const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
-  if (!MINI && w > 900) camera.setViewOffset(w, h, 70, -55, w, h); else camera.clearViewOffset();
+  // a portrait phone: widen the view so the whole brain fits across (the landscape framing, turned); desktop keeps 32°
+  camera.fov = !MINI && w < h ? Math.min(52, 2 * Math.atan(Math.tan(16 * Math.PI / 180) * 1.25 * h / w) * 180 / Math.PI) : 32;
+  if (!MINI && innerWidth > 720) camera.setViewOffset(w, h, Math.round(w * 0.012), Math.round(h * 0.035), w, h); else camera.clearViewOffset();
   camera.updateProjectionMatrix();
   if (n3d) n3d.resize(renderer.domElement.height, camera.fov);
 }
 addEventListener("resize", resize); resize();
 // the right column: the cards stop above the dock whatever its height (#88: the layer row overlapped the cards at 1920 px)
-if ("ResizeObserver" in window) new ResizeObserver(es => document.documentElement.style.setProperty("--dock-h",
-  Math.ceil(es[es.length - 1].target.getBoundingClientRect().height) + "px")).observe($("dock"));
+if ("ResizeObserver" in window && !MINI) {
+  new ResizeObserver(es => document.documentElement.style.setProperty("--dock-h",
+    Math.ceil(es[es.length - 1].target.getBoundingClientRect().height) + "px")).observe($("dock"));
+  new ResizeObserver(es => document.documentElement.style.setProperty("--hdr-h",
+    Math.ceil(es[es.length - 1].target.getBoundingClientRect().height) + "px")).observe($("hdr"));
+}
 
 // ---------- neurons: his live spiking neurons as small real cells inside the brain (#62, #88; web/neurons3d.js) ----------
 // Only real frames from a live spiking network light them; with none, the cells stand still and say they are offline.
-const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.";
-const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind.";
+const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron.";
+const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible.";
 const N3_STATIC = "static cells, no activity";
 let n3morph = null;                                  // neurons_morph.json: the forest's real cells (fetched with the toggle)
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
@@ -405,7 +521,7 @@ function forestLine(st){                            // what the forest draws, an
 // back out reverses it. The scale bar is always true: at brain scale it measures the brain (the forest's cells are
 // drawn ~6x), from the column on it measures the cells too.
 const ZOOM = { start: 110, exit: 170, colIn: [30, 80], brainOut: [6, 40], handoff: 0.9, colView: 5.5, blockUm: 1400 };
-const N3_COLUMN_HONEST = "Shapes are real data from named public datasets: the cells are NeuroMorpho.Org reconstructions of human cortical neurons and the layers are measured in H01 (human temporal cortex, Shapson-Coe et al. 2024, CC BY 4.0); here they are drawn at true size. The activity is simulated by a network of point neurons (no dendrites are simulated). A model, not a mind.";
+const N3_COLUMN_HONEST = "Shapes are real data from named public datasets: the cells are NeuroMorpho.Org reconstructions of human cortical neurons and the layers are measured in H01 (human temporal cortex, Shapson-Coe et al. 2024, CC BY 4.0); here they are drawn at true size. The activity is simulated by a network of point neurons (no dendrites are simulated).";
 let zoom = null, zoomBrain = 1, zoomBack = null;
 window.zoomBrain = 1;
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -551,26 +667,27 @@ function zoomLine(){
 }
 function neuronsText(){
   const live = performance.now() - n3wall < 10000, b = document.querySelector('#layers button[data-l="neurons"]');
-  if (b) { b.textContent = live || !n3want ? "neurons" : "neurons offline"; b.classList.toggle("off", !live); }
+  if (b) { const bt = live || !n3want ? "neurons" : "neurons offline"; if (b.textContent !== bt) b.textContent = bt; b.classList.toggle("off", n3want && !live); }
   const st = n3d ? n3d.state() : null;
   let html = "";
   if (n3want && zoom && !n3close && zoomBrain < 0.5) html = zoomLine() + (live ? "" : `<span class="s">${esc(N3_OFFLINE)}</span>`);
   else if (n3want && n3close) html = closeupLine() + (live ? "" : `<span class="s">${esc(N3_OFFLINE)}</span>`)
     + `<span class="s">${esc(N3_CAPTION)}</span><span class="s">${esc(N3_SHAPES)}</span>`;   // N3_SHAPES: NeuronRender.CAPTION
   else if (n3want && !live) html = `${esc(N3_OFFLINE)} · ${esc(N3_STATIC)}` + forestLine(st);
-  else if (n3want) html = `<b>live · ${esc(N3_NET[n3net] || "spiking network")}</b>`
+  else if (n3want) html = `<b>${esc(N3_NET[n3net] || "spiking network")} · spiking now</b>`
     + (Neurons3D.spikeLine(st) ? ` · ${esc(Neurons3D.spikeLine(st))}` : "")
     + (st && st.race ? ` · <b>a choice is racing in the striatum</b>` : "")
     + (st && st.tint === "groups" ? `<span class="s">colour: each region's network group rate (its frames carry no per-region rates)</span>` : "")
     + forestLine(st) + `<span class="s">${esc(N3_CAPTION)}</span>`;
   const cap = $("n3cap"); if (cap) { cap.hidden = !n3want; if (cap.dataset.h !== html) { cap.dataset.h = html; cap.innerHTML = html; } }
-  const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, live · each cell a sampled model neuron, enlarged · a model, not a mind" : N3_OFFLINE + " · static cells") : "";
+  const mini = $("n3mini"); if (mini && MINI) { const t = n3want ? (live ? "simulated spiking neurons, running · each cell a sampled model neuron, enlarged · a model, not a mind" : N3_OFFLINE + " · static cells") : "";
     if (mini.textContent !== t) mini.textContent = t; }
 }
 setInterval(neuronsText, 1000);
 const STAGES = {AWAKE:[1,0,0], NREM:[0,1,0], REM:[0,0,1]};
 const CHIP = {AWAKE:"#ff9a3c", NREM:"#4d7cff", REM:"#c26bff"};
 const CHIPTXT = {AWAKE:"AWAKE", NREM:"DEEP SLEEP", REM:"REM"};
+const STAGEW = {AWAKE:"awake", NREM:"deep sleep", REM:"REM sleep"}, STAGEC = {AWAKE:"s-awake", NREM:"s-nrem", REM:"s-rem"};
 const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
 let stage = null, target = [1,0,0], mix = null, burst = 0, boost = 0, sci = 0, sciT = 0;
 let fibreMat, cortexMat, nodes = [], nodeGrp = null, showRegions = false, n3dim = 0;
@@ -691,31 +808,33 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
 // ---------- story ----------
 const tickerEl = $("ticker");
 function tick(html){ if (MINI) return; tickerEl.insertAdjacentHTML("afterbegin", `<div>${html}</div>`); while (tickerEl.children.length > 4) tickerEl.lastChild.remove(); }
-let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, sync = 0, baseline = null, slow = null;
+let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, sync = 0, baseline = null, slow = null, clockTxt = "";
 function story(){
   const now = performance.now();
   if (heard && now - heard.at < 9000) return heard.asleep   // asleep, a word gets through at the sleep's gain, no more (R3: never "heard" as if awake)
-    ? `<em>“${esc(heard.text)}”</em> reaches him through the sleep at ${Math.round((heard.gain || 0) * 100)}%${(heard.gain || 0) < 0.3 ? ", barely" : ""}.`
-    : `heard <em>“${esc(heard.text)}”</em>. the signal is travelling along its real fibres.`;
+    ? `asleep; <em>“${esc(heard.text)}”</em> reaches him at ${Math.round((heard.gain || 0) * 100)}%${(heard.gain || 0) < 0.3 ? ", barely" : ""}`
+    : `heard <em>“${esc(heard.text)}”</em>`;
   if (stage === "REM") return lastReplay && now - lastReplay.at < 300000
-    ? `is replaying <em>“${esc(lastReplay.text)}”</em>, heard at ${esc(lastReplay.received)}.`
-    : `is <em>dreaming</em>. the diary is recording.`;
-  if (stage === "NREM") return `deep sleep. <em>slow waves</em> sweep front to back; almost nothing gets through.`;
-  return doing ? `is <em>${esc(doing)}</em>.` : `is <em>awake</em>.`;
+    ? `dreaming of <em>“${esc(lastReplay.text)}”</em>`
+    : `dreaming`;
+  if (stage === "NREM") return `in deep sleep`;
+  return doing ? esc(doing) : `awake`;
 }
 function subline(){
   if (!sleepInfo) return "";
-  if (stage === "AWAKE") return (baseline ? `replaying a real recorded session underneath (${esc(baseline.run)})`
-      : slow ? `background: ${esc(slow.label)}` : "simulated background activity")
-    + ` · global synchrony ${(sync * 100).toFixed(0)}%`;
-  return `stimulus gain ${Math.round(sleepInfo.gain * 100)}% · sleep debt ${sleepInfo.debt.toFixed(1)} h · woken ${sleepInfo.woken_tonight}× tonight`;
+  const now = performance.now(), st = `<span class="${STAGEC[stage] || ""}">${esc(STAGEW[stage] || stage)}</span>`;
+  let third = where;
+  if (heard && now - heard.at < 9000) third = heard.asleep ? "through the sleep" : "the signal travels his real fibres";
+  else if (stage === "REM" && lastReplay && now - lastReplay.at < 300000) third = `replaying a message from ${esc(lastReplay.received)}`;
+  else if (stage === "NREM") third = "slow waves, front to back";
+  else if (stage !== "AWAKE") third = `stimulus gain ${Math.round(sleepInfo.gain * 100)}%${sleepInfo.woken_tonight ? ` · woken ${sleepInfo.woken_tonight}×` : ""}`;
+  return [st, clockTxt, third].filter(Boolean).join(" · ");
 }
 function setStage(s){
   if (s === stage) return;
   stage = s; target = STAGES[s] || STAGES.AWAKE;
   if (!mix) mix = [...target];
   document.documentElement.style.setProperty("--st", CHIP[s] || CHIP.AWAKE);
-  $("chip").textContent = CHIPTXT[s] || s;
   if (cortexMat) cortexMat.uniforms.tint.value.set(CHIP[s] || CHIP.AWAKE);
   controls.autoRotateSpeed = s === "AWAKE" ? 0.35 : s === "REM" ? 0.22 : 0.1;
 }
@@ -862,7 +981,7 @@ const ACT_LUT = Float32Array.from({length:256}, (_, b) => ACT_LO * Math.pow(ACT_
 const unq = s => { const bin = atob(s), a = new Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = ACT_LUT[bin.charCodeAt(i)]; return a; };
 let sock = null, act = null, base = null, actFrom = null, actTo = null, actAt = 0, actDt = 1000 / RATE;
 let full = false, retry = 0;                       // the server sends {"type":"full"} when it has no room for us
-const FULL_TXT = "the room is full · coming back by itself in a minute";   // (the page retries on its own: see ws.onclose)
+const FULL_TXT = "the room is full; back by itself in a minute";   // (the page retries on its own: see ws.onclose)
 // ---------- #89: his screens (what the browser really shows) and the dopamine-like trace ----------
 const DA_N = 240, daTrace = [], daSpikes = [];
 let daLast = 0, daCount = 0;                       // daCount: samples pushed so far (spikes keep their sample number)
@@ -880,16 +999,15 @@ function daSpike(m){
 }
 function drawDA(){
   const c = $("da"); if (!c || MINI) return; const g = c.getContext("2d"), W = c.width, H = c.height;
-  g.clearRect(0, 0, W, H); g.fillStyle = "rgba(255,255,255,.04)"; g.fillRect(0, 0, W, H);
+  g.clearRect(0, 0, W, H);
   const lo = 0.6, hi = 2.2, y = v => H - 4 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo) * (H - 8);
-  g.strokeStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.moveTo(0, y(1)); g.lineTo(W, y(1)); g.stroke();
+  g.strokeStyle = "rgba(255,255,255,.22)"; g.lineWidth = 1; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(0, y(1)); g.lineTo(W, y(1)); g.stroke(); g.setLineDash([]);
   const off = DA_N - daTrace.length, x = i => (i + off) / (DA_N - 1) * W;
-  g.strokeStyle = "#ff6a00"; g.lineWidth = 1.5; g.beginPath();
-  daTrace.forEach((v, i) => i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v))); g.stroke();
-  g.fillStyle = "#ffd27a";
+  g.fillStyle = "#ff2d55";
   for (const s of daSpikes) { const i = s.at - (daCount - daTrace.length) - 1; if (i < 0) continue;
-    g.fillRect(x(i) - 1, H - 4 - Math.min(1, s.size) * (H - 8), 2, Math.min(1, s.size) * (H - 8)); }
-  g.fillStyle = "rgba(236,236,242,.6)"; g.font = "10px sans-serif"; g.fillText("DA", 4, 11);
+    const hh = Math.max(4, Math.min(1, s.size) * (H - 4)); g.fillRect(x(i) - 1, H - hh, 2, hh); }
+  g.strokeStyle = "rgba(255,255,255,.9)"; g.lineWidth = 2; g.lineJoin = "round"; g.beginPath();
+  daTrace.forEach((v, i) => i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v))); g.stroke();
 }
 // ---------- the meters card: simulated levels in the model (a viewer's wish: "extra meters, dopamine spikes etc") ----------
 // Everything here is read from the tick the page already gets (neuro, sleep, sync, the per-region activity): no request,
@@ -909,24 +1027,23 @@ function daBurstLine(){
   if (MINI) return;
   const now = Date.now(); while (daBursts.length && now - daBursts[0].at > 600000) daBursts.shift();
   const n = daBursts.length, lb = daBursts[n - 1], ago = lb ? Math.round((now - lb.at) / 60000) : 0;
-  mtPut("mt-dab", n ? `${n} burst${n === 1 ? "" : "s"} in the last 10 min · last ${lb.size.toFixed(2)}, ${ago < 1 ? "just now" : ago + " min ago"}`
-                    : "no burst in the last 10 min");
+  mtPut("mt-dab", n ? `${n} burst${n === 1 ? "" : "s"} in 10 min · last ${ago < 1 ? "now" : ago + " min ago"}` : "no burst in 10 min");
 }
 function metersTick(m){
   if (MINI) return;
   const nm = m.neuro;
-  if (nm && typeof nm.DA === "number") {                   // 0..2 on the bar, the tick at 1.0 = resting wake
-    meter("mt-da", nm.DA, 0, 2, nm.DA.toFixed(2)); meter("mt-5ht", nm["5HT"], 0, 2, (+nm["5HT"]).toFixed(2));
-    meter("mt-ne", nm.NE, 0, 2, (+nm.NE).toFixed(2)); meter("mt-ach", nm.ACh, 0, 2, (+nm.ACh).toFixed(2));
+  const now = performance.now(); if (now - (metersTick.at || 0) < 400) return; metersTick.at = now;   // 2-3 writes a second: readable digits
+  const L = v => String(Math.round(+v * 100));
+  if (nm && typeof nm.DA === "number") {                   // 0..2 on the bar, the tick at 1.0 = resting wake; shown ×100
+    meter("mt-da", nm.DA, 0, 2, L(nm.DA)); meter("mt-5ht", nm["5HT"], 0, 2, L(nm["5HT"]));
+    meter("mt-ne", nm.NE, 0, 2, L(nm.NE)); meter("mt-ach", nm.ACh, 0, 2, L(nm.ACh));
   }
   const sl = m.sleep;
   if (sl) {
-    if (typeof sl.tired === "number") meter("mt-tired", sl.tired, 0, 1, Math.round(sl.tired * 100) + "%");
-    if (typeof sl.debt === "number") meter("mt-debt", sl.debt, 0, 12, sl.debt.toFixed(1) + " h");
-    mtPut("mt-stage", `sleep · ${CHIPTXT[sl.stage] || sl.stage || "…"}${typeof sl.gain === "number" ? ` · stimulus gain ${Math.round(sl.gain * 100)}%` : ""}`
-      + (sl.woken_tonight ? ` · woken ${sl.woken_tonight}× tonight` : ""));
+    if (typeof sl.tired === "number") meter("mt-tired", sl.tired, 0, 1, String(Math.round(sl.tired * 100)));
+    if (typeof sl.debt === "number") meter("mt-debt", sl.debt, 0, 12, sl.debt.toFixed(1));
   }
-  if (typeof m.sync === "number") meter("mt-sync", m.sync, 0, 1, Math.round(m.sync * 100) + "%");
+  if (typeof m.sync === "number") meter("mt-sync", m.sync, 0, 1, String(Math.round(m.sync * 100)));
   daBurstLine();
 }
 // the 3 networks most above their own ~25 s baseline, from the activity vector and the running base the page keeps
@@ -941,7 +1058,9 @@ function topNets(a){
     s[g] = (s[g] || 0) + a[i] / Math.max(base[i], 0.02); n[g] = (n[g] || 0) + 1;
   }
   const top = Object.keys(s).map(g => [g, s[g] / n[g]]).sort((x, y) => y[1] - x[1]).slice(0, 3);
-  mtPut("mt-top", "busiest vs own baseline: " + (top.length ? top.map(([g, r]) => `${g} ×${r.toFixed(1)}`).join(" · ") : "…"));
+  if (!top.length) return;
+  mtPut("busy-v", top[0][1].toFixed(1) + "×"); mtPut("busy-w", top[0][0]);
+  mtPut("mt-top", top.length > 1 ? "then " + top.slice(1).map(([g, r]) => `${g} ${r.toFixed(1)}×`).join(" · ") : "");
 }
 // an official embed player (Spotify, TikTok, YouTube) in the screens card: replaced only when its source changes, never
 // autoplayed; one allowlist of the official players' hosts, whatever the server sends (R2)
@@ -978,10 +1097,12 @@ if (!MINI) { pollScreens(); setInterval(pollScreens, 5000); } else { const sc = 
 
 function connect(){
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=${RATE}&q=1`);
-  ws.onopen = () => $("live").classList.add("on");
+  // the pulse strip (pulse.js, feed mode) reads this page's own socket: one socket per page
+  ws.onopen = () => { if (window.SUB01Pulse) SUB01Pulse.online(true); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
-    if (m.type === "full") { full = true; if (!MINI) { $("story").textContent = FULL_TXT; $("sub").textContent = "reconnecting by itself"; } return; }
+    if (!MINI && window.SUB01Pulse) SUB01Pulse.feed(m);
+    if (m.type === "full") { full = true; if (!MINI) { capPut("story", esc(FULL_TXT)); capPut("sub", "reconnecting by itself"); } return; }
     if (m.type === "spiking") {
       if (!MINI && window.Neurons) Neurons.onMessage(m);
       if (m.live === false) n3wall = -1e9;
@@ -1016,20 +1137,18 @@ function connect(){
       tick(`${esc(m.t)} · taught <b>“${esc(m.text.slice(0, 60))}”</b>${m.nick ? ` by ${esc(m.nick)}` : ""} → ${esc(m.networks.join(", "))}`);
       fire(m.text, m.networks, m.asleep, m.gain); if (!MINI) loadTaught(); return;
     }
-    if (m.type === "chat_ack") {
-      $("note").textContent = m.ok ? "sent · watch it travel" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return;
-    }
+    if (m.type === "chat_ack") { ack(m.ok ? "sent as a stimulus · watch it travel" : `not sent: ${m.reason}`, m.ok); return; }
     if (m.type !== "tick") return;
     const sl = m.sleep;
     if (sl) {
       sleepInfo = sl; setStage(sl.stage); burst = Math.max(burst, sl.burst || 0);
-      if (!MINI) $("clock").textContent = `${sl.clock} ${sl.tz || "Tokyo"}`;
+      clockTxt = `${esc(sl.clock)} ${esc(sl.tz || "Tokyo")}`;
     }
     if (m.neuro && typeof m.neuro.DA === "number") { daLevel(m.neuro.DA); boost = Math.max(boost, Math.min(0.3, (m.neuro.DA - 1.05) * 0.6)); }   // (the fibres brighten with the reward signal itself; no trade feed on this page)
     if (m.life) {
       doing = m.life.walking ? `walking (${m.life.doing})` : m.life.doing;
       if (deskVideo && (m.life.walking || !/computer/.test(m.life.doing))) { deskVideo = null; renderDesk(); }
-      if (!MINI) $("where").textContent = stage === "AWAKE" ? `· Kichijōji` : stage === "REM" ? "· dreaming" : "· asleep at home";
+      where = stage === "AWAKE" ? "Kichijōji" : "at home";
     }
     sync = m.sync || 0; baseline = m.baseline; slow = m.slow;
     metersTick(m);
@@ -1050,7 +1169,7 @@ function connect(){
     topNets(a);
   };
   ws.onclose = () => {
-    $("live").classList.remove("on");
+    if (window.SUB01Pulse) SUB01Pulse.online(false);
     // full: about a minute, then longer (to 4 min), with jitter so viewers do not all come back at once;
     // otherwise 1.5 s doubling to 30 s
     const wait = full ? 60000 * Math.min(4, 2 ** retry) * (0.75 + 0.5 * Math.random())
@@ -1059,10 +1178,15 @@ function connect(){
     setTimeout(connect, wait);
   };
 }
+let ackT = 0;
+function ack(text, ok){
+  const n = $("note"); n.textContent = text; n.className = "show" + (ok ? "" : " err");
+  clearTimeout(ackT); ackT = setTimeout(() => { n.classList.remove("show"); ackT = setTimeout(() => { if (!n.classList.contains("show")) n.textContent = ""; }, 700); }, 6000);
+}
 $("chat").addEventListener("submit", ev => {
   ev.preventDefault(); const inp = $("msg"), text = inp.value.trim();
   if (!text) return;
-  if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting, try again in a moment"; $("note").className = "err"; return; }
+  if (!sock || sock.readyState !== 1) { ack("still connecting, try again in a moment", false); return; }
   sock.send(JSON.stringify({type:"chat", text})); inp.value = "";
 });
 document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
@@ -1085,17 +1209,29 @@ function anatLoad(){
   const ready = () => new Promise(res => { const t = () => scene.getObjectByName("cortex") && scene.getObjectByName("fibres") ? res() : setTimeout(t, 100); t(); });   // the page's meshes load first
   return anatP = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "/brain_anatomy.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); })
     .then(ready).then(() => { anat = BrainAnatomy.create({THREE, scene, renderer, camera, controls, cortex: scene.getObjectByName("cortex"), fibres: scene.getObjectByName("fibres"),
-                    base: "/anatomy/", caption: html => { const c = $("anatcap"); c.hidden = !html || anat.state().view === "glow" && !anat.state().layers.vessels && !anat.state().layers.nerves;
+                    base: "/anatomy/", caption: html => { const c = $("anatcap");
+                    c.hidden = !capMore || !html;
                     if (c.dataset.h !== html) { c.dataset.h = html; c.innerHTML = html; } }}); return anat; });
+}
+const VIEWCAP = {glow: "the model's own look · his real fibres, lit by simulated activity, drawn ~100× slower than real",
+  fresh: "a fresh specimen · his own cortex, cerebellum and brainstem from his MRI · colours approximate",
+  fixed: "fixed and cut open · the cut shows his own T1 scan: grey matter, white matter, dark ventricles",
+  bundles: "white-matter bundles · his real fibres, coloured by direction; the cortex a ghost"};
+let viewNow = "glow";
+function viewCap(){
+  const on = a => { const b = document.querySelector(`#anat button[data-a="${a}"]`); return b && b.classList.contains("on"); };
+  const t = VIEWCAP[viewNow] + (on("vessels") ? " · arteries from an atlas, fitted to him" : "") + (on("nerves") ? " · cranial nerves from an atlas" : "");
+  if ($("viewcap").textContent !== t) $("viewcap").textContent = t;
 }
 function anatView(v){
   document.querySelectorAll("#anat button[data-v]").forEach(x => x.classList.toggle("on", x.dataset.v === v));
-  $("anat-cut").hidden = $("anat-axis").hidden = v !== "fixed";
+  viewNow = v; viewCap();
+  $("cutrow").hidden = v !== "fixed";
   if (v === "glow" && !anat) return;
-  anatLoad().then(a => { a.setView(v); if (v === "fixed") a.setCut($("anat-axis").textContent, +$("anat-cut").value); }).catch(() => { $("anatcap").hidden = false; $("anatcap").textContent = "the anatomy module did not load"; });
+  anatLoad().then(a => { a.setView(v); if (v === "fixed") a.setCut($("anat-axis").textContent, +$("anat-cut").value); }).catch(() => { $("viewcap").textContent = "the anatomy module did not load"; });
 }
 document.querySelectorAll("#anat button[data-v]").forEach(b => b.onclick = () => anatView(b.dataset.v));
-document.querySelectorAll("#anat button[data-a]").forEach(b => b.onclick = () => { b.classList.toggle("on"); const on = b.classList.contains("on");
+document.querySelectorAll("#anat button[data-a]").forEach(b => b.onclick = () => { b.classList.toggle("on"); const on = b.classList.contains("on"); viewCap();
   anatLoad().then(a => a.setLayer(b.dataset.a, on)).catch(() => {}); });
 $("anat-axis").onclick = () => { const b = $("anat-axis"); b.textContent = ANAT_AXES[(ANAT_AXES.indexOf(b.textContent) + 1) % 3]; if (anat) anat.setCut(b.textContent, +$("anat-cut").value); };
 $("anat-cut").oninput = () => { if (anat) anat.setCut(null, +$("anat-cut").value); };
@@ -1103,16 +1239,57 @@ $("anat-cut").oninput = () => { if (anat) anat.setCut(null, +$("anat-cut").value
   const v0 = ["glow", "fresh", "fixed", "bundles"].includes(q) ? q : (MINI ? "glow" : "fresh");
   if (v0 !== "glow") anatView(v0);
   for (const a of (qs.get("layers") || "").split(",")) { const b = document.querySelector(`#anat button[data-a="${a}"]`); if (b) b.click(); } }
+// "sources": the module's own provenance line (what is his MRI, what is an atlas, licences), opened on request
+let capMore = false;
+$("capmore-t").onclick = () => { capMore = !capMore; $("capmore-t").setAttribute("aria-expanded", capMore);
+  $("capmore-t").textContent = capMore ? "hide sources" : "sources";
+  const c = $("anatcap"); if (!capMore) { c.hidden = true; return; }
+  if (!c.dataset.h) c.innerHTML = "his real fibres and cortex come from one person's public MRI (diffusion and T1); the specimen views add atlas parts, each named with its source and licence when shown; credits on /about";
+  c.hidden = false; };
+$("n3cap").onclick = () => $("n3cap").classList.toggle("open");
 // ---------- end of the brain_anatomy hook ----------
+{ const day = $("day"), t = $("day-t"), phone = matchMedia("(max-width:720px)");
+  const set = open => { day.classList.toggle("open", open); t.setAttribute("aria-expanded", open); t.textContent = open ? "close his day" : "his day · diary, screens, sleep";
+    day.inert = !open && !phone.matches; };
+  t.onclick = () => set(!day.classList.contains("open")); $("day-x").onclick = () => { set(false); t.focus(); };
+  addEventListener("keydown", e => { if (e.key === "Escape" && day.classList.contains("open")) { set(false); t.focus(); } });
+  phone.addEventListener("change", () => set(day.classList.contains("open"))); set(false); }
 if ("IntersectionObserver" in window)            // draw only while the brain is on screen (the room's PiP, a phone's scroll)
   new IntersectionObserver(es => { onScreen = es[es.length - 1].isIntersecting; }).observe(host);
 if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000); loadChess(); loadMusic();
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
 // the caption twice a second, written only when it changed (R4: a rewrite every 500 ms re-laid the header for nothing)
-const capShown = {story: null, sub: null};
-function capPut(id, html){ if (capShown[id] === html) return; capShown[id] = html; $(id).innerHTML = html; }
+const capShown = {story: null, sub: null}, RM = matchMedia("(prefers-reduced-motion: reduce)");
+let capSwap = 0;
+function capPut(id, html){
+  if (capShown[id] === html) return;
+  const first = capShown[id] === null || capShown[id] === "" || $(id).textContent === "connecting…"; capShown[id] = html;
+  if (id !== "story" || first || RM.matches) { if (!capSwap || id !== "sub") $(id).innerHTML = html; return; }
+  const st = $("st"); st.classList.add("swap"); clearTimeout(capSwap);
+  capSwap = setTimeout(() => { $("story").innerHTML = capShown.story; $("sub").innerHTML = capShown.sub || ""; st.classList.remove("swap"); capSwap = 0; }, 200);
+}
 if (!MINI) setInterval(() => { if (full) capPut("story", esc(FULL_TXT));
   else if (stage) { capPut("story", story()); capPut("sub", subline()); } }, 500);
+
+// ---------- orientation marks: front / back / left / right / top, pinned to the brain as it turns ----------
+// (the scene's axes: +x right, +y front, +z up; the points sit just outside his cortex)
+const ORIENT = [["front", 0, 116, 6], ["back", 0, -114, 6], ["left", -80, -4, 4], ["right", 80, -4, 4], ["top", 0, -4, 80]];
+const orientEls = MINI ? [] : ORIENT.map(([name]) => { const e = document.createElement("span"); e.innerHTML = `<i></i>${name}`; $("orient").appendChild(e); return e; });
+const _ov = new THREE.Vector3(), _ow = new THREE.Vector3(), _oc = new THREE.Vector3(0, -4, 0), _od = new THREE.Vector3();
+let orientAt = 0;
+function orientMarks(now){
+  if (MINI || zoom || n3close || now - orientAt < 33) return; orientAt = now;
+  const w = host.clientWidth, h = host.clientHeight;
+  _od.copy(camera.position).sub(_oc).normalize();
+  ORIENT.forEach(([, x, y, z], i) => {
+    _ov.set(x, y, z); const facing = Math.abs(_ow.copy(_ov).sub(_oc).normalize().dot(_od));   // pointing at or away from us: it would sit on the brain
+    _ov.project(camera);
+    const vis = _ov.z < 1 && Math.abs(_ov.x) < 0.94 && Math.abs(_ov.y) < 0.9 ? Math.max(0, Math.min(1, (0.84 - facing) / 0.24)) : 0;
+    const e = orientEls[i];
+    e.style.transform = `translate(${((_ov.x + 1) / 2 * w).toFixed(1)}px, ${((1 - _ov.y) / 2 * h).toFixed(1)}px) translate(-50%, -50%)`;
+    e.style.opacity = (vis * 0.9).toFixed(2);
+  });
+}
 
 // ---------- loop ----------
 let last = performance.now(), t = 0;
@@ -1162,11 +1339,12 @@ function frame(now){
     else if (camera.position.distanceTo(controls.target) < ZOOM.start && now - n3lodAt > 800) zoomStart(false);
   } else if (zoom && !n3want) zoomEnd();
   else if (zoom && n3close) zoomFrame(now);
-  zoomOverlay();
+  zoomOverlay(); orientMarks(now);
   if (n3close) return;                                                            // the close-up overlay draws itself (NeuronRender)
   controls.update(); renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
 </script>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>
