@@ -35,8 +35,8 @@
   .h-state { display:flex; align-items:center; gap:12px; }
 
   /* hero: one bold line, rotating */
-  #hero { position:relative; height:var(--hero-h); display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; padding:0 var(--gut); overflow:hidden; isolation:isolate; }
+  #hero { position:relative; min-height:var(--hero-h); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:12px var(--gut); overflow:hidden; isolation:isolate; }   /* grows with its text: a short window never clips the line */
   /* the real fibre render (decorative), muted, centred behind and below the line; it never leaves the hero box */
   #hero-img { position:absolute; left:50%; top:50%; z-index:-1; height:200%; width:auto; max-width:none; pointer-events:none; user-select:none;
     transform:translate(-50%, -30%); transform-origin:50% 45%; opacity:.55;
@@ -55,7 +55,7 @@
   /* the grid: [LIVE brain] [screen + timeline] [feed + RESPONSE brain] */
   /* desktop: header + hero + grid = one screen (the footer scrolls in below); never crushed under 560px */
   #grid { display:grid; gap:var(--ui-gap); padding:0 var(--gut); max-width:1720px; margin:0 auto;
-    height:calc(100vh - var(--hdr) - var(--hero-h) - var(--ui-gap)); height:calc(100dvh - var(--hdr) - var(--hero-h) - var(--ui-gap)); min-height:560px;
+    height:calc(100vh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--ui-gap)); height:calc(100dvh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--ui-gap)); min-height:560px;
     grid-template-columns:var(--c1) minmax(0, 1fr) var(--c3); grid-template-rows:minmax(0, 1fr) var(--row2);
     grid-template-areas:"live view feed" "live time resp"; }
   #brains { display:contents; }
@@ -1077,6 +1077,7 @@ let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0, respWaitAt = 0, respDr
 const relDraw = {live:null};
 const hdrEl = $("hdr");                                   // the grid is one screen minus the header (which may wrap)
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", hdrEl.offsetHeight + "px")).observe(hdrEl);
+new ResizeObserver(() => document.documentElement.style.setProperty("--hero-px", $("hero").offsetHeight + "px")).observe($("hero"));   // the hero's real height, so the grid still fills the rest of the screen
 function frame(pnow){
   requestAnimationFrame(frame);
   try {
