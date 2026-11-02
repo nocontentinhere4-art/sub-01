@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/ui.css">
 <title>SUB-01 · live</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="A whole-brain simulation on one person's public MRI wiring, running continuously, with live model readouts: attention, arousal, cognitive load, neural activity. Model readouts, not measurements of anyone.">
+<meta name="description" content="A brain model, live. Simulated on one person's real MRI wiring. Model readouts, not measurements.">
 <style>
   /* SUB-01 · live: the brain-first dashboard ("decoded" redesign). Tokens and chrome come from /ui.css. */
   :root { --rp:#a78bfa; --gut:16px; --c1:280px; --c3:320px; --row2:clamp(220px, 34vh, 300px); --hdr:52px; --hero-h:clamp(110px, 15vh, 170px); }
@@ -75,8 +75,7 @@
   .bcv.loading::after { content:"loading the wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
     font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint); }
   @keyframes shim { from { background-position:100% 0; } to { background-position:-150% 0; } }
-  .bcv .orient { position:absolute; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
-  .bcv .o-f { top:4px; left:50%; transform:translateX(-50%); } .bcv .o-l { left:8px; top:50%; } .bcv .o-r { right:8px; top:50%; }
+  .bcv .orient { position:absolute; top:4px; left:50%; transform:translateX(-50%); font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
   .bfoot { padding:0 16px 14px; }
   .bnum { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
   .bnum .ui-big { font-size:clamp(44px, 4.4vw, 64px); display:inline-block; transform-origin:0 80%; }
@@ -87,8 +86,9 @@
   .bnum .ui-big.dim { color:var(--ui-dim); }
   .bcap { margin-top:8px; }
   .bline { margin-top:8px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
+  .bline > div { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .bline b { color:var(--ui-fg2); font-weight:500; }
-  #r-after { color:var(--ui-fg2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #r-after { color:var(--ui-fg2); }
   #r-after:empty { display:none; }
 
   /* his screen */
@@ -127,24 +127,19 @@
   #legend span { white-space:nowrap; font-variant-numeric:tabular-nums; }
   #legend i { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px; }
   #legend b { color:var(--ui-fg); font-weight:600; }
-  .tright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  .tright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
   .capred { font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-live); white-space:nowrap; }
-  .wins { display:flex; gap:4px; }
-  .wins .ui-btn { padding:3px 9px; font-size:10.5px; }
   .tcv { position:relative; flex:1; min-height:150px; margin:0 6px; }
   .tcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
   #tip { position:absolute; top:6px; pointer-events:none; background:rgba(14,14,17,.94); border:1px solid var(--ui-line2); border-radius:8px;
     padding:7px 9px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-fg2); white-space:nowrap; display:none; z-index:3; }
   #tip b { color:var(--ui-fg); }
-  .tfoot { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 14px 12px; flex-wrap:wrap; }
+  .tfoot { padding:6px 14px 12px; }
   #evbtns { display:flex; gap:6px; flex-wrap:wrap; min-height:24px; align-items:center; }
   #evbtns .ui-btn { padding:3px 10px; font-size:10.5px; text-transform:none; animation:pin .25s var(--ui-ease) both; }
   #evbtns .ui-btn.on { background:transparent; color:var(--ui-fg); border-color:var(--ui-fg); }
   #evbtns .k-da { color:var(--ui-live); } #evbtns .k-chat { color:var(--ui-fg); } #evbtns .k-replay { color:var(--rp); }
-  #evbtns .none { font-family:var(--ui-mono); font-size:10.5px; color:var(--ui-faint); }
   @keyframes pin { from { transform:scale(0); opacity:0; } to { transform:none; opacity:1; } }
-  .tkey { font-family:var(--ui-mono); font-size:10px; color:var(--ui-faint); letter-spacing:.06em; }
-  .tkey .r { color:var(--ui-live); } .tkey .v { color:var(--rp); } .tkey .w { color:var(--ui-fg2); }
 
   /* feed */
   #p-feed .fill { padding:0; }
@@ -153,16 +148,12 @@
   .nowbox { background:var(--ui-panel2); border:1px solid var(--ui-line); border-radius:var(--ui-r); padding:9px 11px; font-size:13px; line-height:1.4; }
   .nowbox b { font-weight:700; }
   .fmeta { margin-top:7px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim);
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .fmeta .tag { margin-right:4px; }
-  #f-steps { list-style:none; margin:7px 0 0; padding:0; font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); }
-  #f-steps li { display:flex; gap:10px; padding:2px 0; }
-  #f-steps li span { color:var(--ui-faint); }
-  #f-plan { font-size:13px; line-height:1.4; color:var(--ui-fg2); }
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fmeta .tag { margin-right:6px; }
+  #f-plan { font-size:13px; line-height:1.4; color:var(--ui-fg2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fchat { flex:1 1 0; min-height:150px; display:flex; flex-direction:column; padding:12px 0 0; }
-  @media (min-width:1101px) and (max-height:940px) { .fmeta { -webkit-line-clamp:1; } .fsec { padding:10px 14px; } }
-  @media (min-width:1101px) and (max-height:830px) { #f-steps { display:none; } }      /* the plan line already names them */
-  .fchat .ui-label { padding:0 14px 6px; display:flex; justify-content:space-between; }
+  @media (min-width:1101px) and (max-height:940px) { .fsec { padding:10px 14px; } }
+  .fchat .ui-label { padding:0 14px 6px; }
   #f-chat { flex:1; min-height:0; overflow-y:auto; padding:0 14px 6px; scrollbar-width:thin; scrollbar-color:#333 transparent; }
   .cl { display:flex; gap:9px; padding:5px 0; font-size:12.5px; line-height:1.4; color:var(--ui-fg2); animation:ui-in .45s var(--ui-ease) both; }
   .cl .av { flex:0 0 20px; height:20px; border-radius:50%; background:var(--ui-panel2); border:1px solid var(--ui-line2); color:var(--ui-dim);
@@ -177,16 +168,31 @@
   .cl.sys .av { border-color:rgba(167,139,250,.5); color:var(--rp); }
   #f-form { display:flex; gap:6px; padding:8px 14px 4px; }
   #f-form .ui-input { flex:1; min-width:0; }
-  #f-form .ui-btn { background:#fff; color:#000; border-color:#fff; font-weight:600; }
-  #f-ack { padding:2px 14px 12px; font-family:var(--ui-mono); font-size:10px; color:var(--ui-faint); line-height:1.45; }
+  #f-ack { min-height:28px; padding:4px 14px 10px; font-family:var(--ui-mono); font-size:10px; letter-spacing:.06em; line-height:1.45; color:var(--ui-dim);
+    opacity:0; transition:opacity .6s var(--ui-ease); }
+  #f-ack.show { opacity:1; transition:none; }
   #f-ack.ok { color:var(--ui-proj); } #f-ack.err { color:var(--ui-live2); }
 
+  /* controls: pills, 1px hairline, mono 11px. One primary on the page (send); grouped choices as one segmented pill */
+  .btn-primary { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; text-transform:lowercase; font-weight:600;
+    color:#000; background:#fff; border:1px solid #fff; border-radius:999px; padding:5px 14px; cursor:pointer;
+    transition:background .15s var(--ui-ease), border-color .15s var(--ui-ease); }
+  .btn-primary:hover { background:#dcdce2; border-color:#dcdce2; }
+  .seg { display:inline-flex; padding:2px; gap:0; border:1px solid var(--ui-line2); border-radius:999px; }
+  .seg button { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.06em; color:var(--ui-dim); background:transparent;
+    border:0; border-radius:999px; padding:2px 10px; cursor:pointer; transition:color .15s var(--ui-ease), background .15s var(--ui-ease); }
+  .seg button:hover { color:var(--ui-fg); }
+  .seg button[aria-pressed="true"] { background:var(--ui-fg); color:#000; }
+  a:focus-visible, button:focus-visible { outline:1px solid var(--ui-fg); outline-offset:2px; }
+  .ui-input:focus-visible { outline:none; border-color:var(--ui-fg); }
+  .seg button:focus-visible { outline-offset:0; }
+
   /* footer: the honesty line, never under a panel */
-  #foot { max-width:1720px; margin:0 auto; padding:16px var(--gut) 28px; display:flex; gap:18px 28px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
-  #foot .ui-honest { max-width:880px; margin:0; }
-  #f-slow { display:block; margin-top:4px; color:var(--ui-faint); }
-  #foot .go { font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg); text-decoration:none; border:1px solid var(--ui-line2); border-radius:999px; padding:6px 12px; white-space:nowrap; }
-  #foot .go:hover { background:rgba(255,255,255,.08); }
+  #foot { max-width:1720px; margin:0 auto; padding:16px var(--gut) 28px; display:flex; gap:12px 28px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  #foot .ui-honest { margin:0; }
+  #foot .go { font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); text-decoration:none; border:1px solid var(--ui-line2); border-radius:999px; padding:5px 12px; white-space:nowrap;
+    transition:background .15s var(--ui-ease), color .15s var(--ui-ease); }
+  #foot .go:hover { background:rgba(255,255,255,.06); color:var(--ui-fg); }
 
   /* entering */
   .ui-in.d1 { animation-delay:60ms; } .ui-in.d2 { animation-delay:120ms; } .ui-in.d3 { animation-delay:180ms; } .ui-in.d4 { animation-delay:240ms; } .ui-in.d5 { animation-delay:300ms; }
@@ -206,7 +212,6 @@
     #hdr { padding:10px var(--gut); gap:8px 12px; }
     #hdr .ui-nav { order:5; width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
-    #hdr .ui-wordmark small { display:none; }
     #h-clock { display:none; }
     #hero { height:auto; padding:22px var(--gut) 18px; }
     #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:.3; }
@@ -215,58 +220,58 @@
     #p-time { height:300px; }
     #brains { grid-template-columns:minmax(0, 1fr); }
     #p-live, #p-resp { height:400px; }
-    #p-feed { height:600px; }
+    #p-feed { height:520px; }
     #away { padding:16px; } #away-s { font-size:11px; }
     .capred { font-size:9px; }
-    #v-music { display:none; }
+    #v-music { max-width:50%; }
   }
   @media (prefers-reduced-motion: reduce) {
     .bcv.loading::before, #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl, #hero-img { animation:none !important; }
+    #f-ack { transition:none !important; }
     #hero-h, #hero-s { transition:none !important; }
   }
 </style>
 </head>
 <body>
 <header class="ui-hdr" id="hdr">
-  <a class="ui-wordmark" href="/">SUB-01<small>a brain model, decoded live</small></a>
+  <a class="ui-wordmark" href="/">SUB-01</a>
   <nav class="ui-nav" aria-label="pages"><a class="on" href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav>
   <div class="ui-spacer"></div>
   <div class="h-state">
     <span class="ui-chip live off" id="h-live"><i class="ui-dot"></i><span id="h-live-t">connecting</span></span>
     <span id="h-clock" class="mono">--:-- Tokyo</span>
     <span class="ui-chip" id="h-stage">…</span>
-    <span class="ui-counter" id="h-count">01 / 05</span>
+    <span class="ui-counter" id="h-count">01 / 03</span>
   </div>
 </header>
 
 <section id="hero" aria-live="polite">
   <img id="hero-img" src="/hero_brain.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="low" width="1400" height="954">
-  <h1 id="hero-h">A brain model, decoded live.</h1>
-  <p id="hero-s">A whole-brain simulation built on one person's public MRI wiring, running continuously. Every number on this page is a model readout, not a measurement of anyone.</p>
+  <h1 id="hero-h">A brain model, live.</h1>
+  <p id="hero-s">Simulated on one person's real MRI wiring. Model readouts, not measurements.</p>
 </section>
 
 <main id="grid">
   <div id="brains">
     <section class="ui-panel brainp ui-in d1" id="p-live" aria-label="live brain, top view">
       <div class="fill">
-        <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · brain from above</span><span class="ui-chip live"><i class="ui-dot"></i>live</span></div>
+        <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · --:--</span><span class="ui-chip live"><i class="ui-dot"></i>live</span></div>
         <div class="bcv loading" id="l-cv"><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
-          <span class="orient o-f">front</span><span class="orient o-l">L</span><span class="orient o-r">R</span></div>
+          <span class="orient">front</span></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">at his baseline</span></div>
           <div class="ui-label bcap" id="l-cap">ATTENTION · LIVE</div>
-          <div class="bline" id="l-line">Blue: at its own baseline; lighter: above it. Yellow to red: the few regions running highest. Read from the model, not measured.</div>
         </div>
       </div>
     </section>
     <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's response to the last event">
       <div class="fill">
-        <div class="bhead"><span class="ui-label" id="r-head">RESPONSE · <b>waiting</b></span><span class="tag" id="r-kind">no event yet</span></div>
+        <div class="bhead"><span class="ui-label" id="r-head"><b>RESPONSE</b></span><span class="tag" id="r-kind" hidden></span></div>
         <div class="bcv loading" id="r-cv"><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="r-num">--</span><span class="ui-delta" id="r-delta"></span></div>
           <div class="ui-label bcap" id="r-cap">ATTENTION · WAITING</div>
-          <div class="bline"><div id="r-after"></div><span id="r-line">No event yet. Send a message or wait for a reward burst; this panel freezes at the next one. Read from the model, not measured.</span></div>
+          <div class="bline"><div id="r-after"></div><div id="r-line">waiting for an event</div></div>
         </div>
       </div>
     </section>
@@ -274,13 +279,13 @@
 
   <section class="ui-panel ui-in d2" id="p-view" aria-label="his screen">
     <div id="stage">
-      <div id="away"><span class="ui-label" id="away-k">his screen · not in view</span><h2 id="away-h">…</h2><p id="away-s">connecting to the model…</p></div>
+      <div id="away"><span class="ui-label" id="away-k">off screen</span><h2 id="away-h">…</h2><p id="away-s">connecting…</p></div>
       <img id="v-a" alt=""><img id="v-b" alt="">
       <div id="v-embed"></div>
-      <div class="vchips tl"><span class="ui-chip live"><i class="ui-dot"></i>live</span><span class="ui-chip" id="v-src">his room · fiction</span></div>
+      <div class="vchips tl"><span class="ui-chip live"><i class="ui-dot"></i>live</span><span class="ui-chip" id="v-src">his room</span></div>
       <div class="vchips tr"><span class="ui-chip" id="v-watch">– watching</span></div>
     </div>
-    <div id="v-strip"><span id="v-title">…</span><span id="v-music"></span><span class="ui-chip proj" id="v-kind" hidden>model-chosen page</span></div>
+    <div id="v-strip" hidden><span id="v-title"></span><span id="v-music"></span><span class="ui-chip proj" id="v-kind" hidden>model-chosen page</span></div>
   </section>
 
   <section class="ui-panel ui-in d3" id="p-time" aria-label="model readouts over time">
@@ -292,12 +297,11 @@
           <span><i style="background:var(--ui-load)"></i>Cognitive load <b id="lg-l">--</b>%</span>
           <span><i style="background:var(--ui-neural)"></i>Neural activity <b id="lg-n">--</b>%</span>
         </div>
-        <div class="tright"><span class="capred">● model readouts — not measured from anyone</span>
-          <span class="wins" role="group" aria-label="window"><button class="ui-btn" data-w="60">1m</button><button class="ui-btn on" data-w="300">5m</button><button class="ui-btn" data-w="900">15m</button></span></div>
+        <div class="tright"><span class="capred">● model readouts · not measured from anyone</span>
+          <span class="seg" id="wins" role="group" aria-label="time window"><button type="button" data-w="60" aria-pressed="false">1m</button><button type="button" data-w="300" aria-pressed="true">5m</button><button type="button" data-w="900" aria-pressed="false">15m</button></span></div>
       </div>
       <div class="tcv"><canvas id="tl" aria-label="timeline of the four readouts with event markers"></canvas><div id="tip"></div></div>
-      <div class="tfoot"><div id="evbtns"><span class="none">events appear here · click one to see the brain at that moment</span></div>
-        <span class="tkey"><span class="r">◆</span> reward burst · <span class="w">│</span> chat stimulus · <span class="v">│</span> replay · 50 = his own baseline</span></div>
+      <div class="tfoot"><div id="evbtns" role="group" aria-label="events"></div></div>
     </div>
   </section>
 
@@ -312,22 +316,19 @@
       <div class="fsec">
         <div class="ui-label"><span><b>Up next</b></span><span class="tag teal">planned by the model</span></div>
         <div id="f-plan">…</div>
-        <ul id="f-steps"></ul>
       </div>
       <div class="fchat">
-        <div class="ui-label"><span><b>Chat</b> · every message is a stimulus</span><span id="f-n"></span></div>
+        <div class="ui-label"><b>Chat</b></div>
         <div id="f-chat" aria-live="polite"></div>
-        <form id="f-form" autocomplete="off"><input class="ui-input" id="f-msg" maxlength="200" placeholder="send a stimulus…" aria-label="message"><button class="ui-btn" type="submit">send</button></form>
-        <div id="f-ack">max 200 characters · no links, addresses or tickers · it enters the model as a stimulus pattern</div>
+        <form id="f-form" autocomplete="off"><input class="ui-input" id="f-msg" maxlength="200" placeholder="say something to the model…" aria-label="message to the model"><button class="btn-primary" type="submit">send</button></form>
+        <div id="f-ack" role="status" aria-live="polite"></div>
       </div>
     </div>
   </section>
 </main>
 
 <footer id="foot">
-  <p class="ui-honest">Simulated activity on one real person's public MRI wiring. A model, not a mind: it does not feel, think or understand.
-    The character, his room and his life are fiction. Numbers and credits: <a href="/about.html">/about.html</a>.
-    <span id="f-slow"></span></p>
+  <p class="ui-honest">A model, not a mind: it does not feel, think or understand. The character and his room are fiction. Not measured from anyone. Credits: <a href="/about.html">/about.html</a>.</p>
   <a class="go" href="/brain">open the 3D model →</a>
 </footer>
 
@@ -360,7 +361,7 @@ function putH(id, h){ if (shown[id] === h) return; shown[id] = h; const el = $(i
 // ---------------------------------------------------------------- state
 const S = {
   conn:false, full:false, stage:null, clock:"", tz:"Tokyo", gain:1, sync:0, syncS:0.1, viewers:null, life:null, screen:null,
-  music:null, slow:"", neuro:null, act:null, base:null, rel:null, nodes:null, gEma:{}, grel:{},
+  music:null, neuro:null, act:null, base:null, rel:null, nodes:null, gEma:{}, grel:{},
   read:{a:50, r:50, l:50, n:50}, readS:{a:50, r:50, l:50, n:50}, plan:null, note:null, decision:null, lastTickAt:0, firstTickAt:0,
 };
 const dirty = {tick:true, hdr:true, view:true, feed:true, resp:false, respNew:false, marks:false, tl:true};
@@ -395,7 +396,6 @@ function onTick(m){
   if (m.life && typeof m.life === "object") { S.life = m.life; S.screen = m.life.screen && typeof m.life.screen === "object" ? m.life.screen : null; }
   if (m.neuro && typeof m.neuro === "object") S.neuro = m.neuro;
   if (typeof m.sync === "number") { S.sync = m.sync; S.syncS += (m.sync - S.syncS) * 0.1; }
-  if (m.slow && m.slow.label) S.slow = m.slow.label;
   for (const ev of Array.isArray(m.events) ? m.events : []) onEvent(ev);
 
   // per-region activity vs its own ~25 s baseline
@@ -517,14 +517,10 @@ function handle(m){
     }
     case "chat": chatLine(m); addMarker("chat", `“${trunc(m.text, 60)}”`, m.t); return;
     case "chat_reply": replyLine(m); return;
-    case "chat_ack": {
-      const el = $("f-ack");
-      el.textContent = m.ok ? (m.will_reply ? "sent · propagating along the model's fibre tracts · a reply may follow (AI-written)" : "sent · propagating along the model's fibre tracts")
-                            : `not sent: ${m.reason || "try again later"}`;
-      el.className = m.ok ? "ok" : "err";
+    case "chat_ack":
+      ack(m.ok ? "sent" : `not sent: ${m.reason || "try again later"}`, m.ok);
       if (m.ok) $("f-msg").value = "";
       return;
-    }
     case "dopamine": addMarker("da", `reward burst ${isFinite(+m.size) ? (+m.size).toFixed(2) : ""}${m.why ? " · " + trunc(m.why, 60) : ""}`, S.clock); return;
     case "music":
       if (m.playing) S.music = m; else if (!S.music || S.music.id === m.id) S.music = null;
@@ -606,14 +602,20 @@ function replyLine(r){
 function sysLine(t, text, nets){
   addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${Array.isArray(nets) && nets.length ? ` → ${esc(nets.slice(0, 4).join(" · "))}` : ""}<span class="tm">${esc(t)}</span></span>`, "sys");
 }
+let ackTimer = 0;
+function ack(text, ok){                       // one short line under the input; it fades back to nothing after 6 s
+  const el = $("f-ack");
+  el.textContent = text; el.className = "show " + (ok ? "ok" : "err");
+  clearTimeout(ackTimer);
+  ackTimer = setTimeout(() => { el.classList.remove("show"); setTimeout(() => { if (!el.classList.contains("show")) el.textContent = ""; }, RM ? 0 : 700); }, 6000);
+}
 $("f-form").addEventListener("submit", ev => {
   ev.preventDefault();
-  const el = $("f-msg"), text = el.value.trim(), ack = $("f-ack");
+  const text = $("f-msg").value.trim();
   if (!text) return;
-  if (text.length > 200) { ack.textContent = "not sent: max 200 characters"; ack.className = "err"; return; }
-  if (!sock || sock.readyState !== 1) { ack.textContent = "not sent: reconnecting, try again in a moment"; ack.className = "err"; return; }
+  if (text.length > 200) { ack("not sent: max 200 characters", false); return; }
+  if (!sock || sock.readyState !== 1) { ack("not sent: reconnecting", false); return; }
   sock.send(JSON.stringify({type:"chat", text}));
-  ack.textContent = "sending…"; ack.className = "";
 });
 
 // ---------------------------------------------------------------- brain geometry (in a worker: the first paint stays fast)
@@ -804,15 +806,15 @@ loadBrain().then(g => {
   S.nodes = g.nodes;
   liveBrain.setGeometry(g); respBrain.setGeometry(g);
   $("l-cv").classList.remove("loading"); $("r-cv").classList.remove("loading");
-}).catch(e => { console.warn("live: brain.json", e); put("l-line", "The brain mesh did not load; the readouts still run."); });
+}).catch(e => { console.warn("live: brain.json", e); $("l-cv").classList.remove("loading"); $("r-cv").classList.remove("loading"); });
 
 // ---------------------------------------------------------------- timeline
 const tl = $("tl"), tlc = tl.getContext("2d"), tip = $("tip");
 let winS = 300, tlW = 0, tlH = 0, hoverX = null;
 function tlResize(){ const r = tl.getBoundingClientRect(), d = DPR(); tlW = r.width; tlH = r.height; tl.width = Math.max(1, Math.round(r.width * d)); tl.height = Math.max(1, Math.round(r.height * d)); dirty.tl = true; }
 new ResizeObserver(tlResize).observe(tl.parentElement); tlResize();
-document.querySelectorAll(".wins .ui-btn").forEach(b => b.addEventListener("click", () => {
-  winS = +b.dataset.w; document.querySelectorAll(".wins .ui-btn").forEach(x => x.classList.toggle("on", x === b)); dirty.tl = true;
+document.querySelectorAll("#wins button").forEach(b => b.addEventListener("click", () => {
+  winS = +b.dataset.w; document.querySelectorAll("#wins button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); dirty.tl = true;
 }));
 const TL = {l:8, r:62, t:24, b:20};
 const TL_FONT = "10px " + (getComputedStyle(document.documentElement).getPropertyValue("--ui-mono").trim() || "monospace");
@@ -906,7 +908,7 @@ function renderMarkerButtons(){
   const box = $("evbtns"), last = markers.slice(-6);
   if (!last.length) return;
   const glyph = {da:"◆", chat:"●", replay:"◇"};
-  box.innerHTML = last.map(mk => `<button class="ui-btn${respMk === mk ? " on" : ""}" data-id="${mk.id}" title="${esc(mk.label)}"><span class="k-${mk.kind}">${glyph[mk.kind] || "◆"}</span> ${esc(mk.clock)}</button>`).join("");
+  box.innerHTML = last.map(mk => `<button type="button" class="ui-btn${respMk === mk ? " on" : ""}" data-id="${mk.id}" title="${esc(mk.label)}" aria-label="${esc(mk.label)} at ${esc(mk.clock)}"><span class="k-${mk.kind}" aria-hidden="true">${glyph[mk.kind] || "◆"}</span> ${esc(mk.clock)}</button>`).join("");
 }
 $("evbtns").addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (!b) return; const mk = markers.find(x => x.id === +b.dataset.id); if (mk) scrub(mk); });
 
@@ -956,21 +958,21 @@ function renderView(){
   if (showAway) {
     put("away-h", placeText());
     const L = S.life || {};
-    put("away-k", sc && sc.restarting ? "his screen · restarting" : sc ? "his screen · loading" : "his screen · not in view");
+    put("away-k", sc && sc.restarting ? "restarting" : sc ? "loading" : "off screen");
     put("away-s", S.stage === "NREM" ? `the model's slow waves run; a word reaches it at ${Math.round(S.gain * 100)}%`
       : S.stage === "REM" ? "the model replays the day's words; nothing here is a dream anyone has"
-      : L.doing ? `${L.walking ? "walking · " : ""}${L.doing}` : "connecting to the model…");
+      : L.doing ? `${L.walking ? "walking · " : ""}${L.doing}` : "connecting…");
     $("away").style.setProperty("--away-c", S.stage === "REM" ? "rgba(167,139,250,.22)" : S.stage === "NREM" ? "rgba(40,70,200,.22)" : "rgba(63,123,255,.18)");
   }
-  put("v-src", mode === "embed" ? (emb.label || "official embed") : mode === "shot" ? `his ${dev} · live capture` : "his room · fiction");
-  // the strip: the card title the server gives, its host, what kind of page his model chose
-  if (sc && (sc.title || sc.host)) putH("v-title", `${esc(trunc(sc.title || sc.host, 80))}${sc.title && sc.host ? ` <i>· ${esc(trunc(sc.host, 40))}</i>` : ""}`);
-  else putH("v-title", `<i>${esc(S.life && S.life.doing ? trunc(S.life.doing, 80) : "nothing on his screen right now")}</i>`);
-  const kindEl = $("v-kind"), kind = sc && sc.kind ? String(sc.kind) : "";
+  put("v-src", mode === "away" ? "his room" : "his screen");
+  // the strip, only when there is something to name: the page title (and host) or the music
+  const hasTitle = !!(sc && (sc.title || sc.host)), mu = S.music, hasMusic = !!(mu && mu.title);
+  $("v-strip").hidden = !hasTitle && !hasMusic;
+  putH("v-title", hasTitle ? `${esc(trunc(sc.title || sc.host, 80))}${sc.title && sc.host ? ` <i>· ${esc(trunc(sc.host, 40))}</i>` : ""}` : "");
+  const kindEl = $("v-kind"), kind = hasTitle && sc.kind ? String(sc.kind) : "";
   kindEl.hidden = !kind;
   if (kind) put("v-kind", `model-chosen ${({video:"video", search:"search", shorts:"short", page:"page"})[kind] || "page"}`);
-  const mu = S.music;
-  put("v-music", mu && mu.title ? `♪ ${trunc(mu.title, 40)}${mu.artist ? " — " + trunc(mu.artist, 30) : ""}` : "");
+  put("v-music", hasMusic ? `♪ ${trunc(mu.title, 40)}${mu.artist ? " — " + trunc(mu.artist, 30) : ""}` : "");
   view.mode = mode;
 }
 
@@ -981,18 +983,13 @@ function renderFeed(){
   putH("f-now", L.doing ? `<b>${esc(L.walking ? "walking · " + L.doing : L.doing)}</b> · ${esc(where)}` : `<b>${esc(where)}</b>`);
   put("f-where", S.clock ? `${S.clock} ${S.tz}` : "");
   const note = $("f-note");
-  if (S.note && S.note.summary) { note.hidden = false; putH("f-note", `<span class="tag">notes written by an AI</span>${esc(trunc(S.note.summary, 200))}`); }
+  if (S.note && S.note.summary) { note.hidden = false; putH("f-note", `<span class="tag">AI-written</span>${esc(trunc(S.note.summary, 200))}`); }
   else note.hidden = true;
   const why = $("f-why");
-  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">the model's reason for the page</span>${esc(trunc(S.decision.reason, 200))}`); }
+  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">why · AI-written</span>${esc(trunc(S.decision.reason, 200))}`); }
   else why.hidden = true;
   const p = S.plan;
-  if (p && (p.text || p.steps)) {
-    put("f-plan", trunc(p.text || "Today's plan", 160));
-    const next = (Array.isArray(p.steps) ? p.steps : []).filter(s => s && !s.done).slice(0, 2);
-    putH("f-steps", next.length ? next.map((s, i) => `<li><span>${String(i + 1).padStart(2, "0")}</span>${esc(trunc(s.label || s.activity, 60))}</li>`).join("")
-                                : `<li><span>—</span>nothing left on today's plan</li>`);
-  } else { put("f-plan", "no plan yet today"); putH("f-steps", ""); }
+  put("f-plan", p && (p.text || p.steps) ? trunc(p.text || "Today's plan", 160) : "no plan yet today");
 }
 
 // ---------------------------------------------------------------- header, panels
@@ -1006,7 +1003,6 @@ function renderHeader(){
   put("h-clock", S.clock ? `${S.clock} ${S.tz}` : "--:-- Tokyo");
   put("h-stage", STAGE[S.stage] || "…");
   const st = $("h-stage"); st.classList.toggle("nrem", S.stage === "NREM"); st.classList.toggle("rem", S.stage === "REM");
-  put("f-slow", S.slow ? `Slow layer: ${S.slow}` : "");
 }
 const tween = {};                       // id -> {from, to, t0, cur}
 function tweenTo(id, v){ const tw = tween[id] || (tween[id] = {from:v, to:v, t0:0, cur:v}); if (Math.round(v) === Math.round(tw.to)) return; tw.from = tw.cur; tw.to = v; tw.t0 = performance.now(); }
@@ -1021,7 +1017,7 @@ function level(v){ return v < 42 ? ["below his baseline", ""] : v > 58 ? ["above
 function renderLive(){
   const v = S.readS.a; tweenTo("l-num", v);
   const [w, cls] = level(v); put("l-word", w); $("l-word").className = "bword " + cls;
-  put("l-cap", S.stage && S.stage !== "AWAKE" ? `SLEEP · ${S.stage} · attention readout` : "ATTENTION · LIVE");
+  put("l-cap", S.stage && S.stage !== "AWAKE" ? `ATTENTION · ASLEEP · ${S.stage}` : "ATTENTION · LIVE");
   putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
   put("lg-r", String(Math.round(S.readS.r))); put("lg-l", String(Math.round(S.readS.l))); put("lg-n", String(Math.round(S.readS.n)));
 }
@@ -1030,21 +1026,21 @@ function renderResp(){
   if (!mk) {                                     // before the first event: the live brain, dimmed, and the attention now in grey
     num.classList.add("dim");
     if (S.lastTickAt) tweenTo("r-num", S.readS.a);
-    putH("r-head", "RESPONSE · <b>waiting</b>"); put("r-delta", ""); put("r-cap", "ATTENTION · WAITING"); put("r-after", "");
-    put("r-line", "No event yet. Send a message or wait for a reward burst; this panel freezes at the next one. Read from the model, not measured.");
+    putH("r-head", "<b>RESPONSE</b>"); put("r-delta", ""); put("r-cap", "ATTENTION · WAITING"); put("r-after", "");
+    put("r-line", "waiting for an event"); $("r-kind").hidden = true;
     return;
   }
   num.classList.remove("dim");
   const asleep = mk.stage && mk.stage !== "AWAKE";
-  putH("r-head", `${mk.kind === "replay" ? "REPLAY AT" : "RESPONSE AT"} <b>${esc(mk.clock)}</b>`);
+  putH("r-head", `<b>RESPONSE</b> AT <b>${esc(mk.clock)}</b>`);
   put("r-kind", mk.kind === "da" ? "reward burst" : mk.kind === "replay" ? "sleep replay" : "chat stimulus");
-  $("r-kind").className = "tag " + (mk.kind === "da" ? "red" : mk.kind === "replay" ? "vi" : "");
+  $("r-kind").className = "tag " + (mk.kind === "da" ? "red" : mk.kind === "replay" ? "vi" : ""); $("r-kind").hidden = false;
   tweenTo("r-num", mk.peak);
   const d = Math.round(mk.peak - mk.pre), del = $("r-delta");
   put("r-delta", d >= 0 ? `↑ +${d}` : `↓ ${d}`); del.className = "ui-delta " + (d >= 0 ? "up" : "down");
-  put("r-cap", asleep ? `SLEEP · ${mk.stage} · ATTENTION · RESPONSE` : "ATTENTION · RESPONSE");
+  put("r-cap", asleep ? `ATTENTION · RESPONSE · ${mk.stage}` : "ATTENTION · RESPONSE");
   put("r-after", `after: ${mk.label}`);
-  putH("r-line", `Recruiting <b>${esc((mk.top && mk.top.length ? mk.top : ["…"]).join(" · "))}</b>. Read from the model at ${esc(mk.clock)}, not measured.`);
+  putH("r-line", `Recruiting <b>${esc((mk.top && mk.top.length ? mk.top : ["…"]).join(" · "))}</b>`);
 }
 function pulseResp(){
   if (RM) return;
@@ -1055,11 +1051,9 @@ function pulseResp(){
 
 // ---------------------------------------------------------------- hero
 const HERO = [
-  ["A brain model, decoded live.", "A whole-brain simulation built on one person's public MRI wiring, running continuously. Every number on this page is a model readout, not a measurement of anyone."],
-  ["214 regions. Real tractography. One coupled model.", "Regions coupled along fibre tracts from diffusion MRI, with conduction delays, stepped at 10 Hz. Simulated activity, not a recording."],
-  ["Stimuli in. Readouts out.", "Messages and the model's own browsing enter as stimulus patterns. Attention, arousal, cognitive load and neural activity are formulas over simulated activity against its own baseline (50)."],
-  ["A sleep circuit, modelled.", "At night a sleep model cycles the simulation through NREM and REM and replays the day's inputs. Nobody's sleep is recorded; the replays are model output."],
-  ["A model, not a mind.", "It does not feel, think or understand. The room and the character are fiction, a way to make a running simulation watchable. Method and data credit: /about.html."],
+  ["A brain model, live.", "Simulated on one person's real MRI wiring. Model readouts, not measurements."],
+  ["Stimuli in. Readouts out.", "Messages enter the model. Attention, arousal and load are read from it."],
+  ["A model, not a mind.", "The character and his room are fiction. Credits on /about.html."],
 ];
 let heroI = 0;
 function heroNext(){
