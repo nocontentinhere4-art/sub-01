@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · room</title><meta name="description" content="A fictional guy in a Tokyo room, driven by a brain model built on one person's public MRI wiring. Watch the room live, vote on what he does next, send him a message."><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="canonical" href="/room">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="/ui.css">
 <style>
@@ -70,6 +71,12 @@
     color:var(--fg); text-wrap:balance; min-height:1em; text-shadow:0 2px 28px rgba(0,0,0,.6); overflow-wrap:anywhere; }
   #story em { font-style:normal; color:var(--fg); }
   #story.in { animation:storyin .6s var(--ease); }
+  /* the headline column: at most 18 characters a line (at 1440 a one-line headline ran into the room's window), over a
+     soft black scrim that fades out by 40 % of the width, so it reads over whatever the camera puts behind it */
+  #story { max-width:18ch; }
+  #top::before { content:""; position:fixed; z-index:-1; left:0; top:var(--hdrh); width:40vw; height:min(380px, 52vh); pointer-events:none;
+    background:linear-gradient(90deg, rgba(0,0,0,.62) 0, rgba(0,0,0,.4) 55%, transparent 100%);
+    -webkit-mask-image:linear-gradient(180deg, #000 0, #000 55%, transparent 100%); mask-image:linear-gradient(180deg, #000 0, #000 55%, transparent 100%); }
   @keyframes storyin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
   #state { margin-top:12px; color:var(--fg2); line-height:1.6; text-shadow:0 1px 8px #000; display:flex; flex-wrap:wrap; }
   #state > span { white-space:nowrap; }
@@ -267,12 +274,25 @@
   #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); z-index:4; display:none; padding:10px 16px; text-align:center;
     font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--fg2); border:1px solid var(--line2);
     border-radius:999px; background:rgba(0,0,0,.6); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
-  #boot { position:fixed; inset:0; display:grid; place-items:center; z-index:3; pointer-events:none; background:#000; color:var(--dim);
+  /* the poster: a still of the room (room_poster.webp, a frame of /room?embed at 1600x900 with him at rest), over the
+     canvas from the first paint, so the room reads in the first second while the models load (a slow phone took 53 s);
+     it cross-fades out (600 ms) with the first frame that has him in it, and stays when WebGL is missing or fails */
+  #poster { position:fixed; inset:0; z-index:1; display:block; width:100%; height:100%; object-fit:cover; object-position:50% 50%;
+    pointer-events:none; background:#08080b; transition:opacity .6s ease; }
+  #poster.off { opacity:0; }
+  @media (max-aspect-ratio:1/1) { #poster { object-position:38% 50%; } }   /* (portrait: the crop keeps him at the window and the bed) */
+  #main:focus { outline:none; }                                 /* (the skip link's target: focus lands here, no ring round the whole room) */
+  /* the loader: one small line over the poster, above the fiction caption (not a black screen) */
+  #boot { position:fixed; inset:0; display:grid; place-items:end center; z-index:3; pointer-events:none; color:var(--fg2);
+    padding:0 var(--gut) calc(var(--dockb) + var(--dockh) + var(--fich) + 22px);
     font-family:var(--mono); font-size:11px; letter-spacing:.08em; transition:opacity .7s ease; }
+  #boot > div { max-width:min(460px, 100%); padding:10px 16px 12px; text-align:center; background:rgba(0,0,0,.66);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border:1px solid var(--line); border-radius:var(--r); }
   #boot.off { opacity:0; }
-  #boot .w { font-family:var(--sans); font-weight:800; font-size:34px; letter-spacing:-.04em; color:var(--fg); margin-bottom:12px; text-align:center; }
+  #boot .w { display:none; }                                    /* (the header carries the wordmark) */
+  #boot.nogl .bar { display:none; }
   #boot .w b { font-weight:800; }
-  #boot .bar { width:220px; height:1px; background:var(--line); margin-top:14px; overflow:hidden; }
+  #boot .bar { width:220px; max-width:100%; height:1px; background:var(--line); margin:10px auto 0; overflow:hidden; }
   #boot .bar i { display:block; height:100%; width:0; background:var(--fg); transition:width .2s; }
   #boot.err { pointer-events:auto; color:var(--ui-live2, #ff6b8a); }
   #boot button { margin-top:10px; font-family:var(--mono); font-size:11px; background:var(--fg); color:#000; border:0; padding:6px 14px; border-radius:999px; cursor:pointer; }
@@ -290,7 +310,8 @@
     #hdr .ui-clock { display:none; }
     #reticle { display:none; }
     #top { left:var(--gut); right:calc(var(--gut) + 84px); top:calc(var(--hdrh) + 14px); max-width:none; }
-    #story { font-size:clamp(20px, 6vw, 26px); line-height:1.08; }
+    #story { font-size:clamp(20px, 6vw, 26px); line-height:1.08; max-width:none; }
+    #top::before { width:100vw; height:min(240px, 34vh); background:linear-gradient(90deg, rgba(0,0,0,.55) 0, rgba(0,0,0,.3) 70%, transparent 100%); }
     #state { margin-top:8px; font-size:9.5px; letter-spacing:.12em; }
     #tools { right:var(--gut); top:calc(var(--hdrh) + 14px); }
     #cam { display:none; }
@@ -317,6 +338,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     #story.in, .pane.on, #rxfloat span { animation:none !important; }
+    #poster, #boot { transition:none; }
   }
 
   /* ===== ?embed: the room as a chromeless camera on him, inside the front page's "his screen" viewport (/room?embed in
@@ -354,8 +376,16 @@
     <span class="ui-counter" id="ui-counter">03 / 06</span>
   </div>
 </header>
-<main id="main" aria-label="his room"><div id="scene"></div></main><div id="vignette"></div><div id="reticle" aria-hidden="true"></div>
+<main id="main" tabindex="-1" aria-label="his room"><div id="scene"></div></main><img id="poster" src="/room_poster.webp" width="1600" height="900" alt="a still of his room while the live scene loads" decoding="async" fetchpriority="high" onerror="this.remove()"><div id="vignette"></div><div id="reticle" aria-hidden="true"></div>
 <div id="boot"><div><div class="w">SUB-01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
+<script>
+  // no WebGL here: the poster stays and the loader says so in one sentence (also when the renderer itself fails to start)
+  (() => { const nogl = () => { const b = document.getElementById("boot"); if (!b || b.classList.contains("nogl")) return; b.classList.add("nogl");
+      document.getElementById("boot-t").textContent = "This browser cannot draw the 3D room, so this is a still of it."; };
+    let ok = false; try { const c = document.createElement("canvas"), g = window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"));
+      ok = !!g; const l = g && g.getExtension("WEBGL_lose_context"); if (l) l.loseContext(); } catch (e) {}
+    if (!ok) nogl(); addEventListener("error", e => { if (/WebGL/i.test(String(e && e.message))) nogl(); }); })();
+</script>
 <div id="away"></div>
 <div id="top">
   <h1 id="story">connecting…</h1>
@@ -420,7 +450,7 @@
   <section class="pane" data-pane="more" role="tabpanel">
   <div class="card" id="screencard" hidden>
     <div class="k"><span id="s-k">On his screen</span><a id="s-link" href="#" target="_blank" rel="noopener noreferrer">open ↗</a></div>
-    <div class="frame"><img id="s-img" alt="what is on his screen"></div>
+    <div class="frame"><img id="s-img" width="1280" height="720" alt="what is on his screen"></div>
     <div class="t" id="s-title" style="margin-top:10px"></div>
     <div class="url" id="s-url"></div>
     <div class="s" id="s-why"></div>
@@ -430,7 +460,7 @@
   </div>
   <div class="card" id="musiccard" hidden>
     <div class="k"><span>Now playing</span><span id="mu-k"></span></div>
-    <div class="mu"><img id="mu-art" alt="" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
+    <div class="mu"><img id="mu-art" width="64" height="64" alt="" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
     <iframe id="mu-embed" title="Spotify player" allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture"
       loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
     <div class="s" id="mu-card">his brain model picked this track; press play to listen on your own device</div>
@@ -470,7 +500,7 @@
 <a id="brainpip" class="ui-panel" href="/brain" title="open the brain" aria-label="his brain, live: open the brain page"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy" title="his brain"></iframe></a>
 <span class="ui-caption">his brain · live</span>
 </div>
-<a id="dream" class="ui-panel" href="/world.html" hidden aria-label="an image rendered while he sleeps: open what it sees" title="an image rendered from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t" class="ui-caption"></span></a>
+<a id="dream" class="ui-panel" href="/world.html" hidden title="an image rendered from the brain model's state while it sleeps; a model, not a mind" aria-label="an image rendered while he sleeps: open what it sees"><img id="dream-img" width="320" height="180" alt=""><span id="dream-t" class="ui-caption"></span></a>
 <div id="rxfloat" aria-hidden="true"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -530,7 +560,10 @@ renderer.setPixelRatio(dpr);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = !LITE;
+// under 768 px (a phone; ?embed: by the screen, not its frame) no shadow maps either: the room has no lighter model yet
+// (room.glb is the earlier scan, not a decimated room_clean.glb), and the pixel ratio is already capped at 1 for everyone
+const SMALL = (EMBED ? screen.width : innerWidth) < 768;
+renderer.shadowMap.enabled = !LITE && !SMALL;
 renderer.shadowMap.type = THREE.PCFShadowMap;              // (not the soft variant: 4x the taps) redrawn only when needed, see shadows()
 renderer.setClearColor(0x08080b);
 // nothing is drawn below the floor: the room GLB carries a stray dark rod 1.8 m under it (room_static_8, metal_dark,
@@ -693,7 +726,7 @@ load(OLD_ROOM ? "room/room.glb" : "room/room_clean.glb").then(g => {
       for (const k of ["map", "normalMap", "roughnessMap"]) if (m[k]) m[k].anisotropy = Math.min(8, aniso);
     });
   }
-  $("boot").classList.add("off"); setTimeout(() => $("boot").remove(), 800); buildSurfaces(); brainPip(4000);
+  buildSurfaces(); brainPip(4000);                    // (the loader and the poster stay until he is drawn: see frame())
 }).catch(bootError);
 function mergeBoxes(list){           // axis-aligned boxes [[x0,x1],[y0,y1],[z0,z1]] -> one geometry
   const pos = [], idx = [];
@@ -3731,6 +3764,24 @@ function shadows(now, moving){
   }
 }
 let drawnAt = -1e9, booting = null;
+// first paint: a skinned body drawn before its mixer has run an action is a T-pose. He (and the phone) stay out of the
+// drawn frame until the mixer has stepped with an action playing, on two drawn frames in a row (so the mixer.update of
+// the second already ran with it), and his layer is ready (boy_mh.js: its clips in); 90 s after he loaded he is shown
+// anyway rather than leaving the page on the loader. The loader line and the poster go with that first frame.
+let boyShown = false, showSteps = 0, boyAt = 0;
+function showCheck(){
+  if (boyShown || !boy || !mixer) return false;
+  const now = performance.now(); boyAt = boyAt || now;
+  const playing = mixer.stats.actions.inUse > 0 && !!current && current.isRunning() && current.getEffectiveWeight() > 0 && bodyReady();
+  showSteps = playing || now - boyAt > 90000 ? showSteps + 1 : 0;
+  return showSteps >= 2;
+}
+function unveil(){
+  window.__roomShown = true;
+  const b = $("boot"), p = $("poster");
+  if (b && !b.classList.contains("err") && !b.classList.contains("nogl")) { b.classList.add("off"); setTimeout(() => b.remove(), 800); }
+  if (p) { p.classList.add("off"); setTimeout(() => p.remove(), 700); }
+}
 let embedOn = true, looping = true, readySent = false;          // (?embed: the front page says when its viewport shows us)
 function frame(now){
   if (!embedOn) { looping = false; return; }                      // (?embed, out of view: no loop at all until it is back)
@@ -3738,7 +3789,7 @@ function frame(now){
   // booting (he is not in the scene yet): at most 5 frames a second and the lowest resolution, so the character's decode
   // gets the main thread (full frames of the empty room starved it: he was in at 67 s against ~9 s of network, measured);
   // his first frame restores the cap and the resolution, and adapt() takes it from there. The boot bar is the loader's
-  if (!boy !== booting) { booting = !boy; if (dpr !== (booting ? DPR_MIN : DPR_MAX)) setDpr(booting ? DPR_MIN : DPR_MAX); }
+  if (!boyShown !== booting) { booting = !boyShown; if (dpr !== (booting ? DPR_MIN : DPR_MAX)) setDpr(booting ? DPR_MIN : DPR_MAX); }
   // at most 30 frames a second: a 60/120 Hz display skips every other/three ticks; a skipped tick does not read the
   // clock, so its time goes to the next drawn frame and he moves at real speed (a Mac drew 60 fps and overheated)
   if (now - drawnAt < (booting ? 200 : FRAME_MS) - 2) return;
@@ -3752,7 +3803,9 @@ function frame(now){
   // 8-16 s while he moves (live 2026-10-08 08:02: the chair empty for 3 minutes of "at the computer"; with 8 s at most
   // he still ran at about half of real time). A tab coming back catches up 8 s at most, as before (CATCH.back)
   const real = Math.min(CATCH.back ?? CATCH.max, late), n = Math.max(1, Math.ceil(real / 0.1 - 1e-9)), dt = real / n; CATCH.back = null;
+  const pre = boy && !boyShown ? boy.visible : null; if (pre !== null) boy.visible = false;   // (the glass's reflection probe renders the room too: not him before his clips run)
   windowView.update(real, hour);                      // the sky, the city, the weather follow his clock
+  if (pre !== null) boy.visible = pre;
   let moving = false; for (let i = 0; i < n; i++) moving = animate(dt) || moving;
   if (chatting && typing && monitor) chatTex();       // the reply types out between ticks
   lighting(real);
@@ -3765,9 +3818,11 @@ function frame(now){
   shadows(now, moving);
   controls.update(); keepClear(); GCAM.apply(real, follow && performance.now() - userMovedAt > 20000, camera, controls, boy, bones);
   if (EMBED) driftApply(real);
-  renderer.render(scene, camera);
+  const reveal = showCheck(); if (reveal) { boyShown = true; sun.shadow.needsUpdate = true; if (lamp.intensity > 0.01) lamp.shadow.needsUpdate = true; }   // (his first frame: the shadow maps with him in them, now)
+  const hid = boy && !boyShown ? [boy.visible, phone.visible] : null; if (hid) boy.visible = phone.visible = false;   // (not drawn before his clips run)
+  renderer.render(scene, camera); if (hid) { boy.visible = hid[0]; phone.visible = hid[1]; } if (reveal) unveil();
   if (EMBED) { driftRestore(); window.__embedFrames = (window.__embedFrames || 0) + 1;
-    if (boy && !readySent && parent !== window) { readySent = true; parent.postMessage({type:"sub01-embed-ready"}, location.origin); } }
+    if (boyShown && !readySent && parent !== window) { readySent = true; parent.postMessage({type:"sub01-embed-ready"}, location.origin); } }
   GCAM.restore(camera, controls);
 }
 requestAnimationFrame(frame);
