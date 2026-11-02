@@ -48,7 +48,7 @@
   #vignette { position:fixed; inset:0; pointer-events:none; z-index:2;
     background:radial-gradient(ellipse at 52% 48%, transparent 50%, rgba(0,0,0,.5) 100%),
                linear-gradient(180deg, rgba(0,0,0,.72) 0, rgba(0,0,0,.28) 260px, transparent 380px); }
-  /* the viewfinder: four corner marks and a millimetre rule down the left edge, like a plate under a microscope */
+  /* the viewfinder: four corner marks, like a plate under a microscope */
   #reticle { position:fixed; z-index:3; pointer-events:none; left:10px; right:10px; top:calc(var(--hdrh) + 10px); bottom:calc(var(--pulse) + 10px);
     --c:rgba(255,255,255,.42); --k:14px;
     background:
@@ -57,9 +57,6 @@
       linear-gradient(var(--c), var(--c)) 0 100% / var(--k) 1px, linear-gradient(var(--c), var(--c)) 0 100% / 1px var(--k),
       linear-gradient(var(--c), var(--c)) 100% 100% / var(--k) 1px, linear-gradient(var(--c), var(--c)) 100% 100% / 1px var(--k);
     background-repeat:no-repeat; }
-  #reticle::before { content:""; position:absolute; left:0; top:40px; bottom:40px; width:9px; opacity:.5;
-    background:repeating-linear-gradient(180deg, rgba(255,255,255,.55) 0 1px, transparent 1px 12px) 0 0 / 4px 100% no-repeat,
-               repeating-linear-gradient(180deg, rgba(255,255,255,.75) 0 1px, transparent 1px 60px) 0 0 / 9px 100% no-repeat; }
 
   /* header: the deck's, fixed over the scene */
   #hdr { position:fixed; top:0; left:0; right:0; z-index:20; background:rgba(0,0,0,.82); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
@@ -80,12 +77,14 @@
   #state > span:not(:empty) ~ span:not(:empty)::before { content:"·"; padding:0 .7em; color:var(--dim); }
   #night { margin-top:6px; font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; line-height:1.5; color:var(--ui-blue2, #8fb3ff);
     text-shadow:0 1px 8px #000; max-width:72ch; }
-  /* the fiction line: one mono caption, bottom left, always on screen */
-  #fiction { position:fixed; left:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + 14px); z-index:5; pointer-events:auto;
-    max-width:calc(100vw - 2 * var(--gut) - 200px); color:var(--fg2); line-height:1.5; text-shadow:0 1px 6px #000;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
-  #fiction a { color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line2); }
+  /* the fiction line: its own thin row directly above the dock, full width, left aligned (the dock's height is tracked in
+     --dockh, so it rides on top of an open dock); nothing else is drawn in its row: the brain square and the dream
+     frame sit above it (--fich) */
+  :root { --fich:26px; }
+  #fiction { position:fixed; left:0; right:0; bottom:calc(var(--dockb) + var(--dockh)); z-index:6; height:var(--fich); display:block;
+    padding:0 calc(var(--gut) + 18px); background:rgba(0,0,0,.88); border-top:1px solid var(--line); color:var(--fg2);
+    font-family:var(--mono); font-size:11px; line-height:var(--fich); letter-spacing:.02em; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #fiction a { color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line2); margin-left:.4em; }
   #fiction .short { display:none; }
 
   /* top right, under the header: today ▾ and the camera */
@@ -244,7 +243,7 @@
   #m-cap { margin-top:8px; }
 
   /* the brain: a square panel bottom right, above the dock, one caption under it */
-  #corner { position:fixed; right:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + 14px); z-index:5; display:flex; flex-direction:column;
+  #corner { position:fixed; right:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + var(--fich) + 14px); z-index:5; display:flex; flex-direction:column;
     align-items:flex-end; gap:7px; }
   #brainpip { position:relative; display:block; width:120px; height:120px; background:#000; transition:border-color .25s var(--ease); }
   #brainpip:hover { border-color:var(--line2); }
@@ -253,8 +252,8 @@
   #brainpip.still::after { content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,.55) 100%); }
   #corner .ui-caption { color:var(--fg2); text-shadow:0 1px 6px #000; }
 
-  /* the dream frame while he sleeps (R3): above the fiction caption, bottom left; a link to /world */
-  #dream { position:fixed; left:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + 44px); width:min(220px, 26vw); z-index:5; display:block;
+  /* the dream frame while he sleeps (R3): above the fiction row, bottom left; a link to /world */
+  #dream { position:fixed; left:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + var(--fich) + 14px); width:min(220px, 26vw); z-index:5; display:block;
     text-decoration:none; padding:6px; background:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
   #dream img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; background:#0b0b0e; }
   #dream span { margin-top:6px; color:var(--fg2); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.5; }
@@ -296,13 +295,13 @@
     #tools { right:var(--gut); top:calc(var(--hdrh) + 14px); }
     #cam { display:none; }
     #today { width:calc(100vw - 2 * var(--gut)); }
-    #fiction { left:var(--gut); right:var(--gut); max-width:none; bottom:calc(var(--dockb) + var(--dockh) + 10px); font-size:9px; letter-spacing:.12em;
-      white-space:normal; }
+    #fiction { padding:0 var(--gut); letter-spacing:0; }
     #fiction .long { display:none; } #fiction .short { display:inline; }
     #side { width:auto; border-radius:0; border-left:0; border-right:0; border-bottom:0; }
     #dockbar { padding:8px var(--gut); gap:8px; flex-wrap:wrap; }
     #tabs { flex:1 1 auto; }
     #tabs > button { flex:1; justify-content:center; padding:5px 6px; }
+    #tabs > button { white-space:nowrap; gap:5px; } #tabs > button[data-tab="vote"] { flex:2.6; }
     #dockhint { display:none; }
     #dockbar > .ui-spacer { display:none; }
     #rxpill { flex:1 1 100%; }
@@ -313,7 +312,7 @@
     .pane[data-pane="more"].on { grid-template-columns:minmax(0, 1fr); }
     #tc-form { flex-wrap:wrap; } #tc-form #tc-text { flex:1 1 100%; }
     #corner { display:none; }
-    #dream { left:auto; right:var(--gut); width:140px; bottom:calc(var(--dockb) + var(--dockh) + 48px); }
+    #dream { left:auto; right:var(--gut); width:140px; bottom:calc(var(--dockb) + var(--dockh) + var(--fich) + 14px); }
     #away { width:calc(100vw - 48px); border-radius:12px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -360,9 +359,9 @@
 <div id="top">
   <h1 id="story">connecting…</h1>
   <div id="state" class="ui-caption"><span id="chip"></span><span id="clock"></span><span id="where"></span><span id="next"></span></div>
-  <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a brain model · Not a person, not conscious · <a href="/about.html">about</a></span><span class="short">A fictional character driven by a brain model · Not a person · <a href="/about.html">about</a></span></div>
   <div id="night" hidden></div>
 </div>
+<div id="fiction"><span class="long">A fictional character driven by a brain model · not a person, not conscious · <a href="/about.html">about</a></span><span class="short">fiction · a brain model, not a person · <a href="/about.html">about</a></span></div>
 <div id="hud" class="ui-hud">
   <div id="tools"><button id="todaybtn" class="ui-btn" type="button" aria-expanded="false" aria-controls="today">today ▾</button><button id="cam" class="ui-btn on" type="button" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
     <div id="today" class="ui-panel" hidden>
@@ -376,9 +375,9 @@
 <div id="side">
   <div id="dockbar">
     <nav id="tabs" class="ui-seg" role="tablist" aria-label="panels">
-      <button type="button" role="tab" data-tab="vote" aria-selected="false">vote <span id="tab-left"></span></button>
+      <button type="button" role="tab" data-tab="vote" aria-selected="false">what next? <span id="tab-left"></span></button>
       <button type="button" role="tab" data-tab="chat" aria-selected="false">chat <i id="tab-dot" hidden></i></button>
-      <button type="button" role="tab" data-tab="teach" aria-selected="false">teach</button>
+      <button type="button" role="tab" data-tab="teach" aria-selected="false" title="teach him a fact">teach</button>
       <button type="button" role="tab" data-tab="more" aria-selected="false">more</button>
     </nav>
     <div class="ui-spacer"></div>
@@ -3434,8 +3433,8 @@ function voteClock(){
   const s = Math.max(0, Math.round((voteEnds - performance.now()) / 1000));
   put("v-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)} h ${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} min left`
     : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} left`);
-  put("tab-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, "0")}`
-    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);           // (the Vote tab's header: time left)
+  put("tab-left", "textContent", s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.floor(s % 3600 / 60)).padStart(2, "0")} left`
+    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} left`);           // (the Vote tab's header: time left)
 }
 setInterval(voteClock, 1000);
 function voteNote(t, err){ $("v-note").textContent = t; $("v-note").className = err ? "s err" : "s"; }
@@ -3551,7 +3550,7 @@ function connect(){
     if (m.type === "hello") gotHello = true;
     if (m.type === "tick") { tickAt = drawn; retry = 0; }
     if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
-    if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
+    if (m.type === "chat_ack") { if (m.ok) { try { window.SUB01Pulse && SUB01Pulse.spike && SUB01Pulse.spike(); } catch (e) {} } $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
     if (m.type === "screen") { showScreen(m); return; }
     if (m.type === "chess") { onChess(m); return; }
     if (m.type === "music") { onMusic(m); return; }

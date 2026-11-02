@@ -25,7 +25,8 @@
      on the image's drawn box (#box, measured from naturalWidth/Height, see fit()) */
   #stage { flex:1 1 auto; min-height:0; display:flex; padding:14px var(--gut) 10px; }
   #panel { position:relative; flex:1; min-width:0; margin:0; }
-  #panel img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 1.2s var(--ui-ease); }
+  /* a mild lift for very dark frames, on the viewer image only (not the filmstrip) */
+  #panel img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 1.2s var(--ui-ease); filter:brightness(1.15) contrast(1.05); }
   #panel img.on { opacity:1; }
   #box { position:absolute; left:0; top:0; width:0; height:0; z-index:1; pointer-events:none; overflow:hidden; }
   .ov { position:absolute; left:14px; right:14px; z-index:1; pointer-events:none; font-family:var(--ui-mono); }
@@ -35,6 +36,7 @@
   #now-chip { background:#fff; color:#000; border-color:#fff; padding:1px 7px; font-size:9px; }
   #objs { font-size:10.5px; line-height:1.45; letter-spacing:.04em; color:var(--ui-fg2); text-shadow:0 0 6px #000;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  #objs { pointer-events:auto; }
   #objs:empty { display:none; }
   #line { bottom:14px; font-size:12px; line-height:1.4; color:var(--ui-fg2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 0 6px #000; }
   #line:empty { display:none; }
@@ -55,22 +57,26 @@
   #newpill { position:absolute; right:calc(var(--gut) + 8px); top:50%; transform:translateY(calc(-50% - 4px)); z-index:2; }
   #newpill .ui-dot { color:var(--ui-live); }
 
-  /* the empty state */
-  #empty { flex:1; padding:clamp(48px, 12vh, 140px) var(--gut); }
-  #empty h1 { font-size:clamp(56px, 9vw, 144px); }
-  #empty h1 span { font-size:inherit; }
-  #empty p { max-width:62ch; }
+  .sr { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  .kick { flex:none; margin:0; padding:12px var(--gut) 0; }
+  /* the empty state: a small block, and the faint blue fibre plate behind it so the page is never an empty slide */
+  #empty { flex:1; position:relative; isolation:isolate; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start; gap:12px;
+    padding:clamp(28px, 7vh, 72px) var(--gut) 40px; }
+  #empty::before { content:""; position:absolute; z-index:-1; inset:0; pointer-events:none; opacity:.12;
+    background:url(/intro_brain_top.webp) 50% 50% / min(78vmin, 720px) auto no-repeat;
+    -webkit-mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%); mask-image:radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
+    -webkit-mask-size:min(78vmin, 720px) min(78vmin, 720px); mask-size:min(78vmin, 720px) min(78vmin, 720px);
+    -webkit-mask-position:50% 50%; mask-position:50% 50%; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+  #empty p { margin:0; max-width:34em; font-family:var(--ui-sans); font-size:16px; line-height:1.5; letter-spacing:0; text-transform:none; color:var(--ui-fg2); }
 
-  /* the honesty line: one mono line above the pulse */
-  #note .short { display:none; }
-  #note { flex:none; margin:0; padding:6px var(--gut) 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-top:1px solid var(--ui-line); }
+  /* the honesty line: one short sentence above the pulse */
+  #note { flex:none; margin:0; padding:6px var(--gut) 8px; font-size:12px; border-top:1px solid var(--ui-line); }
 
   @media (max-width:720px) {
     #stage { padding:0; }
     .ov { left:12px; right:12px; }
     #film { padding:8px 0 6px; }
     #newpill { right:8px; }
-    #note .long { display:none; } #note .short { display:inline; }
   }
   @media (prefers-reduced-motion:reduce) {
     #panel img, #strip button { transition:none; }
@@ -90,9 +96,11 @@
 </header>
 
 <main id="main">
-  <section id="empty" class="ui-title ui-in" style="--i:1" hidden>
-    <h1>Nothing seen<span>yet.</span></h1>
-    <p>A view appears here each time the model renders one from its state and the chat; none has been rendered on this server yet.</p>
+  <h1 class="sr">What it sees</h1>
+  <p class="ui-caption kick" id="kick" hidden>05 · SEES</p>
+  <section id="empty" class="ui-in" style="--i:1" hidden>
+    <span class="ui-caption">05 · SEES</span>
+    <p>No pictures yet. One appears when the model renders a scene.</p>
   </section>
 
   <div id="stage" hidden>
@@ -114,7 +122,7 @@
   </div>
 </main>
 
-<p id="note" class="ui-honest"><span class="long">Images and lines are rendered from the model's state and from chat messages · not what anyone saw or thought · a model, not a mind.</span><span class="short">Rendered from the model · a model, not a mind.</span></p>
+<p id="note" class="ui-honest">Rendered from the brain model's state. Not anyone's dreams or thoughts. A model, not a mind.</p>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -131,6 +139,8 @@ function fit(){
 }
 if ("ResizeObserver" in window) new ResizeObserver(fit).observe($("panel")); else addEventListener("resize", fit);
 
+const isRem = st => String(st || "").toUpperCase() === "REM";
+const stageName = (st, gloss) => isRem(st) ? (gloss ? "DREAM SLEEP (REM)" : "DREAM SLEEP") : String(st || "").toUpperCase();   // (the gloss once, on the first such frame)
 function paint(i, smooth){
   if (!frames.length) return;
   at = Math.max(0, Math.min(frames.length - 1, i));
@@ -140,14 +150,15 @@ function paint(i, smooth){
     img.onload = () => { img.classList.add("on"); $(front).classList.remove("on"); front = back; fit(); };
     img.src = f.img;
   }
-  $("cap-t").textContent = `${f.t || "--:--"} · ${String(f.stage || "").toUpperCase()}${latest && resting ? ` · ${resting}` : ""}`;
+  $("cap-t").textContent = `${f.t || "--:--"} · ${stageName(f.stage, at === frames.findIndex(x => isRem(x.stage)))}${latest && resting ? ` · ${resting}` : ""}`;
   $("now-chip").hidden = !latest;
-  $("objs").textContent = latest && world.length
-    ? "in its world · " + world.slice(0, 4).map(o => `${o.name} ${o.strength}`).join(" · ") : "";
+  const wl = latest ? world.slice(0, 4) : [];                          // the names on the picture, the scores on hover
+  $("objs").textContent = wl.length ? "in its world · " + wl.map(o => o.name).join(" · ") : "";
+  $("objs").title = wl.map(o => `${o.name} ${o.strength}`).join(" · ");
   $("line").textContent = f.thought ? `“${f.thought}”` : "";
   const w = f.why || {}, bits = [];                    // where the line came from: on hover, never a paragraph
   if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${String(x).slice(0, 60)}”`).join(", "));
-  if (w.replayed && w.replayed.length) bits.push("replaying: " + w.replayed.slice(-2).map(x => `“${String(x).slice(0, 60)}”`).join(", "));
+  if (w.replayed && w.replayed.length) bits.push("playing again: " + w.replayed.slice(-2).map(x => `“${String(x).slice(0, 60)}”`).join(", "));
   $("panel").title = bits.join(" · ");
   const tiles = $("strip").children;
   for (let k = 0; k < tiles.length; k++) { const on = k === at; tiles[k].classList.toggle("on", on); tiles[k].setAttribute("aria-selected", String(on)); }
@@ -163,9 +174,9 @@ async function refresh(follow){
   (d.frames || []).forEach(f => { if (out.length && out[out.length - 1].img === f.img) out[out.length - 1] = f; else out.push(f); });
   frames = out; world = d.world || []; resting = d.resting || null;
   const none = !frames.length;
-  $("empty").hidden = !none; $("stage").hidden = none; $("film").hidden = none;
+  $("empty").hidden = !none; $("kick").hidden = none; $("stage").hidden = none; $("film").hidden = none;
   if (none) return;
-  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)} · ${esc(f.stage)}" aria-label="${esc(f.t)} ${esc(f.stage)}"><img src="${esc(f.img)}" loading="lazy" decoding="async" alt=""></button>`).join("");
+  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)} · ${esc(stageName(f.stage))}" aria-label="${esc(f.t)} ${esc(stageName(f.stage))}"><img src="${esc(f.img)}" loading="lazy" decoding="async" alt=""></button>`).join("");
   let to = frames.length - 1;
   if (!follow && !wasLatest && keep) { const k = frames.findIndex(f => f.img === keep); if (k >= 0) to = k; }
   if (follow === false && !wasLatest) $("newpill").hidden = false;
