@@ -8,7 +8,7 @@
 <meta name="description" content="A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. Model readouts, not measurements of anyone.">
 <style>
   /* SUB-01 · live: the brain-first dashboard ("decoded" redesign). Tokens and chrome come from /ui.css. */
-  :root { --rp:#a78bfa; --gut:16px; --c1:280px; --c3:320px; --row2:360px; }
+  :root { --rp:#a78bfa; --gut:16px; --c1:280px; --c3:320px; --row2:clamp(220px, 34vh, 300px); --hdr:52px; --hero-h:clamp(110px, 15vh, 170px); }
   * { box-sizing:border-box; }
   [hidden] { display:none !important; }
   html, body { margin:0; background:var(--ui-bg); color:var(--ui-fg); }
@@ -35,22 +35,28 @@
   .h-state { display:flex; align-items:center; gap:12px; }
 
   /* hero: one bold line, rotating */
-  #hero { position:relative; height:clamp(150px, 21vh, 220px); display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; padding:0 var(--gut); overflow:hidden; }
-  #hero::before { content:""; position:absolute; inset:0; pointer-events:none;
-    background:radial-gradient(ellipse 50% 70% at 50% 120%, rgba(63,123,255,.16), transparent 70%); }
-  #hero-h { position:relative; margin:0; font-weight:800; font-size:clamp(28px, 4.6vw, 68px); letter-spacing:-.045em; line-height:.98;
-    max-width:min(1100px, 100%); text-wrap:balance; }
-  #hero-s { position:relative; margin:14px 0 0; font-family:var(--ui-mono); font-size:11.5px; line-height:1.55; color:var(--ui-dim);
-    max-width:760px; text-wrap:balance; }
+  #hero { position:relative; height:var(--hero-h); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:0 var(--gut); overflow:hidden; isolation:isolate; }
+  /* the real fibre render (decorative), muted, centred behind and below the line; it never leaves the hero box */
+  #hero-img { position:absolute; left:50%; top:50%; z-index:-1; height:200%; width:auto; max-width:none; pointer-events:none; user-select:none;
+    transform:translate(-50%, -30%); transform-origin:50% 45%; opacity:.55;
+    -webkit-mask-image:radial-gradient(ellipse 56% 54% at 50% 50%, #000 40%, transparent 78%); mask-image:radial-gradient(ellipse 56% 54% at 50% 50%, #000 40%, transparent 78%);
+    animation:kb 20s ease-in-out infinite alternate; }
+  @keyframes kb { from { scale:1; } to { scale:1.04; } }
+  #hero-h { position:relative; margin:0; font-weight:800; font-size:clamp(26px, min(3.9vw, 5.2vh), 60px); letter-spacing:-.045em; line-height:.98;
+    max-width:min(1280px, 100%); text-wrap:balance; }
+  #hero-s { position:relative; margin:10px 0 0; font-family:var(--ui-mono); font-size:11.5px; line-height:1.55; color:#9b9ba8;
+    max-width:920px; text-wrap:balance; }
   #hero-h, #hero-s { transition:opacity .4s var(--ui-ease), transform .4s var(--ui-ease); }
   #hero.swap #hero-h { opacity:0; transform:translateY(-14px); }
   #hero.swap #hero-s { opacity:0; transform:translateY(-8px); }
   #hero.enter #hero-h, #hero.enter #hero-s { opacity:0; transform:translateY(14px); transition:none; }
 
   /* the grid: [LIVE brain] [screen + timeline] [feed + RESPONSE brain] */
+  /* desktop: header + hero + grid = one screen (the footer scrolls in below); never crushed under 560px */
   #grid { display:grid; gap:var(--ui-gap); padding:0 var(--gut); max-width:1720px; margin:0 auto;
-    grid-template-columns:var(--c1) minmax(0, 1fr) var(--c3); grid-template-rows:auto var(--row2);
+    height:calc(100vh - var(--hdr) - var(--hero-h) - var(--ui-gap)); height:calc(100dvh - var(--hdr) - var(--hero-h) - var(--ui-gap)); min-height:560px;
+    grid-template-columns:var(--c1) minmax(0, 1fr) var(--c3); grid-template-rows:minmax(0, 1fr) var(--row2);
     grid-template-areas:"live view feed" "live time resp"; }
   #brains { display:contents; }
   #p-live { grid-area:live; } #p-view { grid-area:view; } #p-time { grid-area:time; } #p-feed { grid-area:feed; } #p-resp { grid-area:resp; }
@@ -61,7 +67,7 @@
   .brainp { transition:border-color .6s var(--ui-ease), box-shadow .6s var(--ui-ease); }
   .brainp.pulse { border-color:var(--ui-live); box-shadow:0 0 0 1px var(--ui-live), 0 0 32px rgba(255,45,85,.25); transition:none; }
   .bhead { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 14px 0; }
-  .bcv { position:relative; flex:1; min-height:120px; }
+  .bcv { position:relative; flex:1; min-height:100px; }
   .bcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
   .bcv.loading::before { content:""; position:absolute; left:18%; right:18%; top:10%; bottom:10%; border-radius:46% 46% 42% 42%;
     background:linear-gradient(100deg, rgba(63,123,255,.06) 30%, rgba(63,123,255,.18) 50%, rgba(63,123,255,.06) 70%) 0 0/250% 100%;
@@ -78,14 +84,17 @@
   @keyframes pop { 0% { transform:scale(1); } 30% { transform:scale(1.14); color:var(--ui-live2); } 100% { transform:scale(1); } }
   .bword { font-family:var(--ui-mono); font-size:11px; color:var(--ui-live2); }
   .bword.up { color:var(--ui-proj); } .bword.mid { color:var(--ui-dim); }
+  .bnum .ui-big.dim { color:var(--ui-dim); }
   .bcap { margin-top:8px; }
   .bline { margin-top:8px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
   .bline b { color:var(--ui-fg2); font-weight:500; }
   #r-after { color:var(--ui-fg2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #r-after:empty { display:none; }
 
   /* his screen */
-  #stage { position:relative; aspect-ratio:16/9; background:#040406; overflow:hidden; }
-  #stage > img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .7s var(--ui-ease); }
+  #p-view { display:flex; flex-direction:column; }
+  #stage { position:relative; flex:1 1 auto; min-height:0; background:#040406; overflow:hidden; }
+  #stage > img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; opacity:0; transition:opacity .7s var(--ui-ease); }
   #stage > img.on { opacity:1; }
   #v-embed { position:absolute; inset:0; display:none; background:#000; }
   #v-embed iframe { width:100%; height:100%; border:0; display:block; }
@@ -139,7 +148,7 @@
 
   /* feed */
   #p-feed .fill { padding:0; }
-  .fsec { padding:12px 14px; border-bottom:1px solid var(--ui-line); }
+  .fsec { flex:0 1 auto; min-height:0; overflow:hidden; padding:12px 14px; border-bottom:1px solid var(--ui-line); }
   .fsec .ui-label { display:flex; align-items:center; gap:8px; justify-content:space-between; margin-bottom:8px; }
   .nowbox { background:var(--ui-panel2); border:1px solid var(--ui-line); border-radius:var(--ui-r); padding:9px 11px; font-size:13px; line-height:1.4; }
   .nowbox b { font-weight:700; }
@@ -150,7 +159,9 @@
   #f-steps li { display:flex; gap:10px; padding:2px 0; }
   #f-steps li span { color:var(--ui-faint); }
   #f-plan { font-size:13px; line-height:1.4; color:var(--ui-fg2); }
-  .fchat { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 0 0; }
+  .fchat { flex:1 1 0; min-height:150px; display:flex; flex-direction:column; padding:12px 0 0; }
+  @media (min-width:1101px) and (max-height:940px) { .fmeta { -webkit-line-clamp:1; } .fsec { padding:10px 14px; } }
+  @media (min-width:1101px) and (max-height:830px) { #f-steps { display:none; } }      /* the plan line already names them */
   .fchat .ui-label { padding:0 14px 6px; display:flex; justify-content:space-between; }
   #f-chat { flex:1; min-height:0; overflow-y:auto; padding:0 14px 6px; scrollbar-width:thin; scrollbar-color:#333 transparent; }
   .cl { display:flex; gap:9px; padding:5px 0; font-size:12.5px; line-height:1.4; color:var(--ui-fg2); animation:ui-in .45s var(--ui-ease) both; }
@@ -182,10 +193,11 @@
 
   /* ≤ 1100: two columns (centre + feed); the brains side by side under the timeline */
   @media (max-width:1100px) {
-    #grid { grid-template-columns:minmax(0, 1fr) 300px; grid-template-rows:auto 330px auto;
+    #grid { height:auto; min-height:0; grid-template-columns:minmax(0, 1fr) 300px; grid-template-rows:auto 330px auto;
       grid-template-areas:"view feed" "time feed" "brains brains"; }
     #brains { display:grid; grid-area:brains; grid-template-columns:1fr 1fr; gap:var(--ui-gap); }
     #p-live, #p-resp { grid-area:auto; height:430px; }
+    #stage { flex:none; aspect-ratio:16/9; }
     .h-state .ui-counter { display:none; }
   }
   /* ≤ 720: one column: screen, timeline, LIVE, RESPONSE, feed */
@@ -197,6 +209,7 @@
     #hdr .ui-wordmark small { display:none; }
     #h-clock { display:none; }
     #hero { height:auto; padding:22px var(--gut) 18px; }
+    #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:.3; }
     #hero-s { font-size:10.5px; }
     #grid { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-template-areas:"view" "time" "brains" "feed"; }
     #p-time { height:300px; }
@@ -208,7 +221,7 @@
     #v-music { display:none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .bcv.loading::before, #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl { animation:none !important; }
+    .bcv.loading::before, #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl, #hero-img { animation:none !important; }
     #hero-h, #hero-s { transition:none !important; }
   }
 </style>
@@ -227,6 +240,7 @@
 </header>
 
 <section id="hero" aria-live="polite">
+  <img id="hero-img" src="/hero_brain.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="low" width="1400" height="954">
   <h1 id="hero-h">A brain, decoded live.</h1>
   <p id="hero-s">A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. These are model readouts, not measurements of anyone.</p>
 </section>
@@ -241,7 +255,7 @@
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">at his baseline</span></div>
           <div class="ui-label bcap" id="l-cap">ATTENTION · LIVE</div>
-          <div class="bline" id="l-line">Blue: at its own baseline. Yellow to red: a region running above it. Read from the model, not measured.</div>
+          <div class="bline" id="l-line">Blue: at its own baseline; lighter: above it. Yellow to red: the few regions running highest. Read from the model, not measured.</div>
         </div>
       </div>
     </section>
@@ -251,8 +265,8 @@
         <div class="bcv loading" id="r-cv"><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="r-num">--</span><span class="ui-delta" id="r-delta"></span></div>
-          <div class="ui-label bcap" id="r-cap">ATTENTION · RESPONSE</div>
-          <div class="bline"><div id="r-after">send a message: it enters through language areas</div><span id="r-line">Waiting for an event (a chat stimulus, a reward burst or a replay). Read from the model, not measured.</span></div>
+          <div class="ui-label bcap" id="r-cap">ATTENTION · WAITING</div>
+          <div class="bline"><div id="r-after"></div><span id="r-line">No event yet. Send a message or wait for a reward burst; this panel freezes at the next one. Read from the model, not measured.</span></div>
         </div>
       </div>
     </section>
@@ -347,7 +361,7 @@ function putH(id, h){ if (shown[id] === h) return; shown[id] = h; const el = $(i
 const S = {
   conn:false, full:false, stage:null, clock:"", tz:"Tokyo", gain:1, sync:0, syncS:0.1, viewers:null, life:null, screen:null,
   music:null, slow:"", neuro:null, act:null, base:null, rel:null, nodes:null, gEma:{}, grel:{},
-  read:{a:50, r:50, l:50, n:50}, readS:{a:50, r:50, l:50, n:50}, plan:null, note:null, decision:null, lastTickAt:0,
+  read:{a:50, r:50, l:50, n:50}, readS:{a:50, r:50, l:50, n:50}, plan:null, note:null, decision:null, lastTickAt:0, firstTickAt:0,
 };
 const dirty = {tick:true, hdr:true, view:true, feed:true, resp:false, respNew:false, marks:false, tl:true};
 const ring = [];                     // {t, a, r, l, n}: one sample per 500 ms, 15 minutes
@@ -356,14 +370,27 @@ let bin = null;                      // the 500 ms bin being filled
 const recent = [];                   // {t, a}: tick-level attention, last 10 s (the 5 s before an event)
 const markers = [];                  // {id, t, kind, label, clock, pre, peak, rel, top, born, until}
 let markerSeq = 0, track = null, respMk = null, respUser = 0;
+// the per-region and per-network baselines need ~25 s to settle: until then the brains blend towards baseline (blue)
+const WARM_MS = 25000;
+const warmK = () => S.firstTickAt ? Math.min(1, (Date.now() - S.firstTickAt) / WARM_MS) : 0;
+// display rel: warmed up, and when much of the brain runs high at once (a burst) the scale above baseline is compressed
+// so the 92nd percentile sits at 1.3: only the few highest regions turn warm, the rest lighten in blue
+function relShow(){
+  const src = S.rel, k = warmK(), n = src.length, o = S.relShow && S.relShow.length === n ? S.relShow : (S.relShow = new Float32Array(n));
+  const srt = Array.from(src).sort((x, y) => x - y), p92 = 1 + (srt[Math.floor(0.92 * (n - 1))] - 1) * k;
+  const c = Math.max(1, (p92 - 1) / 0.3);
+  for (let i = 0; i < n; i++) { const v = 1 + (src[i] - 1) * k; o[i] = v > 1 ? 1 + (v - 1) / c : v; }
+}
+const relSnap = () => S.relShow ? S.relShow.slice() : null;
 
 // ---------------------------------------------------------------- readouts (per tick: arithmetic only)
 function onTick(m){
   const now = Date.now();
-  S.lastTickAt = now;
+  S.lastTickAt = now; if (!S.firstTickAt) S.firstTickAt = now;
   const sl = m.sleep;
   if (sl && typeof sl === "object") { S.stage = sl.stage || S.stage; S.clock = sl.clock || S.clock; S.tz = sl.tz || "Tokyo";
     if (typeof sl.gain === "number") S.gain = sl.gain; }
+  if (pendingHello && sl && sl.clock) renderHello();             // the chat history is ordered against this tick's clock
   if (m.aud && typeof m.aud.n === "number") S.viewers = m.aud.n;
   if (m.life && typeof m.life === "object") { S.life = m.life; S.screen = m.life.screen && typeof m.life.screen === "object" ? m.life.screen : null; }
   if (m.neuro && typeof m.neuro === "object") S.neuro = m.neuro;
@@ -386,7 +413,7 @@ function onTick(m){
       S.rel[i] = S.rel[i] * 0.8 + r * 0.2;                  // ~1 s display smoothing
       s += r;
     }
-    S.act = a; neural = R(s / a.length);
+    S.act = a; neural = R(s / a.length); relShow();
   }
   // network levels: the tick's `groups` (mean |z| a network), else the mean activity of each network's regions
   let groups = m.groups && typeof m.groups === "object" ? m.groups : null;
@@ -424,7 +451,7 @@ function onTick(m){
 
   // an event's response: the peak attention within 3 s after it, the brain at that peak
   if (track && now - track.t <= 3000) {
-    if (rd.a >= track.peak) { track.peak = rd.a; track.rel = S.rel ? S.rel.slice() : null; track.top = topNets(); if (respMk === track) dirty.resp = true; }
+    if (rd.a >= track.peak) { track.peak = rd.a; track.rel = relSnap(); track.v = (track.v || 0) + 1; track.top = topNets(); if (respMk === track) dirty.resp = true; }
   } else track = null;
   dirty.tick = true;
 }
@@ -437,7 +464,7 @@ function addMarker(kind, label, clock){
   const before = recent.filter(x => now - x.t <= 5000).map(x => x.a);
   const pre = before.length ? mean(before) : S.read.a;
   const mk = {id:++markerSeq, t:now, kind, label:String(label || ""), clock:clock || S.clock || "--:--", pre, peak:S.read.a,
-    rel:S.rel ? S.rel.slice() : null, top:topNets(), born:performance.now(), stage:S.stage};
+    rel:relSnap(), v:0, top:topNets(), born:performance.now(), stage:S.stage};
   markers.push(mk);
   while (markers.length && (now - markers[0].t > RING_MS || markers.length > 300)) markers.shift();
   track = mk;
@@ -482,8 +509,8 @@ function handle(m){
       const rows = [];
       for (const c of Array.isArray(m.chat) ? m.chat : []) rows.push({t:c.t || "", kind:"chat", c});
       for (const r of Array.isArray(m.replies) ? m.replies : []) rows.push({t:r.t || "", kind:"reply", c:r});
-      rows.sort((x, y) => String(x.t).localeCompare(String(y.t)));
-      for (const r of rows.slice(-30)) r.kind === "chat" ? chatLine(r.c) : replyLine(r.c);
+      // the hello carries no clock: the rows are ordered against the next tick's (or, after 3 s, the newest row's)
+      pendingHello = rows; setTimeout(() => { if (pendingHello === rows) renderHello(); }, 3000);
       if (m.audience && typeof m.audience.viewers === "number") S.viewers = m.audience.viewers;
       if (m.music && typeof m.music === "object" && m.music.title) S.music = m.music;
       dirty.hdr = dirty.view = true; return;
@@ -532,7 +559,31 @@ async function loadMusic(){
 
 // ---------------------------------------------------------------- chat feed
 const chatEl = $("f-chat");
-let chatCount = 0;
+let chatCount = 0, pendingHello = null;
+const toMin = t => { const x = /^(\d{1,2}):(\d{2})/.exec(String(t || "")); return x ? (+x[1] % 24) * 60 + +x[2] : NaN; };
+function newestMin(ms){                       // no clock yet: the newest minute is the one before the largest gap on the dial
+  const a = [...new Set(ms)].sort((x, y) => x - y); if (!a.length) return NaN;
+  let gi = a.length - 1, gap = a[0] + 1440 - a[a.length - 1];
+  for (let i = 0; i < a.length - 1; i++) if (a[i + 1] - a[i] > gap) { gap = a[i + 1] - a[i]; gi = i; }
+  return a[gi];
+}
+function renderHello(){
+  const rows = pendingHello; pendingHello = null; if (!rows) return;
+  let nowMin = toMin(S.clock);
+  if (!isFinite(nowMin)) nowMin = newestMin(rows.map(r => toMin(r.t)).filter(isFinite));
+  for (const r of rows) {
+    const mm = toMin(r.t); let age = isFinite(mm) && isFinite(nowMin) ? (nowMin - mm + 1440) % 1440 : 1440;
+    if (age > 1435) age -= 1440;               // a row a few minutes "ahead" of a stale clock is new, not a day old
+    r.age = age;
+  }
+  rows.sort((x, y) => y.age - x.age);          // oldest first; the sort is stable, so one minute keeps its arrival order
+  const later = [...chatEl.children];          // lines that arrived after the hello stay below it
+  chatEl.replaceChildren(); chatCount = 0;
+  for (const r of rows.slice(-30)) r.kind === "chat" ? chatLine(r.c) : replyLine(r.c);
+  for (const el of later) chatEl.appendChild(el);
+  while (chatEl.children.length > 30) chatEl.firstChild.remove();
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
 function nearBottom(){ return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 40; }
 function addLine(html, cls){
   const stick = nearBottom();
@@ -644,33 +695,38 @@ uniform vec2 uScale; uniform vec2 uOff; uniform float uBreath; uniform float uAl
 varying vec3 vCol; varying float vA; varying float vMode;
 void main(){
   vMode = uMode;
-  float h1 = pow(clamp((aRel - 1.0) / 0.3, 0.0, 1.0), 1.4);          // rel 1.0 blue -> 1.3 yellow
-  float h2 = clamp((aRel - 1.3) / 0.5, 0.0, 1.0);                     // 1.3 yellow -> 1.8 red
-  vec3 blue = mix(vec3(0.106, 0.227, 0.541), vec3(0.247, 0.482, 1.0), aDepth);
-  vec3 warm = h2 < 0.5 ? mix(vec3(1.0, 0.85, 0.28), vec3(1.0, 0.5, 0.1), h2 * 2.0) : mix(vec3(1.0, 0.5, 0.1), vec3(1.0, 0.14, 0.1), h2 * 2.0 - 1.0);
+  float lift = smoothstep(1.0, 1.3, aRel);                            // above baseline, not hot: the blue lightens
+  float h1 = smoothstep(1.3, 1.6, aRel);                               // warm from ~1.35 (yellow)
+  float h2 = smoothstep(1.6, 2.0, aRel);                               // to red by 2.0
+  float low = mix(0.7, 1.0, smoothstep(0.3, 1.0, aRel));              // below baseline: a little dimmer, still blue
+  vec3 blue = mix(vec3(0.06, 0.15, 0.52), vec3(0.42, 0.66, 1.0), clamp(aDepth * aDepth * 0.9 + 0.3 * lift, 0.0, 1.0));
+  vec3 warm = h2 < 0.5 ? mix(vec3(1.0, 0.86, 0.30), vec3(1.0, 0.52, 0.12), h2 * 2.0) : mix(vec3(1.0, 0.52, 0.12), vec3(1.0, 0.16, 0.10), h2 * 2.0 - 1.0);
   vCol = mix(blue, warm, h1);
-  float lit = 0.18 + 0.82 * aDepth * aDepth;
-  if (uMode > 0.5) {                                                   // the glow: soft points, large where a region runs hot
-    vA = uAlpha * uBreath * (0.10 * lit + h1 * (0.55 + 0.45 * aDepth));
-    gl_PointSize = uPt * (0.8 + 1.4 * h1 + 0.8 * h2);
-  } else {
-    vA = uAlpha * uBreath * lit * (1.0 + 1.5 * h1);
+  float lit = (0.22 + 0.78 * aDepth * aDepth) * low;
+  if (uMode > 0.5) {                                                   // the glow: soft points, larger where a region runs hot
+    vA = uAlpha * uBreath * (lit * (0.26 + 0.12 * lift) + h1 * (0.5 + 0.4 * aDepth) + 0.3 * h2);
+    gl_PointSize = uPt * (1.0 + 0.7 * h1 + 0.4 * h2);
+  } else {                                                             // the fibres: thin lines
+    vA = uAlpha * uBreath * lit * (1.0 + 0.4 * lift + 1.2 * h1);
     gl_PointSize = 1.0;
   }
   gl_Position = vec4(aPos * uScale + uOff, 0.0, 1.0);
 }`;
 const FS = `precision mediump float; varying vec3 vCol; varying float vA; varying float vMode;
 void main(){ float a = vA; if (vMode > 0.5) { vec2 d = gl_PointCoord - 0.5; a *= exp(-dot(d, d) * 16.0); } gl_FragColor = vec4(vCol * a, a); }`;
+// brain look: point size in px per mm, the alphas at REF px per mm. Additive strokes pile up where the brain is drawn
+// small (line coverage grows as 1/scale), so the alphas scale with the drawn size and the sum stays under white.
+const BT = {pt:2.8, ptA:0.24, meshA:0.105, arcA:0.15, ref:2.4};
 
 class BrainView {
-  constructor(canvas){ this.cv = canvas; this.geo = null; this.heat = null; this.w = 0; this.h = 0; this.visible = true;
+  constructor(canvas){ this.cv = canvas; this.geo = null; this.heat = null; this.w = 0; this.h = 0; this.visible = true; this.need = true;
     try { this.gl = canvas.getContext("webgl", {alpha:true, antialias:true, premultipliedAlpha:true}) || null; } catch (e) { this.gl = null; }
     if (this.gl && !this.initGL()) {                                  // a canvas that once gave a WebGL context never gives a 2D one: swap in a fresh canvas
       this.gl = null; const fresh = canvas.cloneNode(false); canvas.replaceWith(fresh); canvas = this.cv = fresh;
     }
     if (!this.gl) this.g2 = canvas.getContext("2d");
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement); this.resize();
-    if ("IntersectionObserver" in window) new IntersectionObserver(es => { this.visible = es[0].isIntersecting; }).observe(canvas);
+    if ("IntersectionObserver" in window) new IntersectionObserver(es => { this.visible = es[0].isIntersecting; if (this.visible) this.need = true; }).observe(canvas);
   }
   initGL(){
     const gl = this.gl, sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null; };
@@ -684,7 +740,7 @@ class BrainView {
     return true;
   }
   setGeometry(g){
-    this.geo = g; this.heat = new Float32Array(g.depth.length).fill(1);
+    this.geo = g; this.heat = new Float32Array(g.depth.length).fill(1); this.need = true;      // drawn once even off-screen
     const gl = this.gl; if (!gl) return;
     const buf = (data, target = gl.ARRAY_BUFFER, usage = gl.STATIC_DRAW) => { const b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, usage); return b; };
     this.bPos = buf(g.pos); this.bDepth = buf(g.depth); this.bRel = buf(this.heat, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW);
@@ -696,19 +752,21 @@ class BrainView {
     const r = this.cv.parentElement.getBoundingClientRect(), d = DPR();
     this.w = Math.max(1, Math.round(r.width * d)); this.h = Math.max(1, Math.round(r.height * d)); this.d = d;
     if (this.cv.width !== this.w || this.cv.height !== this.h) { this.cv.width = this.w; this.cv.height = this.h; }
+    this.need = true;                                                    // a resized canvas is blank until the next draw
   }
   fit(){
     const [x0, x1, y0, y1] = this.geo.box, bw = x1 - x0, bh = y1 - y0, pad = 0.9;
     const s = Math.min(this.w * pad / bw, this.h * pad / bh);          // px per mm
     return {s, sx:2 * s / this.w, sy:2 * s / this.h, cx:(x0 + x1) / 2, cy:(y0 + y1) / 2};
   }
-  draw(rel, t, breath){
-    if (!this.geo || !this.visible || this.w < 4 || this.h < 4) return;
+  draw(rel, t, breath){                                                 // true when it drew
+    if (!this.geo || this.w < 4 || this.h < 4 || (!this.visible && !this.need)) return false;
+    this.need = false;
     const g = this.geo, reg = g.reg, heat = this.heat;
     if (rel) for (let v = 0; v < heat.length; v++) { const r = reg[v]; heat[v] = r >= 0 && r < rel.length ? rel[r] : 1; }
     else heat.fill(1);
-    if (this.gl) return this.drawGL(t, breath);
-    this.draw2D(breath);
+    if (this.gl) this.drawGL(t, breath); else this.draw2D(breath);
+    return true;
   }
   drawGL(t, breath){
     const gl = this.gl, L = this.loc, f = this.fit();
@@ -716,12 +774,15 @@ class BrainView {
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bRel); gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.heat);
     gl.uniform2f(L.uScale, f.sx, f.sy); gl.uniform2f(L.uOff, -f.cx * f.sx, -f.cy * f.sy); gl.uniform1f(L.uBreath, breath);
-    const dens = clamp(f.s / 2.2, 0.55, 1.6);                        // fewer pixels a stroke when the brain is drawn small
-    gl.uniform1f(L.uMode, 1); gl.uniform1f(L.uAlpha, 0.5); gl.uniform1f(L.uPt, 7 * this.d * Math.min(1.4, f.s / 2.6));
+    // lines are 1 device px: their coverage a pixel goes as 1/scale, so their alpha goes with the scale. Points scale
+    // with the brain; when clamped larger than that, their alpha drops by the extra area.
+    const kLine = clamp(f.s / BT.ref, 0.12, 1.2), ideal = BT.pt * f.s, P = clamp(ideal, 1.5 * this.d, 12 * this.d);
+    const kPt = Math.min(1, (ideal / P) * (ideal / P));
+    gl.uniform1f(L.uMode, 1); gl.uniform1f(L.uAlpha, BT.ptA * kPt); gl.uniform1f(L.uPt, P);
     gl.drawArrays(gl.POINTS, 0, this.geo.nMesh);
-    gl.uniform1f(L.uMode, 0); gl.uniform1f(L.uAlpha, 0.20 / dens);
+    gl.uniform1f(L.uMode, 0); gl.uniform1f(L.uAlpha, BT.meshA * kLine);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bM); gl.drawElements(gl.LINES, this.geo.mIdx.length, gl.UNSIGNED_SHORT, 0);
-    gl.uniform1f(L.uAlpha, 0.30 / dens);
+    gl.uniform1f(L.uAlpha, BT.arcA * kLine);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bA); gl.drawElements(gl.LINES, this.geo.aIdx.length, gl.UNSIGNED_SHORT, 0);
   }
   draw2D(breath){                                                       // no WebGL: points, coloured in four steps
@@ -729,9 +790,10 @@ class BrainView {
     const f = this.fit(), g = this.geo, W = this.w, H = this.h;
     c.clearRect(0, 0, W, H); c.globalCompositeOperation = "lighter";
     const cols = ["rgba(63,123,255,", "rgba(255,217,71,", "rgba(255,128,26,", "rgba(255,36,26,"];
+    const cover = clamp((f.s / 1.2) * (f.s / 1.2), 0.3, 1);            // dots pile up only when drawn very small
     for (let v = 0; v < g.nMesh; v += 2) {
-      const r = this.heat[v], k = r < 1.15 ? 0 : r < 1.4 ? 1 : r < 1.8 ? 2 : 3;
-      c.fillStyle = cols[k] + (0.18 + 0.5 * g.depth[v]) * breath * (k ? 1.6 : 0.6) + ")";
+      const r = this.heat[v], k = r < 1.35 ? 0 : r < 1.6 ? 1 : r < 2.0 ? 2 : 3;
+      c.fillStyle = cols[k] + Math.min(1, (0.3 + 0.6 * g.depth[v] * g.depth[v]) * breath * (k ? 1.2 : 0.9 * cover)) + ")";
       c.fillRect(W / 2 + (g.pos[2 * v] - f.cx) * f.s, H / 2 - (g.pos[2 * v + 1] - f.cy) * f.s, k ? 2 * this.d : this.d, k ? 2 * this.d : this.d);
     }
     c.globalCompositeOperation = "source-over";
@@ -952,6 +1014,7 @@ function tweenStep(now){
   for (const id in tween) {
     const tw = tween[id], p = RM ? 1 : Math.min(1, (now - tw.t0) / 300), e = 1 - Math.pow(1 - p, 3);
     tw.cur = tw.from + (tw.to - tw.from) * e; put(id, String(Math.round(tw.cur)));
+    if (id === "l-num") put("lg-a", String(Math.round(tw.cur)));     // the legend shows the same number as the big one
   }
 }
 function level(v){ return v < 42 ? ["below his baseline", ""] : v > 58 ? ["above his baseline", "up"] : ["at his baseline", "mid"]; }
@@ -960,11 +1023,18 @@ function renderLive(){
   const [w, cls] = level(v); put("l-word", w); $("l-word").className = "bword " + cls;
   put("l-cap", S.stage && S.stage !== "AWAKE" ? `SLEEP · ${S.stage} · attention readout` : "ATTENTION · LIVE");
   putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
-  put("lg-a", String(Math.round(S.readS.a))); put("lg-r", String(Math.round(S.readS.r))); put("lg-l", String(Math.round(S.readS.l))); put("lg-n", String(Math.round(S.readS.n)));
+  put("lg-r", String(Math.round(S.readS.r))); put("lg-l", String(Math.round(S.readS.l))); put("lg-n", String(Math.round(S.readS.n)));
 }
 function renderResp(){
-  const mk = respMk;
-  if (!mk) return;
+  const mk = respMk, num = $("r-num");
+  if (!mk) {                                     // before the first event: the live brain, dimmed, and the attention now in grey
+    num.classList.add("dim");
+    if (S.lastTickAt) tweenTo("r-num", S.readS.a);
+    putH("r-head", "RESPONSE · <b>waiting</b>"); put("r-delta", ""); put("r-cap", "ATTENTION · WAITING"); put("r-after", "");
+    put("r-line", "No event yet. Send a message or wait for a reward burst; this panel freezes at the next one. Read from the model, not measured.");
+    return;
+  }
+  num.classList.remove("dim");
   const asleep = mk.stage && mk.stage !== "AWAKE";
   putH("r-head", `${mk.kind === "replay" ? "REPLAY AT" : "RESPONSE AT"} <b>${esc(mk.clock)}</b>`);
   put("r-kind", mk.kind === "da" ? "reward burst" : mk.kind === "replay" ? "sleep replay" : "chat stimulus");
@@ -999,17 +1069,19 @@ function heroNext(){
   hero.classList.add("swap");
   setTimeout(() => { set(); hero.classList.remove("swap"); hero.classList.add("enter"); void hero.offsetWidth; hero.classList.remove("enter"); }, 400);
 }
-setInterval(() => { if (!document.hidden) heroNext(); }, 8000);
+if (!RM) setInterval(() => { if (!document.hidden) heroNext(); }, 8000);          // reduced motion: the first line stays
 
 // ---------------------------------------------------------------- the frame loop
-const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 60;
-let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0;
+const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 30;
+let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0, respWaitAt = 0, respDrawn = null, respDrawnV = -1;
 const relDraw = {live:null};
+const hdrEl = $("hdr");                                   // the grid is one screen minus the header (which may wrap)
+new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", hdrEl.offsetHeight + "px")).observe(hdrEl);
 function frame(pnow){
   requestAnimationFrame(frame);
   try {
     const now = Date.now();
-    if (pnow - lastDom > 250 || dirty.hdr) { lastDom = pnow; renderHeader(); renderLive(); dirty.hdr = false; }
+    if (pnow - lastDom > 250 || dirty.hdr) { lastDom = pnow; renderHeader(); renderLive(); if (!respMk) renderResp(); dirty.hdr = false; }
     if (dirty.feed || pnow - lastView > 1000) { renderFeed(); dirty.feed = false; }
     if (dirty.view || pnow - lastView > 1000) { lastView = pnow; renderView(); dirty.view = false; }
     if (dirty.resp) { renderResp(); dirty.resp = false; }
@@ -1018,15 +1090,22 @@ function frame(pnow){
     tweenStep(pnow);
     if (pnow - lastTl >= 1000 / FPS_TL - 2) { lastTl = pnow; drawTimeline(now); }
     if (pnow - lastBrain >= 1000 / FPS_BRAIN - 2) {
+      const dt = lastBrain ? Math.min(500, pnow - lastBrain) : 0;
       lastBrain = pnow;
       const t = pnow / 1000;
-      const breath = RM ? 1 : clamp(0.82 + 0.9 * S.syncS + 0.06 * Math.sin(t * 1.1), 0.7, 1.25);
-      if (S.rel) {                                        // the live brain eases towards the latest smoothed activity
-        if (!relDraw.live || relDraw.live.length !== S.rel.length) relDraw.live = S.rel.slice();
-        const L = relDraw.live; for (let i = 0; i < L.length; i++) L[i] += (S.rel[i] - L[i]) * 0.15;
+      const breath = RM ? 1 : clamp(0.82 + 0.9 * S.syncS + 0.06 * Math.sin(t * 1.1), 0.7, 1.15);
+      if (S.relShow) {                                    // the live brain eases (~1.5 s) towards the display activity
+        const T = S.relShow, e = 1 - Math.exp(-dt / 1500);
+        if (!relDraw.live || relDraw.live.length !== T.length) relDraw.live = T.slice();
+        else { const L = relDraw.live; for (let i = 0; i < L.length; i++) L[i] += (T[i] - L[i]) * e; }
       }
       liveBrain.draw(relDraw.live, t, breath);
-      respBrain.draw(respMk && respMk.rel ? respMk.rel : relDraw.live, t, RM ? 1 : (respMk ? 1 + 0.05 * Math.sin(t * 0.8) : 0.55));
+      // RESPONSE: on an event it is redrawn only when its snapshot changes (the 3 s peak search) or the canvas resizes;
+      // before the first event it shows the live brain, dimmed, at 5 fps
+      const mk = respMk;
+      if (mk && mk.rel) {
+        if ((respDrawn !== mk || respDrawnV !== mk.v || respBrain.need) && respBrain.draw(mk.rel, t, 1)) { respDrawn = mk; respDrawnV = mk.v; }
+      } else if (pnow - respWaitAt >= 200 || respBrain.need) { respWaitAt = pnow; respDrawn = null; respBrain.draw(relDraw.live, t, 0.7); }
     }
   } catch (e) { console.warn("live: frame", e); }
 }
