@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/ui.css">
+<link rel="canonical" href="/">
 <title>SUB-01 · live</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="description" content="A brain model, live. It runs on one person's real MRI wiring. Every number here is read from the model.">
 <style>
@@ -46,7 +47,7 @@
     animation:kb 20s ease-in-out infinite alternate; }
   @keyframes kb { from { scale:1; } to { scale:1.04; } }
   #hero-h { position:relative; margin:0; font-weight:800; font-size:clamp(26px, min(3.9vw, 5.2vh), 60px); letter-spacing:-.045em; line-height:.98;
-    max-width:min(1280px, 100%); text-wrap:balance; }
+    max-width:min(22ch, 100%); text-wrap:balance; }
   #hero-s { position:relative; margin:10px 0 0; font-family:var(--ui-mono); font-size:11.5px; line-height:1.55; color:#9b9ba8;
     max-width:920px; text-wrap:balance; }
   #hero-h, #hero-s { transition:opacity .4s var(--ui-ease), transform .4s var(--ui-ease); }
@@ -78,16 +79,18 @@
   .bcv .bloom { position:absolute; left:8%; right:8%; top:10%; bottom:8%; border-radius:50%; pointer-events:none;
     background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(63,123,255,.26), rgba(63,123,255,.09) 48%, transparent 72%);
     opacity:var(--bl, .7); transform:scale(var(--bs, 1)); transition:opacity 1.6s ease-in-out, transform 1.6s ease-in-out; }
-  .bcv.loading::before { content:""; position:absolute; left:18%; right:18%; top:10%; bottom:10%; border-radius:46% 46% 42% 42%;
-    background:linear-gradient(100deg, rgba(63,123,255,.06) 30%, rgba(63,123,255,.18) 50%, rgba(63,123,255,.06) 70%) 0 0/250% 100%;
-    animation:shim 1.4s linear infinite; }
+  /* the poster: the top-view fibre render, faint, until the canvas has drawn its first lit frame (then it fades out) */
+  .bcv .poster { position:absolute; left:6%; right:6%; top:6%; bottom:6%; width:88%; height:88%; object-fit:contain; pointer-events:none; user-select:none;
+    opacity:.2; filter:saturate(.7); transition:opacity .9s var(--ui-ease);
+    -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%); mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%); }
+  .bcv.drawn .poster { opacity:0; }
   .bcv.loading::after { content:"loading the wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
     font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint); }
-  @keyframes shim { from { background-position:100% 0; } to { background-position:-150% 0; } }
   .bcv .orient { position:absolute; top:4px; left:50%; transform:translateX(-50%); font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
   .bfoot { padding:0 16px 14px; }
   .bnum { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
-  .bnum .ui-big { font-size:clamp(44px, 4.4vw, 64px); display:inline-block; transform-origin:0 80%; }
+  .bnum .ui-big { font-size:clamp(44px, 4.4vw, 64px); display:inline-block; transform-origin:0 80%; min-width:2ch; font-variant-numeric:tabular-nums; }
+  .ui-big.stale, #legend b.stale { color:var(--ui-dim); }
   .bnum .ui-big.pop { animation:pop .5s var(--ui-ease); }
   @keyframes pop { 0% { transform:scale(1); } 30% { transform:scale(1.14); color:var(--ui-live2); } 100% { transform:scale(1); } }
   .bword { font-family:var(--ui-mono); font-size:11px; color:var(--ui-live2); }
@@ -143,7 +146,7 @@
   #legend { display:flex; flex-wrap:wrap; gap:4px 16px; font-family:var(--ui-mono); font-size:11px; color:var(--ui-fg2); }
   #legend span { white-space:nowrap; font-variant-numeric:tabular-nums; }
   #legend i { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:1px; }
-  #legend b { color:var(--ui-fg); font-weight:600; }
+  #legend b { color:var(--ui-fg); font-weight:600; display:inline-block; min-width:2ch; text-align:right; }
   .tright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
   .capred { font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-live); white-space:nowrap; }
   .tcv { position:relative; flex:1; min-height:150px; margin:0 6px; }
@@ -201,8 +204,9 @@
   /* controls: pills, 1px hairline, mono 11px. One primary on the page (send); grouped choices as one segmented pill */
   .btn-primary { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; text-transform:lowercase; font-weight:600;
     color:#000; background:#fff; border:1px solid #fff; border-radius:999px; padding:5px 14px; cursor:pointer;
-    transition:background .15s var(--ui-ease), border-color .15s var(--ui-ease); }
-  .btn-primary:hover { background:#dcdce2; border-color:#dcdce2; }
+    transition:background .15s var(--ui-ease), border-color .15s var(--ui-ease), transform .15s var(--ui-ease); }
+  .btn-primary:hover { background:#fff; border-color:#fff; color:#000; transform:translateY(-1px); }
+  .btn-primary:active { transform:none; transition-duration:0s; }
   .seg { display:inline-flex; padding:2px; gap:0; border:1px solid var(--ui-line2); border-radius:999px; }
   .seg button { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.06em; color:var(--ui-dim); background:transparent;
     border:0; border-radius:999px; padding:2px 10px; cursor:pointer; transition:color .15s var(--ui-ease), background .15s var(--ui-ease); }
@@ -234,6 +238,8 @@
     #p-live, #p-resp { grid-area:auto; height:430px; }
     #stage { flex:none; aspect-ratio:16/9; }
     #hdr .ui-state .ui-counter { display:none; }
+    /* the strip under his screen keeps its row while empty: when a title or a track arrives nothing below moves */
+    #v-strip[hidden] { display:flex !important; visibility:hidden; }
   }
   /* ≤ 720: one column: his room / screen, the chat (now + chat + input), the timeline, LIVE, RESPONSE */
   @media (max-width:720px) {
@@ -242,6 +248,12 @@
     #hdr .ui-nav { order:5; width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
     #ui-clock { display:none; }
+    /* the first row never wraps: the state takes the rest of it and its text shortens with an ellipsis, so "offline ·
+       reconnecting" -> "live · 3 watching" cannot push the row in two and the page down (it moved 32 px on load) */
+    #hdr .ui-spacer { display:none; }
+    #hdr .ui-state { flex:1 1 0; min-width:0; justify-content:flex-end; flex-wrap:nowrap; }
+    #hdr .ui-state > #ui-live { min-width:0; max-width:100%; overflow:hidden; }
+    #ui-live-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     #hero { height:auto; padding:22px var(--gut) 18px; }
     #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:calc(.3 * (1 + .08 * var(--hb, 0))); }
     #hero-s { font-size:10.5px; }
@@ -253,19 +265,21 @@
     #p-feed .fill { position:relative; inset:auto; }
     .fsec { flex:none; }
     .fchat { flex:none; min-height:0; }
-    #f-chat { flex:none; max-height:260px; }
-    #f-chat:empty { display:none; }
+    #f-chat { flex:none; height:200px; }   /* a fixed box: the history arriving does not push the timeline down */
+    #f-chat:empty::before { content:"no messages yet"; display:block; padding-top:4px; font-family:var(--ui-mono); font-size:11px; color:var(--ui-faint); }
     #away { padding:16px; } #away-s { font-size:11px; }
     .capred { font-size:9px; }
     #v-music { max-width:50%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .bcv.loading::before, #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl, #hero-img { animation:none !important; }
+    #away::before, .bnum .ui-big.pop, #evbtns .ui-btn, .cl, #hero-img { animation:none !important; }
     #f-ack { transition:none !important; }
     .bcv .bloom, .bnum .ui-big, .bnum .ui-big.flash, #hero-img, #grid .ui-panel, #v-room { transition:none !important; }
     .bnum .ui-big.flash { text-shadow:none; filter:none; }
     #grid.reveal { animation:none !important; }
     #hero-h, #hero-s { transition:none !important; }
+    .btn-primary, .btn-primary:hover, .btn-primary:active { transform:none !important; transition:none !important; }
+    .bcv .poster { transition:none !important; }
   }
 
   /* ---------------------------------------------------------------- the intro deck: five slides over the page, once a session */
@@ -332,7 +346,7 @@
     .i-skip { display:flex; }
     .i-count { right:68px; }
   }
-  .i-dots { display:flex; gap:2px; pointer-events:auto; }
+  .i-dots { display:flex; gap:2px; pointer-events:auto; min-height:24px; }
   .i-dots button { width:24px; height:24px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:50%; }
   .i-dots button::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--ui-faint); transition:background .2s var(--ui-ease), transform .2s var(--ui-ease); }
   .i-dots button:hover::before { background:var(--ui-dim); }
@@ -377,21 +391,22 @@
   </div>
 </header>
 
+<main id="main" tabindex="-1">
 <section id="hero">
   <img id="hero-img" src="/hero_brain.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="low" width="1400" height="954">
   <h1 id="hero-h">A brain model, live.</h1>
   <p id="hero-s">It runs on one person's real MRI wiring. Every number here is read from the model.</p>
 </section>
 
-<main id="grid">
+<div id="grid">
   <div id="brains">
     <section class="ui-panel brainp ui-in d1" id="p-live" aria-label="live brain, top view">
       <div class="fill">
         <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · --:--</span></div>
-        <div class="bcv loading" id="l-cv"><i class="bloom" aria-hidden="true"></i><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
+        <div class="bcv loading" id="l-cv"><img class="poster" src="/intro_brain_top.webp" alt="" aria-hidden="true" width="1200" height="1748" decoding="async"><i class="bloom" aria-hidden="true"></i><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
           <span class="orient">front</span></div>
         <div class="bfoot">
-          <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">his normal</span></div>
+          <div class="bnum"><span class="ui-big" id="l-num">—</span><span class="bword mid" id="l-word"></span></div>
           <div class="ui-label bcap" id="l-cap">ATTENTION · LIVE</div>
         </div>
       </div>
@@ -399,9 +414,9 @@
     <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's reaction to the last event">
       <div class="fill">
         <div class="bhead"><span class="ui-label" id="r-head"><b>RESPONSE</b></span><span class="tag" id="r-kind" hidden></span></div>
-        <div class="bcv loading" id="r-cv"><i class="bloom" aria-hidden="true"></i><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
+        <div class="bcv loading" id="r-cv"><img class="poster" src="/intro_brain_top.webp" alt="" aria-hidden="true" width="1200" height="1748" decoding="async"><i class="bloom" aria-hidden="true"></i><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
         <div class="bfoot">
-          <div class="bnum"><span class="ui-big" id="r-num">--</span><span class="ui-delta" id="r-delta"></span></div>
+          <div class="bnum"><span class="ui-big" id="r-num">—</span><span class="ui-delta" id="r-delta"></span></div>
           <div class="ui-label bcap" id="r-cap">REACTION · WAITING</div>
           <div class="bline"><div id="r-after"></div><div id="r-line">waiting for an event</div></div>
         </div>
@@ -425,10 +440,10 @@
     <div class="fill">
       <div class="thead">
         <div id="legend">
-          <span title="Attention = 50 + 40·log2(attention, salience and visual networks vs their own 25 s baseline). A model readout."><i style="background:var(--ui-attn)"></i>Attention <b id="lg-a">--</b>%</span>
-          <span title="Alertness = 50 + 30·log2(the model's noradrenaline level); 1.0 = resting wake = 50. A model readout."><i style="background:var(--ui-arousal)"></i>Alertness <b id="lg-r">--</b>%</span>
-          <span title="Mental effort = 70 % control and resting networks vs their own baseline, 30 % the model's acetylcholine level. A model readout."><i style="background:var(--ui-load)"></i>Mental effort <b id="lg-l">--</b>%</span>
-          <span title="Brain activity = 50 + 40·log2(mean of the 214 regions vs their own 25 s baseline). A model readout."><i style="background:var(--ui-neural)"></i>Brain activity <b id="lg-n">--</b>%</span>
+          <span title="Attention = 50 + 40·log2(attention, salience and visual networks vs their own 25 s baseline). A model readout."><i style="background:var(--ui-attn)"></i>Attention <b id="lg-a">—</b>%</span>
+          <span title="Alertness = 50 + 30·log2(the model's noradrenaline level); 1.0 = resting wake = 50. A model readout."><i style="background:var(--ui-arousal)"></i>Alertness <b id="lg-r">—</b>%</span>
+          <span title="Mental effort = 70 % control and resting networks vs their own baseline, 30 % the model's acetylcholine level. A model readout."><i style="background:var(--ui-load)"></i>Mental effort <b id="lg-l">—</b>%</span>
+          <span title="Brain activity = 50 + 40·log2(mean of the 214 regions vs their own 25 s baseline). A model readout."><i style="background:var(--ui-neural)"></i>Brain activity <b id="lg-n">—</b>%</span>
         </div>
         <div class="tright"><span class="capred">● model readouts · not measured from anyone</span>
           <span class="seg" id="wins" role="group" aria-label="time window"><button type="button" data-w="60" aria-pressed="false">1m</button><button type="button" data-w="300" aria-pressed="true">5m</button><button type="button" data-w="900" aria-pressed="false">15m</button></span></div>
@@ -458,6 +473,7 @@
       </div>
     </div>
   </section>
+</div>
 </main>
 
 <footer id="foot">
@@ -494,7 +510,7 @@
     <div class="i-act"><button type="button" class="btn-primary" id="i-enter">Enter the live view →</button>
       <button type="button" class="i-link" id="i-later">replay the intro later from the header</button></div>
   </section>
-  <div class="i-foot"><span class="i-hint" id="i-hint"><span class="h-fine">→ next · esc skip</span><span class="h-touch">tap → next · tap ✕ skip</span></span>
+  <div class="i-foot"><span class="i-hint" id="i-hint"><span class="h-fine">→ / scroll next · esc skip</span><span class="h-touch">swipe or tap → next · ✕ skip</span></span>
     <div class="i-dots" id="i-dots" role="group" aria-label="slides"></div></div>
 </div>
 
@@ -509,12 +525,12 @@ const Intro = (() => {
   let i = 0, open = false, back = null;
   const seen = () => { try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; } };
   const mark = () => { try { localStorage.setItem(KEY, "1"); } catch (e) {} };
-  dots.innerHTML = slides.map((_, k) => `<button type="button" data-k="${k}" aria-label="slide ${k + 1} of ${N}"></button>`).join("");
+  dots.innerHTML = slides.map((_, k) => `<button type="button" data-k="${k}" aria-label="slide ${k + 1} of ${N}" tabindex="-1"></button>`).join("");
   function go(k){
     k = Math.max(0, Math.min(N - 1, k)); if (k === i && slides[k].classList.contains("on")) return;
     i = k;
     slides.forEach((s, n) => s.classList.toggle("on", n === k));
-    dots.querySelectorAll("button").forEach((b, n) => b.setAttribute("aria-current", String(n === k)));
+    dots.querySelectorAll("button").forEach((b, n) => { b.setAttribute("aria-current", String(n === k)); b.tabIndex = n === k ? 0 : -1; });   // roving: only the current dot is tabbable
     count.textContent = `intro · ${k + 1} / ${N}`;
     hint.classList.toggle("off", k !== 0);
   }
@@ -542,14 +558,15 @@ const Intro = (() => {
     const f = focusEl || (back && back !== document.body && document.contains(back) ? back : null);
     if (f) f.focus({preventScroll:true}); else if (document.activeElement && box.contains(document.activeElement)) document.activeElement.blur();
   }
-  function focusables(){ return [...box.querySelectorAll("button")].filter(b => b.offsetParent !== null && getComputedStyle(b).visibility !== "hidden"); }
+  function focusables(){ return [...box.querySelectorAll("button")].filter(b => b.tabIndex >= 0 && b.offsetParent !== null && getComputedStyle(b).visibility !== "hidden"); }
   document.addEventListener("keydown", e => {
     if (!open) return;
-    const k = e.key, onBtn = e.target.closest && e.target.closest("button");
+    const k = e.key, onBtn = e.target.closest && e.target.closest("button"), onDot = onBtn && dots.contains(onBtn);
+    const moved = () => { if (onDot) { const d = dots.querySelector('[aria-current="true"]'); if (d) d.focus(); } };   // ← → on a dot: the focus follows
     if (k === "Escape") { e.preventDefault(); close(); }
-    else if (k === "ArrowRight" || k === "PageDown" || (k === " " && !onBtn)) { e.preventDefault(); go(i + 1); }
-    else if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); go(i - 1); }
-    else if (k === "Home") { e.preventDefault(); go(0); } else if (k === "End") { e.preventDefault(); go(N - 1); }
+    else if (k === "ArrowRight" || k === "PageDown" || (k === " " && !onBtn)) { e.preventDefault(); go(i + 1); moved(); }
+    else if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); go(i - 1); moved(); }
+    else if (k === "Home") { e.preventDefault(); go(0); moved(); } else if (k === "End") { e.preventDefault(); go(N - 1); moved(); }
     else if (k === "Tab") {                                    // the focus stays inside the deck
       const f = focusables(); if (!f.length) { e.preventDefault(); return; }
       const at = f.indexOf(document.activeElement);
@@ -562,6 +579,28 @@ const Intro = (() => {
     if (b) { if (b.dataset.k !== undefined) go(+b.dataset.k); return; }
     e.clientX < innerWidth / 2 ? go(i - 1) : go(i + 1);
   });
+  // the wheel: one slide a gesture. Events closer than 200 ms are one gesture (a trackpad's inertia included); after a
+  // move the wheel rests 600 ms, so a fling never skips several slides
+  let wLast = 0, wAcc = 0, wDone = false, wLock = 0;
+  box.addEventListener("wheel", e => {
+    if (!open) return; e.preventDefault();
+    const now = performance.now();
+    if (now - wLast > 200) { wAcc = 0; wDone = false; }
+    wLast = now;
+    if (wDone || now < wLock) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    wAcc += e.deltaMode ? d * 40 : d;
+    if (Math.abs(wAcc) < 24) return;
+    go(i + (wAcc > 0 ? 1 : -1)); wDone = true; wLock = now + 600; wAcc = 0;
+  }, {passive:false});
+  // touch: a horizontal swipe of 40 px or more (left = next); a tap keeps the halves (left back, right next)
+  let tx0 = null, ty0 = 0;
+  box.addEventListener("touchstart", e => { const t = e.touches[0]; tx0 = e.touches.length === 1 && t ? t.clientX : null; ty0 = t ? t.clientY : 0; }, {passive:true});
+  box.addEventListener("touchend", e => {
+    if (!open || tx0 === null) return;
+    const t = e.changedTouches[0], dx = t.clientX - tx0, dy = t.clientY - ty0; tx0 = null;
+    if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy)) { if (e.cancelable) e.preventDefault(); go(i + (dx < 0 ? 1 : -1)); }
+  }, {passive:false});
   document.getElementById("i-enter").addEventListener("click", () => close());
   document.getElementById("i-skip").addEventListener("click", () => close());
   const replay = document.getElementById("i-replay");
@@ -595,6 +634,15 @@ const COL = {a:"#ffffff", r:"#5aa9ff", l:"#ffd166", n:"#2ee6c5", da:"#ff2d55", c
 (() => { const cs = getComputedStyle(document.documentElement), g = k => cs.getPropertyValue(k).trim();
   COL.a = g("--ui-attn") || COL.a; COL.r = g("--ui-arousal") || COL.r; COL.l = g("--ui-load") || COL.l; COL.n = g("--ui-neural") || COL.n; COL.da = g("--ui-live") || COL.da; })();
 const shown = {};                                           // id -> last text written (the DOM is the cost)
+// the four readouts as last seen in this browser: shown dimmed (not as live) until the first tick; saved at most every 2 s
+const LAST_KEY = "sub01.last";
+const lastSeen = (() => { try { const v = JSON.parse(localStorage.getItem(LAST_KEY) || "null");
+  return v && ["a", "r", "l", "n"].every(k => isFinite(+v[k])) && Date.now() - (+v.t || 0) < 7 * 864e5 ? v : null; } catch (e) { return null; } })();
+let lastSaved = 0;
+function saveLast(){
+  const now = Date.now(); if (now - lastSaved < 2000) return; lastSaved = now;
+  const r = S.readS; try { localStorage.setItem(LAST_KEY, JSON.stringify({a:Math.round(r.a), r:Math.round(r.r), l:Math.round(r.l), n:Math.round(r.n), t:now})); } catch (e) {}
+}
 function put(id, t){ if (shown[id] === t) return; shown[id] = t; const el = $(id); if (el) el.textContent = t; }
 function putH(id, h){ if (shown[id] === h) return; shown[id] = h; const el = $(id); if (el) el.innerHTML = h; }
 
@@ -678,6 +726,7 @@ function onTick(m){
   else if (isFinite(+nm.ACh)) rd.l = clamp(+nm.ACh / 2 * 100);
   if (isFinite(neural)) rd.n = neural;
   for (const key of ["a", "r", "l", "n"]) S.readS[key] += (rd[key] - S.readS[key]) * 0.25;
+  saveLast();
 
   // the 500 ms samples
   if (!bin) bin = {t0:now, a:0, r:0, l:0, n:0, c:0};
@@ -962,7 +1011,7 @@ void main(){ float a = vA; if (vMode > 0.5) { vec2 d = gl_PointCoord - 0.5; a *=
 const BT = {pt:2.8, ptA:0.24, meshA:0.105, arcA:0.15, ref:2.4};
 
 class BrainView {
-  constructor(canvas){ this.cv = canvas; this.geo = null; this.heat = null; this.w = 0; this.h = 0; this.visible = true; this.need = true;
+  constructor(canvas){ this.cv = canvas; this.geo = null; this.heat = null; this.w = 0; this.h = 0; this.visible = true; this.need = true; this.lit = false; this.litTry = 0;
     try { this.gl = canvas.getContext("webgl", {alpha:true, antialias:true, premultipliedAlpha:true}) || null; } catch (e) { this.gl = null; }
     if (this.gl && !this.initGL()) {                                  // a canvas that once gave a WebGL context never gives a 2D one: swap in a fresh canvas
       this.gl = null; const fresh = canvas.cloneNode(false); canvas.replaceWith(fresh); canvas = this.cv = fresh;
@@ -1009,6 +1058,15 @@ class BrainView {
     if (rel) for (let v = 0; v < heat.length; v++) { const r = reg[v]; heat[v] = r >= 0 && r < rel.length ? rel[r] : 1; }
     else heat.fill(1);
     if (this.gl) this.drawGL(t, breath); else this.draw2D(breath);
+    if (!this.lit && (this.litTry++ >= 60 || this.isLit())) { this.lit = true; const box = this.cv.parentElement; requestAnimationFrame(() => box.classList.add("drawn")); }
+    return true;
+  }
+  isLit(){                                                              // one row across the middle has a lit pixel (read right after the draw)
+    const y = this.h >> 1, w = this.w;
+    try {
+      if (this.gl) { const px = new Uint8Array(w * 4); this.gl.readPixels(0, y, w, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, px); for (let i = 3; i < px.length; i += 4) if (px[i] > 6) return true; return false; }
+      if (this.g2) { const px = this.g2.getImageData(0, y, w, 1).data; for (let i = 3; i < px.length; i += 4) if (px[i] > 6) return true; return false; }
+    } catch (e) {}
     return true;
   }
   drawGL(t, breath){
@@ -1236,7 +1294,7 @@ function renderView(){
     put("away-k", sc && sc.restarting ? "restarting" : sc ? "loading" : "camera on him · loading");
     put("away-s", S.stage === "NREM" ? `the model's slow waves run; a word reaches it at ${Math.round(S.gain * 100)}%`
       : S.stage === "REM" ? "the model replays the day's words; nothing here is a dream anyone has"
-      : L.doing ? `${L.walking ? "walking · " : ""}${L.doing}` : "connecting…");
+      : L.doing ? `${L.walking ? "walking · " : ""}${L.doing}` : S.conn ? "the model is starting up" : "connecting…");
     $("away").style.setProperty("--away-c", S.stage === "REM" ? "rgba(167,139,250,.22)" : S.stage === "NREM" ? "rgba(40,70,200,.22)" : "rgba(63,123,255,.18)");
   }
   put("v-src", mode === "away" ? "his room" : "his screen");
@@ -1297,7 +1355,26 @@ function tweenStep(now){
   }
 }
 function level(v){ return v < 42 ? ["below his normal", ""] : v > 58 ? ["above his normal", "up"] : ["his normal", "mid"]; }
+let staleOn = null;
 function renderLive(){
+  if (!S.lastTickAt) {                                      // no tick yet: "—", or the last values seen here, dimmed
+    if (staleOn === null) {
+      const c = lastSeen; staleOn = !!c;
+      put("l-num", c ? String(c.a) : "—"); put("lg-a", c ? String(c.a) : "—"); put("lg-r", c ? String(c.r) : "—");
+      put("lg-l", c ? String(c.l) : "—"); put("lg-n", c ? String(c.n) : "—"); put("r-num", c ? String(c.a) : "—");
+      put("l-word", c ? "last seen here" : "");
+      for (const id of ["l-num", "lg-a", "lg-r", "lg-l", "lg-n", "r-num"]) $(id).classList.toggle("stale", !!c);
+      const ttl = c ? "the last value this browser saw; the live value replaces it on the first tick" : "";
+      for (const id of ["l-num", "r-num"]) $(id).title = ttl;
+    }
+    put("l-cap", "ATTENTION · LIVE"); putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
+    return;
+  }
+  if (staleOn !== false) {
+    staleOn = false;
+    for (const id of ["l-num", "lg-a", "lg-r", "lg-l", "lg-n", "r-num"]) { $(id).classList.remove("stale"); $(id).title = ""; }
+    for (const id of ["l-num", "r-num"]) { const tw = tween[id]; if (!tw) tween[id] = {from:S.readS.a, to:S.readS.a, t0:0, cur:S.readS.a, fl:0}; }
+  }
   const v = S.readS.a; tweenTo("l-num", v);
   const [w, cls] = level(v); put("l-word", w); $("l-word").className = "bword " + cls;
   put("l-cap", S.stage && S.stage !== "AWAKE" ? `ATTENTION · ASLEEP · ${S.stage}` : "ATTENTION · LIVE");
@@ -1346,7 +1423,18 @@ function heroNext(){
   hero.classList.add("swap");
   setTimeout(() => { set(); hero.classList.remove("swap"); hero.classList.add("enter"); void hero.offsetWidth; hero.classList.remove("enter"); }, 400);
 }
-if (!RM) setInterval(() => { if (!document.hidden) heroNext(); }, 8000);          // reduced motion: the first line stays
+// the hero box keeps the height of its tallest line pair, so the rotation never moves the grid below it
+function heroReserve(){
+  const hero = $("hero"), h = $("hero-h"), p = $("hero-s"), a = h.textContent, b = p.textContent;
+  hero.style.minHeight = ""; let m = 0;
+  for (const [x, y] of HERO) { h.textContent = x; p.textContent = y; m = Math.max(m, hero.offsetHeight); }
+  h.textContent = a; p.textContent = b; hero.style.minHeight = m + "px";
+}
+if (!RM) {
+  heroReserve();
+  let heroW = innerWidth; addEventListener("resize", () => { if (innerWidth !== heroW) { heroW = innerWidth; heroReserve(); } });
+  setInterval(() => { if (!document.hidden) heroNext(); }, 8000);                 // reduced motion: the first line stays
+}
 
 // ---------------------------------------------------------------- the frame loop
 const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 30;
