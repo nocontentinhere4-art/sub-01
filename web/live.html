@@ -100,6 +100,7 @@
   .bline > div { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .bline b { color:var(--ui-fg2); font-weight:500; }
   #r-after { color:var(--ui-fg2); }
+  #r-line { white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }   /* the plain network names run longer: two lines */
   #r-after:empty { display:none; }
 
   /* his screen */
@@ -146,6 +147,7 @@
   .tright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
   .capred { font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-live); white-space:nowrap; }
   .tcv { position:relative; flex:1; min-height:150px; margin:0 6px; }
+  .yax { position:absolute; top:0; left:8px; z-index:2; pointer-events:none; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:.08em; color:var(--ui-dim); }
   .tcv canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
   #tip { position:absolute; top:6px; pointer-events:none; background:rgba(14,14,17,.94); border:1px solid var(--ui-line2); border-radius:8px;
     padding:7px 9px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-fg2); white-space:nowrap; display:none; z-index:3; }
@@ -178,8 +180,6 @@
   @media (min-width:1101px) and (max-height:940px) { .fsec { padding:10px 14px; } }
   .fchat .ui-label { padding:0 14px 6px; }
   #f-chat { flex:1; min-height:0; overflow-y:auto; padding:0 14px 6px; scrollbar-width:thin; scrollbar-color:#333 transparent; }
-  #f-chat:empty::before { content:"no messages yet · say something: it reaches the model as a stimulus pattern"; display:block; padding:6px 0;
-    font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-faint); }
   .cl { display:flex; gap:9px; padding:5px 0; font-size:12.5px; line-height:1.4; color:var(--ui-fg2); animation:ui-in .45s var(--ui-ease) both; }
   .cl .av { flex:0 0 20px; height:20px; border-radius:50%; background:var(--ui-panel2); border:1px solid var(--ui-line2); color:var(--ui-dim);
     font-family:var(--ui-mono); font-size:9.5px; display:flex; align-items:center; justify-content:center; text-transform:uppercase; margin-top:1px; }
@@ -235,7 +235,7 @@
     #stage { flex:none; aspect-ratio:16/9; }
     #hdr .ui-state .ui-counter { display:none; }
   }
-  /* ≤ 720: one column: screen, timeline, LIVE, RESPONSE, feed */
+  /* ≤ 720: one column: his room / screen, the chat (now + chat + input), the timeline, LIVE, RESPONSE */
   @media (max-width:720px) {
     :root { --gut:12px; }
     #hdr { padding:10px var(--gut); gap:8px 12px; }
@@ -245,11 +245,16 @@
     #hero { height:auto; padding:22px var(--gut) 18px; }
     #hero-img { height:auto; width:min(560px, 130%); transform:translate(-50%, -42%); opacity:calc(.3 * (1 + .08 * var(--hb, 0))); }
     #hero-s { font-size:10.5px; }
-    #grid { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-template-areas:"view" "time" "brains" "feed"; }
+    #grid { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-template-areas:"view" "feed" "time" "brains"; }
     #p-time { height:300px; }
     #brains { grid-template-columns:minmax(0, 1fr); }
     #p-live, #p-resp { height:400px; }
-    #p-feed { height:520px; }
+    #p-feed { height:auto; }
+    #p-feed .fill { position:relative; inset:auto; }
+    .fsec { flex:none; }
+    .fchat { flex:none; min-height:0; }
+    #f-chat { flex:none; max-height:260px; }
+    #f-chat:empty { display:none; }
     #away { padding:16px; } #away-s { font-size:11px; }
     .capred { font-size:9px; }
     #v-music { max-width:50%; }
@@ -317,6 +322,16 @@
   .i-foot { position:absolute; left:0; right:0; bottom:26px; z-index:2; display:flex; flex-direction:column; align-items:center; gap:12px; pointer-events:none; }
   .i-hint { font-family:var(--ui-mono); font-size:10.5px; letter-spacing:.1em; color:var(--ui-dim); transition:opacity .3s var(--ui-ease); }
   .i-hint.off { opacity:0; }
+  .i-hint .h-touch { display:none; }
+  /* the skip button: touch screens only (a keyboard has esc) */
+  .i-skip { position:absolute; top:12px; right:12px; z-index:3; width:44px; height:44px; padding:0; border:1px solid var(--ui-line2);
+    border-radius:50%; background:rgba(0,0,0,.6); color:var(--ui-fg); font:inherit; font-size:18px; line-height:1; cursor:pointer;
+    display:none; align-items:center; justify-content:center; }
+  @media (pointer: coarse) {
+    .i-hint .h-fine { display:none; } .i-hint .h-touch { display:inline; }
+    .i-skip { display:flex; }
+    .i-count { right:68px; }
+  }
   .i-dots { display:flex; gap:2px; pointer-events:auto; }
   .i-dots button { width:24px; height:24px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:50%; }
   .i-dots button::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--ui-faint); transition:background .2s var(--ui-ease), transform .2s var(--ui-ease); }
@@ -330,6 +345,7 @@
   #i-replay.flash { color:var(--ui-fg); background:rgba(255,255,255,.14); }
   @media (max-width:720px) {
     .i-mark { top:18px; left:18px; } .i-count { top:20px; right:18px; }
+    @media (pointer: coarse) { .i-count { top:26px; right:66px; } .i-skip { top:12px; right:12px; } }
     .i-slide { padding:64px 20px 92px; }
     .i-title .i-h { font-size:clamp(44px, 14vw, 120px); }
     .i-title .i-s { font-size:11.5px; max-width:30ch; margin-left:auto; margin-right:auto; }
@@ -360,7 +376,7 @@
   </div>
 </header>
 
-<section id="hero" aria-live="polite">
+<section id="hero">
   <img id="hero-img" src="/hero_brain.webp" alt="" aria-hidden="true" decoding="async" fetchpriority="low" width="1400" height="954">
   <h1 id="hero-h">A brain model, live.</h1>
   <p id="hero-s">It runs on one person's real MRI wiring. Every number here is read from the model.</p>
@@ -374,18 +390,18 @@
         <div class="bcv loading" id="l-cv"><i class="bloom" aria-hidden="true"></i><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
           <span class="orient">front</span></div>
         <div class="bfoot">
-          <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">at his baseline</span></div>
+          <div class="bnum"><span class="ui-big" id="l-num">--</span><span class="bword mid" id="l-word">his normal</span></div>
           <div class="ui-label bcap" id="l-cap">ATTENTION · LIVE</div>
         </div>
       </div>
     </section>
-    <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's response to the last event">
+    <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's reaction to the last event">
       <div class="fill">
         <div class="bhead"><span class="ui-label" id="r-head"><b>RESPONSE</b></span><span class="tag" id="r-kind" hidden></span></div>
         <div class="bcv loading" id="r-cv"><i class="bloom" aria-hidden="true"></i><canvas id="r-canvas" aria-label="his brain model at the last event"></canvas></div>
         <div class="bfoot">
           <div class="bnum"><span class="ui-big" id="r-num">--</span><span class="ui-delta" id="r-delta"></span></div>
-          <div class="ui-label bcap" id="r-cap">ATTENTION · WAITING</div>
+          <div class="ui-label bcap" id="r-cap">REACTION · WAITING</div>
           <div class="bline"><div id="r-after"></div><div id="r-line">waiting for an event</div></div>
         </div>
       </div>
@@ -409,14 +425,14 @@
       <div class="thead">
         <div id="legend">
           <span title="Attention = 50 + 40·log2(attention, salience and visual networks vs their own 25 s baseline). A model readout."><i style="background:var(--ui-attn)"></i>Attention <b id="lg-a">--</b>%</span>
-          <span title="Arousal = 50 + 30·log2(the model's noradrenaline level); 1.0 = resting wake = 50. A model readout."><i style="background:var(--ui-arousal)"></i>Arousal <b id="lg-r">--</b>%</span>
-          <span title="Cognitive load = 70 % control and default-mode networks vs their own baseline, 30 % the model's acetylcholine level. A model readout."><i style="background:var(--ui-load)"></i>Cognitive load <b id="lg-l">--</b>%</span>
-          <span title="Neural activity = 50 + 40·log2(mean of the 214 regions vs their own 25 s baseline). A model readout."><i style="background:var(--ui-neural)"></i>Neural activity <b id="lg-n">--</b>%</span>
+          <span title="Alertness = 50 + 30·log2(the model's noradrenaline level); 1.0 = resting wake = 50. A model readout."><i style="background:var(--ui-arousal)"></i>Alertness <b id="lg-r">--</b>%</span>
+          <span title="Mental effort = 70 % control and resting networks vs their own baseline, 30 % the model's acetylcholine level. A model readout."><i style="background:var(--ui-load)"></i>Mental effort <b id="lg-l">--</b>%</span>
+          <span title="Brain activity = 50 + 40·log2(mean of the 214 regions vs their own 25 s baseline). A model readout."><i style="background:var(--ui-neural)"></i>Brain activity <b id="lg-n">--</b>%</span>
         </div>
         <div class="tright"><span class="capred">● model readouts · not measured from anyone</span>
           <span class="seg" id="wins" role="group" aria-label="time window"><button type="button" data-w="60" aria-pressed="false">1m</button><button type="button" data-w="300" aria-pressed="true">5m</button><button type="button" data-w="900" aria-pressed="false">15m</button></span></div>
       </div>
-      <div class="tcv"><canvas id="tl" aria-label="timeline of the four readouts with event markers"></canvas><div id="tip"></div></div>
+      <div class="tcv"><span class="yax" aria-hidden="true">0–100 · model index</span><canvas id="tl" aria-label="timeline of the four readouts with event markers"></canvas><div id="tip"></div></div>
       <div class="tfoot"><div id="evbtns" role="group" aria-label="events"></div></div>
     </div>
   </section>
@@ -435,8 +451,8 @@
       </div>
       <div class="fchat">
         <div class="ui-label"><b>Chat</b></div>
-        <div id="f-chat" aria-live="polite"></div>
-        <form id="f-form" autocomplete="off"><input class="ui-input" id="f-msg" maxlength="200" placeholder="say something to the model…" aria-label="message to the model"><button class="btn-primary" type="submit">send</button></form>
+        <div id="f-chat" role="log" aria-live="off" aria-label="chat"></div>
+        <form id="f-form" autocomplete="off"><input class="ui-input" id="f-msg" maxlength="200" placeholder="send him a message…" aria-label="send him a message"><button class="btn-primary" type="submit">send</button></form>
         <div id="f-ack" role="status" aria-live="polite"></div>
       </div>
     </div>
@@ -450,14 +466,15 @@
 
 <div id="intro" role="dialog" aria-modal="true" aria-label="introduction" tabindex="-1">
   <div class="i-mark" aria-hidden="true"><b>SUB-01</b><span>brain model</span></div>
-  <span class="i-count" id="i-count" aria-live="polite">01 / 05</span>
+  <span class="i-count" id="i-count" aria-live="polite">intro · 1 / 5</span>
+  <button type="button" class="i-skip" id="i-skip" aria-label="skip the intro">✕</button>
   <section class="i-slide i-title on" aria-label="1 of 5">
     <h2 class="i-h"><span class="w1">A brain</span><span class="w2">decoded</span></h2>
-    <p class="i-s">a simulation of one person's real brain wiring, running live</p>
+    <p class="i-s">a simulation of one person's real brain wiring, running a fictional guy in a Tokyo room</p>
     <div class="i-fig"><img src="/hero_brain.webp" alt="the brain's fibre tracts, seen from the side" width="1400" height="954" decoding="async"></div>
   </section>
   <section class="i-slide i-split" aria-label="2 of 5">
-    <div class="i-txt"><h2 class="i-h">Real wiring.</h2><p class="i-s">214 brain regions from one public MRI scan, joined by its real fibre tracts.</p></div>
+    <div class="i-txt"><h2 class="i-h">Real wiring.</h2><p class="i-s">214 brain regions, joined by fibre tracts estimated from one public MRI scan.</p></div>
     <div class="i-fig"><img src="/intro_brain_top.webp" alt="the fibre tracts seen from above" width="1200" height="1748" decoding="async"></div>
   </section>
   <section class="i-slide i-split" aria-label="3 of 5">
@@ -465,18 +482,18 @@
     <div class="i-fig hot"><img src="/intro_brain_top.webp" alt="the same wiring, two regions running above their baseline" width="1200" height="1748" decoding="async"></div>
   </section>
   <section class="i-slide i-split" aria-label="4 of 5">
-    <div class="i-txt"><h2 class="i-h">Four readouts.</h2><p class="i-s">Attention · Arousal · Cognitive load · Neural activity. Read from the model, not measured from anyone. 50 is its own baseline.</p></div>
+    <div class="i-txt"><h2 class="i-h">Four numbers.</h2><p class="i-s">Attention · Alertness · Mental effort · Brain activity. Read from the model, not measured from anyone. 50 = his normal.</p></div>
     <div class="i-fig"><ul class="i-keys">
-      <li style="color:var(--ui-attn)"><i></i>Attention</li><li style="color:var(--ui-arousal)"><i></i>Arousal</li>
-      <li style="color:var(--ui-load)"><i></i>Cognitive load</li><li style="color:var(--ui-neural)"><i></i>Neural activity</li></ul></div>
+      <li style="color:var(--ui-attn)"><i></i>Attention</li><li style="color:var(--ui-arousal)"><i></i>Alertness</li>
+      <li style="color:var(--ui-load)"><i></i>Mental effort</li><li style="color:var(--ui-neural)"><i></i>Brain activity</li></ul></div>
   </section>
   <section class="i-slide i-last" aria-label="5 of 5">
-    <h2 class="i-h">Send a stimulus.</h2>
-    <p class="i-s">Type a message. It enters the model and the RESPONSE panel shows what changed. He answers from the model; he is fiction.</p>
+    <h2 class="i-h">Send him a message.</h2>
+    <p class="i-s">It reaches the model and the REACTION panel shows what changed. He answers from the model; he is fiction.</p>
     <div class="i-act"><button type="button" class="btn-primary" id="i-enter">Enter the live view →</button>
       <button type="button" class="i-link" id="i-later">replay the intro later from the header</button></div>
   </section>
-  <div class="i-foot"><span class="i-hint" id="i-hint">→ next · esc skip</span>
+  <div class="i-foot"><span class="i-hint" id="i-hint"><span class="h-fine">→ next · esc skip</span><span class="h-touch">tap → next · tap ✕ skip</span></span>
     <div class="i-dots" id="i-dots" role="group" aria-label="slides"></div></div>
 </div>
 
@@ -497,7 +514,7 @@ const Intro = (() => {
     i = k;
     slides.forEach((s, n) => s.classList.toggle("on", n === k));
     dots.querySelectorAll("button").forEach((b, n) => b.setAttribute("aria-current", String(n === k)));
-    count.textContent = `${String(k + 1).padStart(2, "0")} / ${String(N).padStart(2, "0")}`;
+    count.textContent = `intro · ${k + 1} / ${N}`;
     hint.classList.toggle("off", k !== 0);
   }
   function show(){
@@ -545,6 +562,7 @@ const Intro = (() => {
     e.clientX < innerWidth / 2 ? go(i - 1) : go(i + 1);
   });
   document.getElementById("i-enter").addEventListener("click", () => close());
+  document.getElementById("i-skip").addEventListener("click", () => close());
   const replay = document.getElementById("i-replay");
   document.getElementById("i-later").addEventListener("click", () => {
     close(replay); replay.classList.add("flash"); setTimeout(() => replay.classList.remove("flash"), 1600);
@@ -568,8 +586,10 @@ const PHONE = matchMedia("(max-width: 720px)").matches || /Mobi|Android/i.test(n
 const DPR = () => Math.min(2, window.devicePixelRatio || 1);
 const RATE = 5, ACT_LO = 0.01, ACT_HI = 10;
 const ACT_LUT = Float32Array.from({length:256}, (_, b) => ACT_LO * Math.pow(ACT_HI / ACT_LO, b / 255));
-const NET = {visual:"Visual", somatomotor:"Somatomotor", attention:"Attention", salience:"Salience", limbic:"Limbic", control:"Control",
-  default:"Default mode", reward:"Reward", fear:"Fear", memory:"Memory", relay:"Relay", insula:"Insula", language:"Language"};
+// the networks in plain words (the RESPONSE line and the chat's "entered through" titles)
+const NET = {visual:"vision", somatomotor:"movement", attention:"attention", salience:"alert areas", limbic:"emotion", control:"control",
+  default:"resting network", reward:"reward", fear:"threat areas", memory:"memory", relay:"relay", insula:"insula", language:"language"};
+const plainNet = n => { const k = String(n || "").toLowerCase().replace(/[\s_-]*mode$/, "").trim(); return NET[k] || String(n || ""); };
 const COL = {a:"#ffffff", r:"#5aa9ff", l:"#ffd166", n:"#2ee6c5", da:"#ff2d55", chat:"#ffffff", replay:"#a78bfa"};
 (() => { const cs = getComputedStyle(document.documentElement), g = k => cs.getPropertyValue(k).trim();
   COL.a = g("--ui-attn") || COL.a; COL.r = g("--ui-arousal") || COL.r; COL.l = g("--ui-load") || COL.l; COL.n = g("--ui-neural") || COL.n; COL.da = g("--ui-live") || COL.da; })();
@@ -811,7 +831,7 @@ const tm = t => t ? `<span class="tm"> · ${esc(t)}</span>` : "";
 function chatLine(c){
   if (!c || !c.text) return;
   const nick = c.nick ? String(c.nick) : "viewer";
-  const nets = Array.isArray(c.networks) && c.networks.length ? `entered through ${c.networks.slice(0, 4).join(" · ")}` : "";
+  const nets = Array.isArray(c.networks) && c.networks.length ? `entered through ${c.networks.slice(0, 4).map(plainNet).join(" · ")}` : "";
   const sleep = c.asleep ? `through the sleep at ${Math.round((+c.gain || 0) * 100)}%` : "";
   addLine(`<span class="av">${esc(nick[0] || "v")}</span><span class="tx"><span class="nk">${esc(nick)}</span>${esc(trunc(c.text, 200))}${tm(c.t)}</span>`, "", [nets, sleep].filter(Boolean).join(" · "));
 }
@@ -820,7 +840,7 @@ function replyLine(r){
   addLine(`<span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${r.to ? `<span class="nets">@${esc(r.to)} </span>` : ""}${esc(trunc(r.text, 280))} <span class="tag">his reply</span>${tm(r.t)}</span>`, "me");
 }
 function sysLine(t, text, nets){
-  addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${tm(t)}</span>`, "sys", Array.isArray(nets) && nets.length ? `entered through ${nets.slice(0, 4).join(" · ")}` : "");
+  addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${tm(t)}</span>`, "sys", Array.isArray(nets) && nets.length ? `entered through ${nets.slice(0, 4).map(plainNet).join(" · ")}` : "");
 }
 let ackTimer = 0;
 function ack(text, ok){                       // one short line under the input; it fades back to nothing after 6 s
@@ -1121,7 +1141,7 @@ function drawTimeline(now){
     let best = pts[0]; for (const p of pts) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
     const mk = markerAt(hoverX, now);
     c.strokeStyle = "rgba(255,255,255,.4)"; c.lineWidth = 1; c.beginPath(); c.moveTo(hoverX + .5, y0); c.lineTo(hoverX + .5, y1); c.stroke();
-    const html = `<b>${esc(fmtAgo(now - best.t))}</b> · ${esc(S.clock)} now<br>Attention <b>${Math.round(best.a)}</b> · Arousal <b>${Math.round(best.r)}</b><br>Load <b>${Math.round(best.l)}</b> · Neural <b>${Math.round(best.n)}</b>`
+    const html = `<b>${esc(fmtAgo(now - best.t))}</b> · ${esc(S.clock)} now<br>Attention <b>${Math.round(best.a)}</b> · Alertness <b>${Math.round(best.r)}</b><br>Mental effort <b>${Math.round(best.l)}</b> · Brain activity <b>${Math.round(best.n)}</b>`
       + (mk ? `<br><span style="color:${mk.kind === "da" ? COL.da : mk.kind === "replay" ? COL.replay : "#fff"}">${esc(trunc(mk.label, 48))} · click</span>` : "");
     if (tip.innerHTML !== html) tip.innerHTML = html;
     tip.style.display = "block";
@@ -1275,7 +1295,7 @@ function tweenStep(now){
     if (id === "l-num") put("lg-a", String(Math.round(tw.cur)));     // the legend shows the same number as the big one
   }
 }
-function level(v){ return v < 42 ? ["below his baseline", ""] : v > 58 ? ["above his baseline", "up"] : ["at his baseline", "mid"]; }
+function level(v){ return v < 42 ? ["below his normal", ""] : v > 58 ? ["above his normal", "up"] : ["his normal", "mid"]; }
 function renderLive(){
   const v = S.readS.a; tweenTo("l-num", v);
   const [w, cls] = level(v); put("l-word", w); $("l-word").className = "bword " + cls;
@@ -1288,7 +1308,7 @@ function renderResp(){
   if (!mk) {                                     // before the first event: the live brain, dimmed, and the attention now in grey
     num.classList.add("dim");
     if (S.lastTickAt) tweenTo("r-num", S.readS.a);
-    putH("r-head", "<b>RESPONSE</b>"); put("r-delta", ""); put("r-cap", "ATTENTION · WAITING"); put("r-after", "");
+    putH("r-head", "<b>RESPONSE</b>"); put("r-delta", ""); put("r-cap", "REACTION · WAITING"); put("r-after", "");
     put("r-line", "waiting for an event"); $("r-kind").hidden = true;
     return;
   }
@@ -1300,9 +1320,9 @@ function renderResp(){
   tweenTo("r-num", mk.peak);
   const d = Math.round(mk.peak - mk.pre), del = $("r-delta");
   put("r-delta", d >= 0 ? `↑ +${d}` : `↓ ${d}`); del.className = "ui-delta " + (d >= 0 ? "up" : "down");
-  put("r-cap", asleep ? `ATTENTION · RESPONSE · ${mk.stage}` : "ATTENTION · RESPONSE");
+  put("r-cap", asleep ? `REACTION · ATTENTION · ${mk.stage}` : "REACTION · ATTENTION");
   put("r-after", `after: ${mk.label}`);
-  putH("r-line", `Recruiting <b>${esc((mk.top && mk.top.length ? mk.top : ["…"]).join(" · "))}</b>`);
+  putH("r-line", `what lit up: <b>${esc((mk.top && mk.top.length ? mk.top : ["…"]).join(" · "))}</b>`);
 }
 function pulseResp(){
   if (RM) return;
@@ -1314,7 +1334,7 @@ function pulseResp(){
 // ---------------------------------------------------------------- hero
 const HERO = [
   ["A brain model, live.", "It runs on one person's real MRI wiring. Every number here is read from the model."],
-  ["Send it a message.", "Your words enter the model. Attention, arousal and load respond."],
+  ["Send him a message.", "Your words reach the model. Attention, alertness and mental effort respond."],
   ["A model, not a mind.", "The character and his room are fiction. Credits on /about.html."],
 ];
 let heroI = 0;
