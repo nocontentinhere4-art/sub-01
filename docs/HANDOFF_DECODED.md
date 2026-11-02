@@ -26,7 +26,7 @@ save tokens, and checks the work.
    Now v2, with the one-deck classes (decision 17).
 4. Voice: bold declarative headlines, honest mono sub-lines; his chat replies keep the casual voice from `mind.py`
    (commit 7069cd1) and are shown tagged "his reply" (the "AI-written" tag was removed on 2026-11-02, see decision 14).
-5. Readouts are MODEL readouts, formulas in the spec; labelled "not measured from anyone" wherever shown.
+5. Readouts are MODEL readouts, formulas in the spec; the label "not measured from anyone" was removed on 2 November (owner); readouts are "model readouts", nothing more.
 6. The q=1 WebSocket feed now carries `groups`, `aud` and `life.{activity,place,phone,screen}` (screen filtered to
    `BRAIN_SCREEN`), see `Feed.brain_view` in live_server.py and the sample tick in the spec.
 7. **City removed** (owner, 2026-11-02: abandon the city and everything built around it). Done: the `city` nav link is gone from every
@@ -45,7 +45,7 @@ save tokens, and checks the work.
    lines of Python; the hot loop `brain_sim.step` takes ~4 ms per 50 ms tick, so a full rewrite is not justified. If
    performance ever matters, port `brain_sim.step` as a compiled extension.
 10. **Front page: half the words** (owner, 2026-11-02 afternoon: "too much information, keep it simple, clean buttons, everything understandable instantly"). innerText at 1440×900 went from 1728 to 839 characters. One caption per panel, no explanatory paragraphs, a segmented 1m / 5m / 15m control (`#wins`), one primary button (send), a one-line footer, and the viewport strip only when there is a title or music. Chat lines read "nick text · hh:mm" (the networks sit in the line's `title` attribute). The stimulus form's ack reads "sent" or "not sent: reason" (the old "propagating along the model's fibre tracts" line is gone). The hero rotates three lines, not five, every 8 s: "A brain model, live." / "Send it a message." / "A model, not a mind." ("Stimuli in. Readouts out." is replaced).
-11. **Intro deck** (owner: "the first thing when you open the website" is a title slide like the reference, plus a small tutorial). `#intro` is five slides, shown on the first visit per browser session (`sessionStorage` key `sub01.intro`), counter 01 / 05, a two-line lock-up. Slides: "A brain / decoded" (`web/hero_brain.webp`); "Real wiring."; "Simulated activity." (`web/intro_brain_top.webp`, a muted blue top view made from `out/sub01_fibres_top.png`); "Four readouts."; "Send a stimulus." with the primary button. Keyboard, dots and click navigate, Esc skips, and the header link "intro" replays it.
+11. **Intro deck** (owner: "the first thing when you open the website" is a title slide like the reference, plus a small tutorial). `#intro` is five slides, shown on the first visit per browser session (`sessionStorage` key `sub01.intro`) (its own count was removed on 2 November, owner; the dots mark the place), a two-line lock-up. Slides: "A brain / decoded" (`web/hero_brain.webp`); "Real wiring."; "Simulated activity." (`web/intro_brain_top.webp`, a muted blue top view made from `out/sub01_fibres_top.png`); "Four readouts."; "Send a stimulus." with the primary button. Keyboard, dots and click navigate, Esc skips, and the header link "intro" replays it.
 12. **The 3D room in the viewport** (owner: "add there the 3D room"). The "his screen" viewport shows the room whenever his screen is off. `web/room.html` has a chromeless `?embed` mode: scene only, a fading mono caption of what he does (`#ecap`), a slow camera drift (±4° round him over 40 s, a ±3 % dolly over 12 s, a ±0.7° tilt), exposure breathing ±3.5 % over 16 s, 30 fps, DPR 1, cursor hidden after 2 s. Contract: parent → iframe `postMessage {type:"sub01-embed", visible:boolean}`, where `visible:false` stops its render loop; iframe → parent `{type:"sub01-embed-ready"}` when he is first drawn. `live.html` creates the iframe once, shows or hides it by opacity, and posts `visible:false` when he is at a screen, when the tab is hidden, when the viewport is off screen, or while the intro deck is open. The away card stays as the loading placeholder ("camera on him · loading").
 13. **Motion** (owner: "make everything beautiful and hypnotic"). A radial bloom under each brain breathes with the model's synchrony (CSS variables `--bl` and `--bs`, set at most 10 times a second). The attention trace has a glow and the playhead has a 0.5 Hz halo. A big number that moves 5 points or more flashes (at most once per 2 s). The grid fades in over 600 ms after the deck closes, the hero image's opacity breathes ±8 % with the same sync, and panel borders lift on hover. All of it is off under `prefers-reduced-motion`. Measured cost: 0 fps under software GL (20.5 → 20.9). The room iframe is a separate, open cost (see the open items).
 14. **No AI wording on any page** (owner, 2026-11-02: "remove everything that says AI, AI written"). The tags read "his reply", "his notes" and "why". The diary and world pages say images are "rendered from the brain model's state". The room's page-reader lines say "the page is read for him". `about.html` keeps one factual sentence: a language model writes the notes, plans and replies. **This supersedes the hard rule "AI-written text is labelled" in `docs/HANDOFF.md`** (owner decision, 2026-11-02). The mechanism is still stated on `about.html`.
@@ -66,7 +66,7 @@ save tokens, and checks the work.
     - the room's fiction caption on its own bar;
     - the pulse spike on a sent message.
     The segments are simulated reviewers, so the result is a review aid, not user research.
-20. **Pages rebuilt** (owner decisions 16 to 19, applied). Front page: the deck header (counter 01 / 06) and the footer inside the first screen. Brain (`/brain`): full-bleed brain under the deck chrome, a title-style state line, a rail of seven numbers, two segmented controls, a "his day" drawer holding the old cards, `?mini` unchanged. Room (`/room`): full-bleed scene, state line, a bottom dock with vote · chat · teach · more, reactions in the dock row, the brain square, today and camera pills, corner marks, `?embed` unchanged. Diary and sees: see decision 18. About (`/about.html`): numbered slides with result tiles. Life, tastes and fibres: chrome only.
+20. **Pages rebuilt** (owner decisions 16 to 19, applied). Front page: the deck header (the slide counter was removed on 2 November, owner) and the footer inside the first screen. Brain (`/brain`): full-bleed brain under the deck chrome, a title-style state line, a rail of seven numbers, two segmented controls, a "his day" drawer holding the old cards, `?mini` unchanged. Room (`/room`): full-bleed scene, state line, a bottom dock with vote · chat · teach · more, reactions in the dock row, the brain square, today and camera pills, corner marks, `?embed` unchanged. Diary and sees: see decision 18. About (`/about.html`): numbered slides with result tiles. Life, tastes and fibres: chrome only.
 
 ## State of the work
 | piece | owner | state |
@@ -94,6 +94,35 @@ save tokens, and checks the work.
 | Docs for the one deck: this file, `decoded/README.md`, `SYSTEM.md` | docs | **done** (2026-11-02 evening) |
 | Docs: this file, `SPEC.md`, `decoded/README.md`, `OPERATIONS.md`, `HANDOFF.md` | docs agent | **done** |
 
+## Round of 2 November 2026 (afternoon): jury fixes, owner removals, v3 controls
+Branch `claude/compassionate-fermat-piv6wx`. The jury card is `docs/design/decoded/JURY-1.md`; the second is being written.
+- **Shared layer:** a skip link on every page (`deck.js`); hovers move more than colour; chips are 24 px; the phone header
+  has the lock-up and the LIVE chip on one row; the nav is one scrolling row of 44 px targets.
+- **Live (`/`):** phone CLS 0.385 → 0.005. The intro advances on wheel and swipe (roving dots). A faint brain poster sits
+  behind each canvas. Readouts show a dash until the first tick, then the last values seen.
+- **Brain (`/brain`):** `web/brain_poster.webp` (99 KB) cross-fades out at the first lit frame. The socket opens before
+  the geometry. Under reduced motion the brain is still. The headline is capped clear of the brain.
+- **Room (`/room`):** `web/room_poster.webp` (60 KB). He is not drawn until his clips run (no T-pose, also in the window
+  reflection). A loader pill; a still with one sentence where WebGL is missing. Headline capped at 18ch; shadow maps off under 768 px.
+- **About, diary, sees:** cost rows, then the whole Costs section, removed. The contract address is a full-width block with
+  a copy button. Empty states show a live next-dream or next-frame line. Images have dimensions; canonical links; `main` landmarks.
+- **Owner removals (same afternoon):** the Costs section of `/about.html` (sections now 01–06); "not measured from anyone"
+  from every page, `pulse.js` and the spec; the slide counter from every header and `deck.js`; the intro's own count (the dots mark the place).
+- **v3 controls** (`web/ui.css` v3 block, `window.SUB01UI` in `deck.js`), from the owner's five references (Rare UI, Kobra,
+  EasyUI, Pin UI, Aceternity UI), in black and white, with no library and no font: a light runs round a hovered pill; a white
+  thumb slides in the segmented control; one pill slides under the nav; a faint light follows the pointer in panels; the
+  primary button is magnetic and shines; `title=` tooltips and a toast; the send button reads "sent ✓"; a blur-in on a
+  changing headline (brain, room); shimmer on loader captions. All of it is off under reduced motion.
+- **Bugs fixed just after:** the thumb's MutationObserver re-fired itself. It now ignores the thumb's own style changes and
+  changes the control's class only when the value changes.
+- **Other:** `robots.txt` lost its relative `Sitemap` line (the directive must be absolute; the public origin is still unknown).
+  Jury tooling: `audit.mjs` resolves relative URLs.
+- **Tests:** green except the five pre-existing failures from main (`test_boy_mh`, `test_reading`, `test_spiking_live`,
+  `test_spiking_ops`, `test_tastes_faster`) and `tests/test_interactive.py::test_server_round_end_applies_when_awake`, which
+  depends on the Tokyo clock (the "window" activity scores zero around midnight).
+- **Still open from this round:** a decimated room GLB for phones; real-GPU and phone checks; the public origin (canonical
+  links, sitemap); two template-literal links in served HTML that the audit reads as 404s; the second jury card.
+
 ## Open items (what remains)
 From the jury review and the audience round:
 - **Real GPU and phone checks.** Brain glow fps and the room-in-viewport cost are not measured on a real GPU. The earlier numbers came from software GL only (rAF 12.8 → 20.6 fps at 1440 px; 91–100 % of lit brain pixels blue-dominant at 1440 and 390 px). The caps are 30 fps on desktop and 15 on phones. Measure on the owner's Mac and on a phone. If the room costs too much, pause it while the brains draw, or lower its resolution in embed mode.
@@ -101,7 +130,7 @@ From the jury review and the audience round:
 - **Phone diary scroll.** On phones a portrait dream image makes the diary scroll.
 - **Server-written night text.** The night text the server writes still says "replayed"; the page copy was changed to plain words ("played again").
 - **X-post clips.** Every frame still carries the corner label "AI · fictional character" and the hashtags #AI #AIgenerated. Left as is: labelling generated media on a platform is the owner's call.
-- **Audit warnings.** No `og:` tags, no robots.txt, no sitemap, thin text on sees, and the 404 page has no h1.
+- **Audit warnings (after the 2 November round).** 11 WARN: em dashes in visible text on three pages, meta descriptions over 160 characters on diary and about, thin text on the diary and sees empty states, a repeated sentence on about, images without dimensions on the live page, the 404 page without an h1. 2 FAIL: the template-literal links in served HTML.
 
 Carried over from the earlier list (not in the jury or audience results, still open):
 - **Embed, screenshot viewport and dopamine markers on a live server.** The demo runs with `BROWSE=0` (no `life.screen`) and has no dopamine events, so none of them is checked on a live server yet.

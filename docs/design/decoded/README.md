@@ -14,7 +14,7 @@ and 1280×800. The hero is `clamp(110px,15vh,170px)` high. ≤1100px: two column
 
 **Motion:** a radial bloom under each brain breathes with the model's synchrony (CSS variables `--bl` and `--bs`, set at most 10 times a second); the attention trace has a glow; the playhead has a 0.5 Hz halo; a big number that moves 5 points or more flashes its brightness (at most once per 2 s); the grid fades in over 600 ms after the intro deck closes; panel borders lift on hover. All of it is off under `prefers-reduced-motion`. Measured under software GL: no measurable cost (20.5 → 20.9 fps). The room iframe is the open cost (see the gaps).
 
-**Intro deck:** five slides on the first visit per browser session (`sessionStorage` key `sub01.intro`), counter 01 / 05: "A brain / decoded", "Real wiring.", "Simulated activity." (`web/intro_brain_top.webp`, a muted blue top view), "Four readouts." and "Send a stimulus." with the primary button. Keyboard, dots and click navigate; Esc skips. On touch, the intro has tap hints and a close button.
+**Intro deck:** five slides on the first visit per browser session (`sessionStorage` key `sub01.intro`), its own count removed on 2 November (owner; the dots mark the place), slides: "A brain / decoded", "Real wiring.", "Simulated activity." (`web/intro_brain_top.webp`, a muted blue top view), "Four readouts." and "Send a stimulus." with the primary button. Keyboard, dots and click navigate; Esc skips. On touch, the intro has tap hints and a close button.
 
 ## What it shows
 - **His screen**: the official embed (YouTube/TikTok allowlist, 8 s fallback), else `/api/screen/<desk|phone>.jpg` every 3 s with a crossfade, else the 3D room (see Room below). The away card (place / stage / activity on an animated grid) is the loading placeholder until the room has drawn ("camera on him · loading"). The bottom strip shows only when there is a title or music: the card title · host (80 chars), a "model-chosen …" chip and the music line.
@@ -68,8 +68,8 @@ mesh is in `p` space. `q` is the space of cortex.bin, which index.html uses. Wit
 `/live.html` now redirects to `/` (server routes). `--time-scale 60 --start 23:50` shows the asleep state.
 
 ## Honesty rules followed
-Model, not mind: no feel, think or understand. "He" is a fictional character. Every readout is labelled "model
-readouts — not measured from anyone". No text carries an AI label (decision 14 in `docs/HANDOFF_DECODED.md`); the about page states that a language model writes the notes, plans and replies. No real person is named. No trade or coin content.
+Model, not mind: no feel, think or understand. "He" is a fictional character. Every readout is labelled "model readouts" (the line "not measured from
+anyone" was removed on 2 November, owner). No text carries an AI label (decision 14 in `docs/HANDOFF_DECODED.md`); the about page states that a language model writes the notes, plans and replies. No real person is named. No trade or coin content.
 All server text is escaped. Images come only from the server itself, and embeds only from the official hosts.
 
 **Copy rules (2026-11-02):** plain factual sentences; no fragment-for-punch headlines (the hero line "Stimuli in. Readouts out." is now "Send it a message."); no "day and night"; no "AI" on any page: the tags read "his reply", "his notes" and "why", the diary and world pages say images are "rendered from the brain model's state", and the room's page-reader lines say "the page is read for him".
@@ -83,6 +83,30 @@ All server text is escaped. Images come only from the server itself, and embeds 
 - The room's fiction caption sits on its own bar, and a sent message sends the pulse spike along the strip.
 - The audience is simulated, so it is a review aid, not user research.
 
+## Jury fix round (2 November 2026, afternoon)
+What landed on `claude/compassionate-fermat-piv6wx`, by page. The owner's removals of that afternoon (the Costs section,
+the "not measured from anyone" line, the slide counters) are in `docs/HANDOFF_DECODED.md`.
+
+- **Shared (`deck.js`, `ui.css`, `pulse.js`):** skip link on every page; hovers move more than colour; chips are 24 px;
+  the phone header holds the lock-up and the LIVE chip on one row; the nav is one scrolling row of 44 px targets.
+- **Live (`/`):** phone CLS 0.385 → 0.005. The intro advances on wheel and swipe, with roving dots. A faint brain poster
+  sits behind each canvas. Readouts show a dash until the first tick, then the last values seen. The send button reads "sent ✓".
+- **Brain (`/brain`):** `web/brain_poster.webp` (99 KB) shows until the first lit frame, then cross-fades out. The
+  socket opens before the geometry. Under reduced motion the brain is still. The headline is capped clear of the brain.
+- **Room (`/room`):** `web/room_poster.webp` (60 KB). He is not drawn until his clips run, so there is no T-pose, also not
+  in the window reflection. A loader pill shows while it loads. Without WebGL, the poster stays with one sentence. The
+  headline is capped at 18ch. Shadow maps are off under 768 px.
+- **About, diary, sees:** the contract address is a full-width block with a copy button. Empty states show a live
+  next-dream or next-frame line. Images have dimensions; pages have canonical links and `main` landmarks.
+- **v3 controls** (`ui.css` v3 block, `window.SUB01UI` in `deck.js`): black-and-white translations of the owner's five
+  component references, with no library and no font. A light runs round a hovered pill, a white thumb slides in the
+  segmented control, one pill slides under the nav, panels have a pointer-following light, the primary button is magnetic,
+  and `title=` tooltips and a toast are part of the system. The headline blur-in (brain, room) and the loader shimmer
+  are on too. All of it is off under reduced motion.
+- **Bug fixed:** the segmented thumb's MutationObserver re-fired on its own style changes. It now ignores them and changes
+  the control's class only when the value changes.
+- **Open:** a decimated room GLB for phones; real-GPU and phone checks for the room and the brain glow.
+
 ## Not done / known gaps (handed over)
 Checks on a real device (from the jury review and the audience round):
 - **Real GPU and phone checks.** Brain glow fps and the room-in-viewport cost are not measured on a real GPU. The earlier numbers came from software GL only (rAF 12.8 → 20.6 fps at 1440 px; the caps are 30 fps on desktop and 15 on phones). Measure on the owner's Mac and on a phone. If the room costs too much, pause it while the brains draw, or lower its resolution in embed mode.
@@ -90,7 +114,7 @@ Checks on a real device (from the jury review and the audience round):
 - **Phone diary scroll.** On phones a portrait dream image makes the diary scroll.
 - **Server-written night text.** The server still writes "replayed"; the page copy uses plain words ("played again").
 - **X-post clips.** Every frame still carries "AI · fictional character" and the hashtags #AI #AIgenerated. The owner decides this.
-- **Audit warnings.** No `og:` tags, no robots.txt, no sitemap, thin text on sees, and the 404 page has no h1.
+- **Audit warnings (after the 2 November round).** 11 WARN (dashes in visible text, two long meta descriptions, thin empty states on diary and sees, a repeated sentence on about, images without dimensions on the live page, the 404 without an h1) and 2 FAIL (template-literal links in served HTML). robots.txt and sitemap.xml exist; the sitemap line waits for the public origin.
 
 Carried over from the earlier list (still open):
 - **Embed, screenshot viewport and dopamine markers on a live server.** The demo runs with `BROWSE=0` and has no dopamine events. The room embed has been run in headless Chromium only.
