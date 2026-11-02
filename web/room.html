@@ -376,7 +376,7 @@
   </div>
 </header>
 <main id="main" tabindex="-1" aria-label="his room"><div id="scene"></div></main><img id="poster" src="/room_poster.webp" width="1600" height="900" alt="a still of his room while the live scene loads" decoding="async" fetchpriority="high" onerror="this.remove()"><div id="vignette"></div><div id="reticle" aria-hidden="true"></div>
-<div id="boot"><div><div class="w">SUB-01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
+<div id="boot"><div><div class="w">SUB-01</div><div id="boot-t" class="ui-shimmer">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <script>
   // no WebGL here: the poster stays and the loader says so in one sentence (also when the renderer itself fails to start)
   (() => { const nogl = () => { const b = document.getElementById("boot"); if (!b || b.classList.contains("nogl")) return; b.classList.add("nogl");
@@ -3654,7 +3654,9 @@ function storyText(life, outside, seated){
   if (outside && life.walking) return `is <em>walking</em> · next: ${esc(life.doing)}.`;   // a walk home takes minutes: don't say he's already there
   return r ? `is reading <em>${esc(r.title)}</em>.` : `is <em>${esc(life.doing)}</em>.`;
 }
-function story(life, outside){ put("story", "innerHTML", storyText(life, outside, !(visible && !seatedAtDesk()))); if (EMBED) embedCaption(); }
+function story(life, outside){ const h = storyText(life, outside, !(visible && !seatedAtDesk()));
+  if (story.last !== h) { story.last = h; if (window.SUB01UI) SUB01UI.swap($("story"), () => put("story", "innerHTML", h)); else put("story", "innerHTML", h); }
+  if (EMBED) embedCaption(); }
 // ---------- the night (R3): while he sleeps the room is not dead air: the eye's newest frame, and the night so far ----------
 let eyeFrame = null, nights = null, stageWas = null;
 function onEye(f){ if (f && f.img) { eyeFrame = f; dreamCard(); } }
@@ -3728,8 +3730,9 @@ new ResizeObserver(() => document.documentElement.style.setProperty("--dockh", `
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdrh", `${Math.ceil($("hdr").offsetHeight)}px`)).observe($("hdr"));
 $("chat").addEventListener("submit", ev => {
   ev.preventDefault(); const t = $("msg").value.trim(); if (!t) return;
-  if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting"; $("note").className = "err"; return; }
-  sock.send(JSON.stringify({type:"chat", text:t})); $("msg").value = "";
+  const btn = ev.target.querySelector("button");
+  if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting"; $("note").className = "err"; if (window.SUB01UI) SUB01UI.state(btn, "fail"); return; }
+  sock.send(JSON.stringify({type:"chat", text:t})); $("msg").value = ""; if (window.SUB01UI) SUB01UI.state(btn, "done");
 });
 
 // ---------- loop ----------

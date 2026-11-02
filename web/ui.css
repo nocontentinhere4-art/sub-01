@@ -289,3 +289,93 @@ main[tabindex="-1"]:focus { outline:none; }
   .ui-btn, .ui-seg > button, .ui-nav a, .ui-lockup, .ui-lockup small, .ui-tab, .tab, :is(.ui-dock, #tools, .ui-hud) button,
   :is(p, li, td, .ui-honest, .ui-caption) a { transition-duration:0s !important; }
 }
+
+/* ============================================================================================================
+   v3 · controls that answer (2026-11-02). The owner's five component references (Rare UI, Kobra, EasyUI, Pin UI,
+   Aceternity) translated into black and white, no library, no font: a light runs round a hovered pill, a white thumb
+   slides inside the segmented control, one pill slides under the nav, a faint light follows the pointer in panels,
+   the primary button is magnetic and shines, a tooltip and a toast in the system, a stateful send, shimmer on loader
+   captions, a blur-in on a changing headline. deck.js places the moving parts (window.SUB01UI). Still under reduced
+   motion; pointer things only on fine pointers. */
+@property --ui-ang { syntax:"<angle>"; inherits:false; initial-value:0deg; }
+@keyframes ui-run { to { --ui-ang:360deg; } }
+@keyframes ui-shine { from { transform:translateX(-140%) skewX(-18deg); } to { transform:translateX(260%) skewX(-18deg); } }
+@keyframes ui-shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
+@keyframes ui-swap { from { opacity:0; filter:blur(6px); transform:translateY(4px); } to { opacity:1; filter:blur(0); transform:none; } }
+@keyframes ui-tip { from { opacity:0; transform:translate(-50%, 4px) scale(.96); } to { opacity:1; transform:translate(-50%, 0) scale(1); } }
+@keyframes ui-tip-b { from { opacity:0; transform:translate(-50%, -4px) scale(.96); } to { opacity:1; transform:translate(-50%, 0) scale(1); } }
+@keyframes ui-toast { from { opacity:0; transform:translate(-50%, 8px); } to { opacity:1; transform:translate(-50%, 0); } }
+
+/* pills: a light runs round the hairline under the pointer; the press is a 3 % squeeze */
+.ui-btn, .ui-seg > button { position:relative; isolation:isolate; }
+.ui-btn::before { content:""; position:absolute; inset:-1px; border-radius:inherit; padding:1px; pointer-events:none; z-index:1; opacity:0;
+  background:conic-gradient(from var(--ui-ang), transparent 0 60%, rgba(255,255,255,.95) 80%, transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite:exclude;
+  transition:opacity .25s var(--ui-ease); }
+.ui-btn:hover:not(:disabled):not([aria-disabled="true"])::before { opacity:1; animation:ui-run 1.4s linear infinite; }
+.ui-btn:active:not(:disabled), .ui-seg > button:active:not(:disabled) { transform:scale(.97); }
+/* the primary pill: a shine crosses the white fill once, and the pointer pulls it a few pixels (deck.js) */
+.ui-btn.primary { overflow:hidden; }
+.ui-btn.primary::before { inset:0 auto 0 0; width:45%; padding:0; -webkit-mask:none; mask:none; border-radius:0; z-index:1;
+  background:linear-gradient(100deg, transparent 20%, rgba(0,0,0,.14) 50%, transparent 80%); transform:translateX(-140%) skewX(-18deg); }
+.ui-btn.primary:hover:not(:disabled)::before { opacity:1; animation:ui-shine .7s var(--ui-ease) 1 forwards; }
+.ui-btn.primary:active:not(:disabled) { transform:scale(.97); }
+
+/* the segmented control: a white thumb slides to the chosen button (a control with several chosen buttons keeps the fill) */
+.ui-seg { position:relative; }
+.ui-seg > .ui-seg-thumb { position:absolute; left:0; top:0; width:0; height:0; border-radius:999px; background:var(--ui-fg); z-index:0;
+  pointer-events:none; opacity:0; transition:transform .28s var(--ui-ease), width .28s var(--ui-ease), height .28s var(--ui-ease), opacity .2s; }
+.ui-seg.has-thumb > button { z-index:1; transition:color .18s var(--ui-ease), background .18s var(--ui-ease), box-shadow .18s var(--ui-ease); }
+.ui-seg.has-thumb > button.on, .ui-seg.has-thumb > button[aria-pressed="true"] { background:transparent; box-shadow:none; }
+
+/* the nav: one pill slides under the pointer (or the focus) and comes home to the current page */
+.ui-nav { position:relative; }
+.ui-nav > .ui-nav-pill { position:absolute; left:0; top:0; width:0; height:0; border-radius:999px; background:rgba(255,255,255,.1); z-index:0;
+  pointer-events:none; opacity:0; transition:transform .3s var(--ui-ease), width .3s var(--ui-ease), height .3s var(--ui-ease), opacity .2s; }
+.ui-nav.has-pill > a { position:relative; z-index:1; }
+.ui-nav.has-pill > a:hover, .ui-nav.has-pill > a.on { background:transparent; }
+
+/* panels: a faint light follows the pointer, the hairline brightens (deck.js sets --mx/--my and positions the panel) */
+.ui-panel.has-spot { isolation:isolate; --mx:50%; --my:50%; transition:border-color .3s var(--ui-ease); }
+.ui-panel.has-spot::before { content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:-1; opacity:0;
+  background:radial-gradient(260px circle at var(--mx) var(--my), rgba(255,255,255,.07), transparent 65%); transition:opacity .35s var(--ui-ease); }
+.ui-panel.has-spot:hover::before { opacity:1; }
+.ui-panel.has-spot:hover { border-color:var(--ui-line2); }
+
+/* inputs: a soft halo when the pointer puts the focus there (the keyboard keeps the ring) */
+.ui-input:focus:not(:focus-visible) { border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.08); }
+.ui-input::placeholder { color:var(--ui-faint); }
+
+/* a stateful button (SUB01UI.state(btn, "busy" | "done" | "fail", text)): the label changes, done fills white for a moment */
+button[data-state="busy"] { opacity:.7; cursor:progress; }
+button[data-state="done"] { background:#fff !important; color:#000 !important; border-color:#fff !important; }
+button[data-state="fail"] { border-color:var(--ui-live) !important; color:var(--ui-live2) !important; }
+
+/* the tooltip (deck.js shows it for title= on buttons, links, chips and summaries, and for [data-tip]) */
+.ui-tip { position:fixed; left:0; top:0; z-index:2147483000; max-width:260px; padding:6px 9px; border-radius:8px; background:#0e0e11;
+  color:var(--ui-fg2); border:1px solid var(--ui-line2); font-family:var(--ui-mono); font-size:11px; line-height:1.45; letter-spacing:.02em;
+  text-transform:none; pointer-events:none; transform:translate(-50%, 0); animation:ui-tip .16s var(--ui-ease) both; }
+.ui-tip.below { animation-name:ui-tip-b; }
+.ui-tip[hidden] { display:none; }
+
+/* the toast (SUB01UI.toast("copied")): a white pill above the pulse for a moment */
+.ui-toast { position:fixed; left:50%; bottom:calc(var(--ui-pulse-h) + 16px); z-index:2147483000; transform:translate(-50%, 0); padding:8px 14px;
+  border-radius:999px; background:#fff; color:#000; font-family:var(--ui-mono); font-size:12px; letter-spacing:.06em; pointer-events:none;
+  animation:ui-toast .22s var(--ui-ease) both; transition:opacity .3s var(--ui-ease); }
+.ui-toast.out { opacity:0; }
+body:not([data-pulse]) .ui-toast { bottom:16px; }
+
+/* a loader caption: a light passes along the text */
+.ui-shimmer { background:linear-gradient(90deg, var(--ui-dim) 0 38%, #fff 50%, var(--ui-dim) 62% 100%); background-size:200% 100%;
+  color:transparent; -webkit-background-clip:text; background-clip:text; animation:ui-shimmer 1.8s linear infinite; }
+
+/* a changing line (SUB01UI.swap(el, fn)): the new text comes in from a 6 px blur */
+.ui-swap { animation:ui-swap .32s var(--ui-ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn::before, .ui-shimmer, .ui-swap, .ui-tip, .ui-toast { animation:none !important; }
+  .ui-btn.primary::before { display:none; }
+  .ui-shimmer { color:var(--ui-dim); background:none; -webkit-background-clip:border-box; background-clip:border-box; }
+  .ui-seg > .ui-seg-thumb, .ui-nav > .ui-nav-pill, .ui-panel.has-spot::before, .ui-panel.has-spot { transition:none !important; }
+}

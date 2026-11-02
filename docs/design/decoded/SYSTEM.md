@@ -88,3 +88,21 @@ Page crossfade 320 ms; panels enter with the `.ui-in` stagger; big numbers tween
 A model, not a mind. The character, his room and his life are fiction. Never name the scanned person (credit on
 /about.html only). No coin promotion beyond the address line, no trade tape. Keep the password gate and every API.
 No new third-party scripts or fonts beyond the CDNs already used. No "AI" wording on any page.
+
+## v3 · controls that answer (11-02, from the owner's five component references)
+Rare UI, Kobra, EasyUI, Pin UI and Aceternity UI, translated into black and white; no library, no font, nothing new under
+reduced motion except the end states. All of it is ui.css (the v3 block) and deck.js (`window.SUB01UI`); a page only adds
+a class or a call.
+- Every `.ui-btn`: a white light runs round the hairline while the pointer is on it (a conic gradient masked to the ring,
+  `--ui-ang` animated); the press squeezes 3 %. `.ui-btn.primary`: a shine crosses the white fill once on hover, and the
+  button leans up to 3 px toward the pointer (magnetic; `.btn-primary` too).
+- `.ui-seg`: deck.js inserts `.ui-seg-thumb`, a white pill that slides to the one `.on` / `aria-pressed` button (a
+  MutationObserver follows the choice). A control with several chosen buttons keeps the static fill.
+- `.ui-nav`: deck.js inserts `.ui-nav-pill`; it rests under the current page and slides under the hovered or focused link.
+- `.ui-panel`: a 260 px light at 7 % follows the pointer inside (`--mx`/`--my`), the hairline brightens.
+- Tooltips: a `title` on a button, link, chip or summary shows as `.ui-tip` (11 px mono, hairline panel, 160 ms in) above
+  the control; the title moves to `data-tip` on first hover and `aria-describedby` points at the tip while it shows.
+- `SUB01UI.toast(text)`: a white pill above the pulse for 1.6 s (`role=status`). `SUB01UI.state(btn, "busy"|"done"|"fail", text)`:
+  the send buttons read "sent ✓" (white) or "not sent" (red hairline) for 1.2 s. `SUB01UI.swap(el, fn)`: a changing
+  headline comes in from a 6 px blur (brain and room `#story`, once per change). `.ui-shimmer`: a light passes along a
+  loader caption (the room's boot line, the live page's "loading the wiring…").

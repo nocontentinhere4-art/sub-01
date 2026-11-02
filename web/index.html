@@ -1255,8 +1255,9 @@ function ack(text, ok){
 $("chat").addEventListener("submit", ev => {
   ev.preventDefault(); const inp = $("msg"), text = inp.value.trim();
   if (!text) return;
-  if (!sock || sock.readyState !== 1) { ack("still connecting, try again in a moment", false); return; }
-  sock.send(JSON.stringify({type:"chat", text})); inp.value = "";
+  const btn = ev.target.querySelector("button");
+  if (!sock || sock.readyState !== 1) { ack("still connecting, try again in a moment", false); if (window.SUB01UI) SUB01UI.state(btn, "fail"); return; }
+  sock.send(JSON.stringify({type:"chat", text})); inp.value = ""; if (window.SUB01UI) SUB01UI.state(btn, "done");
 });
 document.querySelectorAll("#layers button").forEach(b => b.onclick = () => {
   b.classList.toggle("on"); const on = b.classList.contains("on"), l = b.dataset.l;
@@ -1332,7 +1333,9 @@ if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); 
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
 // the caption twice a second, written only when it changed (R4: a rewrite every 500 ms re-laid the header for nothing)
 const capShown = {story: null, sub: null}, RM = REDUCED;
-function storyPut(html){ const e = $("story"); e.innerHTML = html; e.classList.toggle("long", e.textContent.length > 30); }
+function storyPut(html){ const e = $("story"); if (storyPut.last === html) return; storyPut.last = html;
+  const put = () => { e.innerHTML = html; e.classList.toggle("long", e.textContent.length > 30); };
+  if (window.SUB01UI) SUB01UI.swap(e, put); else put(); }   // (the new line comes in from a blur; once per change)
 let capSwap = 0;
 function capPut(id, html){
   if (capShown[id] === html) return;

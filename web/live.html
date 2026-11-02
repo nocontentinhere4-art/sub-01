@@ -85,7 +85,10 @@
     -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%); mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%); }
   .bcv.drawn .poster { opacity:0; }
   .bcv.loading::after { content:"loading the wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
-    font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint); }
+    font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint);
+    background:linear-gradient(90deg, var(--ui-faint) 0 38%, #fff 50%, var(--ui-faint) 62% 100%); background-size:200% 100%; color:transparent;
+    -webkit-background-clip:text; background-clip:text; animation:ui-shimmer 1.8s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .bcv.loading::after { animation:none; background:none; color:var(--ui-faint); -webkit-background-clip:border-box; background-clip:border-box; } }
   .bcv .orient { position:absolute; top:4px; left:50%; transform:translateX(-50%); font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
   .bfoot { padding:0 16px 14px; }
   .bnum { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
@@ -898,8 +901,9 @@ $("f-form").addEventListener("submit", ev => {
   const text = $("f-msg").value.trim();
   if (!text) return;
   if (text.length > 200) { ack("not sent: max 200 characters", false); return; }
-  if (!sock || sock.readyState !== 1) { ack("not sent: reconnecting", false); return; }
-  sock.send(JSON.stringify({type:"chat", text}));
+  const btn = ev.target.querySelector("button");
+  if (!sock || sock.readyState !== 1) { ack("not sent: reconnecting", false); if (window.SUB01UI) SUB01UI.state(btn, "fail"); return; }
+  sock.send(JSON.stringify({type:"chat", text})); if (window.SUB01UI) SUB01UI.state(btn, "done");
 });
 
 // ---------------------------------------------------------------- brain geometry (in a worker: the first paint stays fast)
