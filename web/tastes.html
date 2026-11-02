@@ -6,83 +6,99 @@
 <title>SUB-01 · tastes</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  :root { --bg:#040406; --fg:#ececf2; --dim:#7a7a8c; --line:#1c1c26; --or:#ff6a00; --cy:#6fb7ff; }
+  /* SUB-01 · tastes: a notes page of the deck (counter "—"). Tokens and chrome come from /ui.css; no orange here. */
   * { box-sizing:border-box; }
-  html,body { margin:0; background:var(--bg); color:var(--fg); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  html,body { margin:0; background:var(--ui-bg); color:var(--ui-fg); }
+  body { font-family:var(--ui-mono); -webkit-font-smoothing:antialiased; overflow-x:hidden; }
   a { color:inherit; }
-  header { display:flex; align-items:center; flex-wrap:wrap; gap:14px; padding:14px 18px; }
-  header h1 { margin:0; font-size:20px; letter-spacing:.12em; background:var(--or); color:#0a0a0a; padding:2px 10px; }
-  header .sub { color:var(--dim); font-size:12px; }
-  header .sub a { text-decoration:none; padding:4px 6px; border-radius:4px; transition:color .2s, background .2s; }
-  header .sub a:hover { color:var(--fg); background:rgba(255,255,255,.06); }
-  main { padding:0 18px 18px; max-width:980px; }
-  .lead { font-size:16px; line-height:1.6; margin:6px 0 24px; max-width:70ch; }
-  section { margin:0 0 30px; }
-  h2 { color:var(--dim); font-size:11px; font-weight:normal; letter-spacing:.1em; text-transform:uppercase;
-    margin:0 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line); }
-  h2 b { color:var(--or); font-weight:normal; margin-right:8px; }
-  .cols { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  #hdr { position:sticky; top:0; z-index:20; background:rgba(0,0,0,.82); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--ui-line); flex-wrap:wrap; row-gap:8px; }
+  main { padding:0 var(--ui-pad) 28px; max-width:1100px; margin:0 auto; }
+  .ui-title { padding:clamp(28px, 6vh, 64px) 0 clamp(20px, 4vh, 40px); }
+  .ui-title h1 { margin:0 0 14px; font-family:var(--ui-sans); font-weight:800; font-size:clamp(40px, 7vw, 96px); line-height:.95; letter-spacing:-.05em; }
+  .ui-title p { margin:0; max-width:760px; font-size:13.5px; line-height:1.7; letter-spacing:0; text-transform:none; color:var(--ui-fg2); }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:var(--ui-gap); margin-bottom:var(--ui-gap); }
+  .ui-panel { padding:0; }
+  .ui-panel .ui-caption { display:flex; align-items:baseline; gap:10px; margin:0; padding:12px 14px; border-bottom:1px solid var(--ui-line); }
+  .ui-panel .ui-caption b { font-family:var(--ui-sans); font-weight:700; font-size:15px; letter-spacing:0; color:var(--ui-fg); line-height:1; }
+  .ui-panel .pb { padding:14px; }
+  .panel-w { margin-bottom:var(--ui-gap); }
   .chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-  .chip { display:inline-flex; align-items:baseline; gap:7px; padding:5px 10px; border:1px solid var(--line);
-    border-radius:999px; background:#0c0c12; line-height:1.2; max-width:100%; }
-  .chip .t { overflow-wrap:anywhere; }
-  .chip .k { font-size:10px; color:var(--dim); letter-spacing:.06em; text-transform:uppercase; }
-  .chip .v { font-size:11px; color:var(--dim); }
+  .chip { display:inline-flex; align-items:baseline; gap:7px; padding:5px 10px; border:1px solid var(--ui-line2);
+    border-radius:999px; background:transparent; line-height:1.2; max-width:100%; }
+  .chip .t { overflow-wrap:anywhere; color:var(--ui-fg); }
+  .chip .k { font-size:10px; color:var(--ui-dim); letter-spacing:.06em; text-transform:uppercase; }
+  .chip .v { font-size:11px; color:var(--ui-dim); }
   .chip.net { border-style:dashed; }
-  .fav .chip { border-color:rgba(255,106,0,.45); } .fav .chip .t { color:#ffd2b0; }
-  .avo .chip { border-color:rgba(111,183,255,.4); } .avo .chip .t { color:#cfe5ff; }
-  .none { color:var(--dim); font-size:13px; line-height:1.6; }
-  #charts { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; }
-  .card { border:1px solid var(--line); border-radius:4px; padding:10px 12px 8px; background:#0a0a10; }
-  .card .h { display:flex; justify-content:space-between; gap:8px; font-size:13px; margin-bottom:6px; }
+  .avo .chip { border-color:var(--ui-line); } .avo .chip .t { color:var(--ui-fg2); }
+  .none { color:var(--ui-dim); font-size:13px; line-height:1.6; }
+  #charts { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:1px; background:var(--ui-line); border:1px solid var(--ui-line); border-radius:var(--ui-r); overflow:hidden; }
+  #charts .none { background:var(--ui-panel); padding:12px; grid-column:1 / -1; }
+  .card { padding:12px 14px 10px; background:var(--ui-panel); }
+  .card .h { display:flex; justify-content:space-between; gap:8px; font-size:13px; margin-bottom:8px; color:var(--ui-fg); }
   .card .h span:first-child { overflow-wrap:anywhere; }
-  .card .h span:last-child { color:var(--dim); font-size:11px; flex:none; }
+  .card .h span:last-child { color:var(--ui-dim); font-size:11px; flex:none; }
   .card svg { display:block; width:100%; height:64px; }
-  .card .d { display:flex; justify-content:space-between; color:#55556a; font-size:10px; margin-top:3px; }
-  #since { color:var(--dim); font-size:13px; margin:0 0 12px; }
-  ol { margin:0; padding-left:20px; } li { font-size:14px; line-height:1.65; color:#d6d6e0; max-width:72ch; margin-bottom:6px; }
-  .box { border:1px solid var(--or); border-radius:4px; padding:12px 14px; font-size:14px; line-height:1.6; max-width:72ch; }
-  .meta { color:#55556a; font-size:11px; margin-top:10px; line-height:1.5; }
-  @media (max-width: 700px) {
-    .cols { grid-template-columns:1fr; gap:4px; }
-    .lead { font-size:15px; }
-    li, .box { font-size:13.5px; }
+  .card .d { display:flex; justify-content:space-between; color:var(--ui-faint); font-size:10px; margin-top:4px; }
+  #since { color:var(--ui-dim); font-size:12px; margin:0 0 12px; line-height:1.6; }
+  ol { margin:0; padding-left:20px; } li { font-size:13.5px; line-height:1.7; color:var(--ui-fg2); max-width:72ch; margin-bottom:8px; }
+  .box p { margin:0; font-size:13.5px; line-height:1.6; max-width:72ch; color:var(--ui-fg); }
+  .meta { color:var(--ui-dim); font-size:11px; margin-top:10px; line-height:1.5; }
+  .meta:empty { display:none; }
+  @media (max-width: 720px) {
+    #hdr .ui-nav { order:3; flex:0 0 100%; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:0 -9px; }
+    #hdr .ui-nav::-webkit-scrollbar { display:none; }
+    #hdr .ui-nav a { flex:none; }
+    .cols { grid-template-columns:1fr; }
+    li, .box p, .ui-title p { font-size:13px; }
   }
-  header { background:#000; }
-  header h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
-  header nav.ui-nav { font-size:12px; flex-wrap:wrap; }
-  header nav.ui-nav a { padding:5px 9px; }
 </style>
 </head>
-<body>
-<header><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav><div class="sub">tastes</div></header>
+<body data-deck="" data-pulse>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">—</span>
+  </div>
+</header>
 <main>
 
-<p class="lead">Which kinds of pages the brain model has learned to lean towards or away from while browsing. Each
+<div class="ui-title ui-in">
+  <h1>Tastes</h1>
+  <p>Which kinds of pages the brain model has learned to lean towards or away from while browsing. Each
 topic is a brain network or a word from the pages he opened.</p>
-
-<div class="cols">
-  <section class="fav"><h2><b>+</b>What he leans towards</h2><div class="chips" id="fav"></div></section>
-  <section class="avo"><h2><b>−</b>What he avoids</h2><div class="chips" id="avo"></div></section>
 </div>
 
-<section><h2><b>~</b>How it changes over days</h2>
+<div class="cols">
+  <section class="ui-panel fav"><div class="ui-caption"><b>+</b>What he leans towards</div><div class="pb"><div class="chips" id="fav"></div></div></section>
+  <section class="ui-panel avo"><div class="ui-caption"><b>−</b>What he avoids</div><div class="pb"><div class="chips" id="avo"></div></div></section>
+</div>
+
+<section class="ui-panel panel-w"><div class="ui-caption"><b>~</b>How it changes over days</div>
+  <div class="pb">
   <p id="since"></p>
   <div id="charts"></div>
+  </div>
 </section>
 
-<section><h2><b>?</b>How this works</h2>
+<section class="ui-panel panel-w"><div class="ui-caption"><b>?</b>How this works</div>
+  <div class="pb">
   <ol>
     <li>While he stays on a page, the brain model's reward and attention response is measured.</li>
     <li>It is compared with what his preferences for that page's topics predicted; the difference nudges those topics
       up or down.</li>
     <li>Old preferences fade over about a week, so topics he stops visiting slowly drop out.</li>
   </ol>
+  </div>
 </section>
 
-<section>
-  <div class="box">These numbers come from the simulated responses of his brain model to the pages he opened.</div>
-  <div class="meta" id="meta"></div>
+<section class="ui-panel panel-w box">
+  <div class="pb"><p>These numbers come from the simulated responses of his brain model to the pages he opened.</p>
+  <div class="meta" id="meta"></div></div>
 </section>
 
 </main>
@@ -114,7 +130,7 @@ function spark(points, color) {
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
   const zero = document.createElementNS(ns, "line");
-  Object.entries({ x1: 0, x2: W, y1: H / 2, y2: H / 2, stroke: "#2a2a36", "stroke-dasharray": "3 3", "vector-effect": "non-scaling-stroke" })
+  Object.entries({ x1: 0, x2: W, y1: H / 2, y2: H / 2, stroke: "rgba(255,255,255,.18)", "stroke-dasharray": "3 3", "vector-effect": "non-scaling-stroke" })
     .forEach(([k, v]) => zero.setAttribute(k, v));
   svg.appendChild(zero);
   let d = "", pen = false;
@@ -154,7 +170,7 @@ function charts(t) {
     const c = el("div", "card");
     const h = el("div", "h"); h.append(el("span", null, x.topic), el("span", null, (x.kind === "network" ? "network" : "word") + " · " + sign(x.pref)));
     const dd = el("div", "d"); dd.append(el("span", null, days[0].day.slice(5)), el("span", null, "today"));
-    c.append(h, spark(pts, x.pref >= 0 ? "#ff6a00" : "#6fb7ff"), dd);
+    c.append(h, spark(pts, x.pref >= 0 ? "#ffffff" : "#7d7d8a"), dd);
     box.appendChild(c);
   }
 }
@@ -175,5 +191,6 @@ function render(t) {
 
 fetch("/api/tastes", { cache: "no-store" }).then(r => r.ok ? r.json() : {}).catch(() => ({})).then(render);
 </script>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>

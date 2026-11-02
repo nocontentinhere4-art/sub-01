@@ -6,28 +6,41 @@
 <title>SUB-01 · fibres</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  html,body { margin:0; height:100%; background:#000; overflow:hidden; color:#e8e8ee;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  #hud { position:absolute; left:22px; top:18px; pointer-events:none; }
-  #hud h1 { margin:0; font-size:24px; letter-spacing:.14em; display:inline-block; background:#ff6a00; color:#0a0a0a; padding:2px 10px; }
-  #hud div { color:#8a8a9c; font-size:12px; margin-top:5px; }
-  #foot { position:absolute; left:22px; right:22px; bottom:16px; color:#6e6e80; font-size:11px; pointer-events:none; }
-  body.clean #hud, body.clean #foot { display:none; }
-  #hud h1.ui-wordmark { background:none; color:#fff; padding:0; font-size:20px; letter-spacing:-.03em; vertical-align:middle; }
-  #hud nav.ui-nav { pointer-events:auto; font-size:12px; }
+  /* SUB-01 · fibres: a notes page of the deck (counter "—"). The full-screen canvas is untouched; the header, HUD lines
+     and footer float over it. Tokens and chrome come from /ui.css. */
+  html,body { margin:0; height:100%; background:#000; overflow:hidden; color:var(--ui-fg); font-family:var(--ui-mono); }
+  body { box-sizing:border-box; }
+  #hdr { position:fixed; top:0; left:0; right:0; z-index:10; pointer-events:none; flex-wrap:wrap; row-gap:8px;
+    background:linear-gradient(#000 0, rgba(0,0,0,.55) 60%, transparent); }
+  #hdr a, #hdr .ui-nav { pointer-events:auto; }
+  #hud { position:absolute; left:16px; top:64px; pointer-events:none; z-index:5; }
+  #hud .ui-caption { display:block; line-height:1.6; text-shadow:0 1px 6px #000; }
+  #hud #count { color:var(--ui-fg); }
+  #foot { position:absolute; left:16px; right:16px; bottom:40px; pointer-events:none; z-index:5; text-shadow:0 1px 6px #000; }
+  body.clean #hdr, body.clean #hud, body.clean #foot, body.clean #ui-pulse { display:none; }
   @media (max-width:720px) {   /* nav on its own full-width row, scrollable without a bar */
-    #hud { left:12px; right:12px; top:12px; }
-    #hud nav.ui-nav { display:flex !important; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:8px 0 0 -9px !important; }
-    #hud nav.ui-nav::-webkit-scrollbar { display:none; }
-    #hud nav.ui-nav a { flex:none; }
+    #hdr .ui-nav { order:3; flex:0 0 100%; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:0 -9px; }
+    #hdr .ui-nav::-webkit-scrollbar { display:none; }
+    #hdr .ui-nav a { flex:none; }
+    #hud { left:12px; right:12px; top:112px; }
     #foot { left:12px; right:12px; }
   }
 </style>
 </head>
-<body>
-<div id="hud"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav" style="display:inline-flex;vertical-align:middle;margin-left:12px"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav><div id="count">loading fibres…</div>
-  <div>colour = fibre direction · red left–right · green front–back · blue up–down</div></div>
-<div id="foot">Real nerve-fibre bundles traced from one human's diffusion MRI (OpenNeuro ds000031, public domain). Not generated, not simulated.</div>
+<body data-deck="" data-pulse>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">—</span>
+  </div>
+</header>
+<div id="hud"><div id="count" class="ui-caption">loading fibres…</div>
+  <div class="ui-caption">colour = fibre direction · red left–right · green front–back · blue up–down</div></div>
+<div id="foot" class="ui-honest">Real nerve-fibre bundles traced from one human's diffusion MRI (OpenNeuro ds000031, public domain). Not generated, not simulated.</div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
@@ -79,5 +92,6 @@ if (q.has("cortex")) Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), 
 });
 (function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
 </script>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>

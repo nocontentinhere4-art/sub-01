@@ -6,71 +6,119 @@
 <title>SUB-01 · about</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  :root { --bg:#040406; --fg:#ececf2; --dim:#7a7a8c; --line:#1c1c26; --or:#ff6a00; }
+  /* SUB-01 · about: slide 06 of the deck, a column of numbered slides. Tokens and chrome come from /ui.css. */
   * { box-sizing:border-box; }
-  html,body { margin:0; background:var(--bg); color:var(--fg); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  html,body { margin:0; background:var(--ui-bg); color:var(--ui-fg); }
+  body { font-family:var(--ui-mono); -webkit-font-smoothing:antialiased; overflow-x:hidden; }
   a { color:inherit; }
-  header { display:flex; align-items:center; flex-wrap:wrap; gap:14px; padding:14px 18px; }
-  header h1 { margin:0; font-size:20px; letter-spacing:.12em; background:var(--or); color:#0a0a0a; padding:2px 10px; }
-  header .sub { color:var(--dim); font-size:12px; }
-  main { padding:0 18px 18px; max-width:860px; }
-  .lead { font-size:17px; line-height:1.6; margin:6px 0 26px; max-width:70ch; }
-  section { margin:0 0 30px; }
-  h2 { color:var(--dim); font-size:11px; font-weight:normal; letter-spacing:.1em; text-transform:uppercase;
-    margin:0 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
-  h2 b { color:var(--or); font-weight:normal; margin-right:8px; }
-  p, li { font-size:14px; line-height:1.65; color:#d6d6e0; max-width:72ch; }
+  code { font-size:12px; color:var(--ui-fg2); background:var(--ui-panel); border:1px solid var(--ui-line); padding:0 4px; border-radius:3px;
+    overflow-wrap:anywhere; }
+
+  #hdr { position:sticky; top:0; z-index:20; background:rgba(0,0,0,.82); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--ui-line); flex-wrap:wrap; row-gap:8px; }
+  @media (max-width:720px) {   /* the nav takes its own row and scrolls without a bar */
+    #hdr .ui-nav { order:3; flex:0 0 100%; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:0 -9px; }
+    #hdr .ui-nav::-webkit-scrollbar { display:none; }
+    #hdr .ui-nav a { flex:none; }
+  }
+
+  main { padding:0 var(--ui-pad) 24px; max-width:1240px; margin:0 auto; }
+  .cap-row { padding:22px 0 0; }
+
+  .lead { font-family:var(--ui-sans); font-weight:600; font-size:clamp(22px, 3.2vw, 38px); line-height:1.18; letter-spacing:-.035em;
+    margin:18px 0 clamp(36px, 7vh, 80px); max-width:30em; color:var(--ui-fg); text-wrap:balance; }
+
+  /* a slide: hairline above, a title block, the body in a 760 px measure */
+  .slide { border-top:1px solid var(--ui-line); padding:clamp(28px, 6vh, 64px) 0 clamp(36px, 7vh, 80px); }
+  .slide .ui-title { margin:0 0 clamp(18px, 3vh, 32px); }
+  .slide .ui-title .ui-caption { display:block; margin:0 0 12px; }
+  .slide .ui-title h2 { margin:0; font-family:var(--ui-sans); font-weight:800; font-size:clamp(34px, 6.4vw, 92px); line-height:.95;
+    letter-spacing:-.05em; color:var(--ui-fg); text-wrap:balance; }
+  .body { max-width:760px; }
+  .slide:has(.nums) .body { max-width:1040px; }
+  .slide:has(.nums) .body > p { max-width:760px; }
+  p, li { font-size:13.5px; line-height:1.7; color:var(--ui-fg2); }
   p { margin:0 0 10px; }
   ul { margin:0 0 10px; padding-left:20px; }
-  li { margin-bottom:6px; }
-  code { font-size:12px; color:#b8b8c8; background:#0c0c12; border:1px solid var(--line); padding:0 4px; border-radius:2px;
-    overflow-wrap:anywhere; }
-  .num { margin:0 0 14px; padding:12px 14px; background:#0c0c12; border:1px solid var(--line); border-radius:4px; }
-  .num .v { font-size:15px; color:var(--fg); margin-bottom:4px; }
-  .num .v strong { color:var(--or); font-weight:normal; }
-  .num p { font-size:13px; margin:0 0 6px; }
-  .src { color:var(--dim); font-size:11px; }
-  .num.ph { border-style:dashed; border-color:#3a3a4a; }
-  .tag { display:inline-block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#0a0a0a;
-    background:var(--dim); padding:1px 6px; border-radius:2px; margin-right:6px; vertical-align:1px; }
-  .tag.neg { background:var(--or); }
-  table { width:100%; border-collapse:collapse; font-size:13px; margin:0 0 8px; }
-  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--dim); font-weight:normal; font-size:11px; letter-spacing:.06em; text-transform:uppercase; }
-  td.ph { color:var(--dim); font-style:italic; }
-  .box { border:1px solid var(--or); border-radius:4px; padding:12px 14px; }
-  .box p:last-child { margin-bottom:0; }
-  #note { color:#55556a; font-size:11px; padding:0 18px 22px; max-width:90ch; line-height:1.5; }
-  @media (max-width: 600px) {
-    .lead { font-size:15px; }
-    p, li { font-size:13.5px; }
-    th, td { padding:6px 4px; font-size:12px; }
+  li { margin-bottom:8px; }
+  li strong { color:var(--ui-fg); font-weight:600; }
+  li ul { margin-top:8px; }
+  .src { color:var(--ui-dim); font-size:11px; line-height:1.6; }
+  .body > .src { margin:0 0 10px; }
+
+  /* outlined mono tags, as on the front page */
+  .tag { display:inline-block; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-dim);
+    border:1px solid var(--ui-line2); border-radius:999px; padding:1px 7px; margin:0 6px 0 0; white-space:nowrap; vertical-align:1px; }
+  .tag.neg, .tag.red { color:var(--ui-live2); border-color:rgba(255,45,85,.45); }
+
+  /* the results: one tile per claim, figure on the left, text on the right, hairlines between */
+  .nums { margin:22px 0 0; border-top:1px solid var(--ui-line); }
+  .tile { display:grid; grid-template-columns:minmax(240px, 340px) minmax(0, 1fr); gap:clamp(16px, 4vw, 48px); padding:26px 0;
+    border-bottom:1px solid var(--ui-line); }
+  .tile .ui-num { align-content:start; row-gap:12px; }
+  .tile .ui-num .ui-caption { line-height:1.5; }
+  .tile .ui-big { font-size:clamp(40px, 5vw, 64px); white-space:nowrap; }
+  .tile .ui-big.off { color:var(--ui-dim); }
+  .tile .ui-word { white-space:normal; }
+  .tile .three { display:flex; flex-wrap:wrap; gap:10px 24px; }
+  .tile .three > span { display:flex; flex-direction:column; gap:8px; }
+  .tile .three .ui-big { font-size:clamp(30px, 3.6vw, 46px); }
+  .tile .txt { min-width:0; max-width:620px; }
+  .tile .txt p, .tile .txt .src { font-size:13px; }
+  .tile.ph { border-bottom-style:dashed; }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:0 0 12px; }
+  th, td { text-align:left; padding:9px 8px 9px 0; border-bottom:1px solid var(--ui-line); vertical-align:top; color:var(--ui-fg2); }
+  th { color:var(--ui-dim); font-weight:400; font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+  td.ph { color:var(--ui-dim); font-style:italic; }
+
+  .box { border:1px solid var(--ui-line2); border-radius:var(--ui-r2); padding:14px 16px; background:var(--ui-panel); }
+  .box p { margin:0; color:var(--ui-fg); }
+  .box code { font-size:13px; color:var(--ui-fg); }
+
+  #note { color:var(--ui-dim); font-size:10.5px; padding:20px var(--ui-pad) 30px; max-width:1240px; margin:0 auto; line-height:1.6;
+    border-top:1px solid var(--ui-line); }
+
+  @media (max-width: 720px) {
+    p, li { font-size:13px; }
+    .tile { grid-template-columns:1fr; gap:14px; padding:22px 0; }
+    .tile .txt p, .tile .txt .src { font-size:12.5px; }
+    th, td { padding:7px 6px 7px 0; font-size:12px; }
   }
-  header { background:#000; }
-  header h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
-  header nav.ui-nav { font-size:12px; flex-wrap:wrap; }
-  header nav.ui-nav a { padding:5px 9px; }
 </style>
 </head>
-<body>
-<header><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav><div class="sub">about</div></header>
-<main>
+<body data-deck="06" data-pulse>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html" class="on">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">06 / 06</span>
+  </div>
+</header>
 
-<p class="lead">SUB-01 is a computer model of brain activity, built from one person's public MRI scans. It drives an
+<main>
+<div class="ui-caption cap-row">06 / 06 · about</div>
+
+<p class="lead ui-in">SUB-01 is a computer model of brain activity, built from one person's public MRI scans. It drives an
 invented character who lives in a small room in Tokyo. It is a model, not a mind.</p>
 
-<section id="what">
-<h2><b>1</b>What this is</h2>
+<section class="slide" id="what">
+<div class="ui-title"><span class="ui-caption">01</span><h2>What this is</h2></div>
+<div class="body">
 <p>A model of large-scale brain activity built from one person's open MRI data (OpenNeuro ds000031): the wiring
 between brain regions from diffusion MRI, the shape of the cortex, and resting-state recordings. The model runs
 continuously, and its activity drives an invented character: when he sleeps, what he reads, how his pulse moves.</p>
 <p>It is a model, not a mind. It does not understand, feel or think. It is not alive and it is not conscious.
 When the site says that "he" reads, sleeps or remembers, that is shorthand for what the simulation and the
 code around it do.</p>
+</div>
 </section>
-
-<section id="not">
-<h2><b>2</b>What it is not</h2>
+<section class="slide" id="not">
+<div class="ui-title"><span class="ui-caption">02</span><h2>What it is not</h2></div>
+<div class="body">
 <ul>
   <li>It is not the scanned person. The data are public, and the site never depicts or speaks as that person or
     uses them to promote anything.</li>
@@ -79,14 +127,20 @@ code around it do.</p>
   <li>The character, his room, his day and his life are fiction. His food orders are simulated. His diary lines
     and dream images are rendered from the model's state.</li>
 </ul>
+</div>
 </section>
+<section class="slide" id="numbers">
+<div class="ui-title"><span class="ui-caption">03</span><h2>Numbers</h2></div>
+<div class="body"><p>Every number below comes from a file in the project's repository. Negative results stay on this page.</p>
+<div class="nums">
 
-<section id="numbers">
-<h2><b>3</b>Numbers</h2>
-<p>Every number below comes from a file in the project's repository. Negative results stay on this page.</p>
-
-<div class="num">
-  <div class="v">Wiring-only model vs recorded activity: <strong>FC r ≈ 0.21</strong> on held-out sessions</div>
+<article class="tile">
+  <div class="ui-num">
+    <span class="ui-caption">Wiring-only model vs recorded activity · FC</span>
+    <span class="ui-big">r ≈ 0.21</span>
+    <span class="ui-caption">on held-out sessions</span>
+  </div>
+  <div class="txt">
   <p>A slow-layer model that uses only the wiring and one fitted number produces activity whose correlation pattern
   matches the recordings at r ≈ 0.21 (0.206), on sessions never used for fitting. It beats randomised brains
   that keep each region's total connection strength (p = 0.01). Against randomised brains that keep the spatial
@@ -94,18 +148,30 @@ code around it do.</p>
   fit comes from the brain's geometry, not the specific wiring. The two halves of the recordings agree with each
   other at r = 0.96, so the model is far from that ceiling.</p>
   <div class="src">source: <code>docs/real_wiring_report.md</code></div>
-</div>
+  </div>
+</article>
 
-<div class="num">
-  <div class="v"><span class="tag neg">not a result</span>The old "r = 0.40"</div>
+<article class="tile">
+  <div class="ui-num">
+    <span class="ui-caption">The old “r = 0.40” <span class="tag">not a result</span></span>
+    <span class="ui-big off">r = 0.40</span>
+    <span class="ui-caption">not from the wiring</span>
+  </div>
+  <div class="txt">
   <p>An earlier version reported r = 0.40. That number came from replaying the person's own recorded activity
   as input, not from the wiring. A model with no coupling between regions at all scores 0.45 the same way. So it
   is not shown as a result.</p>
   <div class="src">source: <code>docs/real_wiring_report.md</code>, <code>analysis/null_test.py</code>, <code>docs/HANDOFF.md</code></div>
-</div>
+  </div>
+</article>
 
-<div class="num">
-  <div class="v"><span class="tag neg">negative</span>Perturbational complexity (PCI): <strong>0.18</strong> awake, <strong>0.07</strong> NREM, <strong>0.17</strong> REM</div>
+<article class="tile">
+  <div class="ui-num">
+    <span class="ui-caption">Perturbational complexity (PCI) <span class="tag">negative</span></span>
+    <div class="three"><span><span class="ui-big">0.18</span><span class="ui-word">awake</span></span><span><span class="ui-big">0.07</span><span class="ui-word">NREM</span></span><span><span class="ui-big">0.17</span><span class="ui-word">REM</span></span></div>
+    <span class="ui-caption">below the 0.31 clinical cut-off</span>
+  </div>
+  <div class="txt">
   <p>A sudden kick to one region, repeated 60 times per state, and a measure of how complex and widespread the
   response is (Casali et al. 2013). All three values are below the 0.31 clinical cut-off, because the pulse stays
   local: the struck region responds, and the rest of the brain barely does. The ordering (awake ≈ REM &gt; deep
@@ -114,35 +180,57 @@ code around it do.</p>
   conscious, and a model scoring low says nothing about experience either: it says this model's fast layer is too
   damped and weakly coupled to carry a perturbation across the brain.</p>
   <div class="src">source: <code>docs/pci/README.md</code></div>
-</div>
+  </div>
+</article>
 
-<div class="num">
-  <div class="v"><span class="tag neg">negative</span>Spiking network playing Pong: <strong>17.5 %</strong> vs 25 % for a control</div>
+<article class="tile">
+  <div class="ui-num">
+    <span class="ui-caption">Spiking network playing Pong <span class="tag">negative</span></span>
+    <span class="ui-big">17.5 %</span><span class="ui-word">vs 25 % for a control</span>
+    <span class="ui-caption">in the exam</span>
+  </div>
+  <div class="txt">
   <p>A network of one million simulated spiking neurons was trained on Pong. It does not learn: in the exam it
   scored 17.5 %, against 25 % for the same network with every learned change removed. Pong is off by default and labelled "not learning
   yet" where shown.</p>
   <div class="src">source: <code>docs/spiking_report.md</code>, <code>docs/HANDOFF.md</code></div>
-</div>
+  </div>
+</article>
 
-<div class="num">
-  <div class="v">Daily reading memory on the GPU: <strong>6/6</strong> items recalled the next day, in <strong>one validation run</strong></div>
+<article class="tile">
+  <div class="ui-num">
+    <span class="ui-caption">Daily reading memory on the GPU</span>
+    <span class="ui-big">6/6</span><span class="ui-word">items recalled the next day</span>
+    <span class="ui-caption">one validation run</span>
+  </div>
+  <div class="txt">
   <p>The same one-million-neuron network stores the day's top chat messages and readings as patterns. Shown half
   of each pattern a simulated day later, after a compressed night with REM replay, it completed all 6 stored items
   better than never-stored lures. This is a single run (RTX A5000, 2026-10-01), not a statistic. The chance of a
   false "recalled" is about 1 in 7 per item in this test. Recall here means a pattern is completed in simulated
   neurons; it is not remembering in the human sense.</p>
   <div class="src">source: <code>docs/spiking/gpu_reading/results.json</code>, <code>docs/spiking_report.md</code>, <code>docs/HANDOFF.md</code></div>
-</div>
+  </div>
+</article>
 
-<div class="num ph">
-  <div class="v"><span class="tag">placeholder</span>Daily memory test, live results</div>
+<article class="tile ph">
+  <div class="ui-num">
+    <span class="ui-caption">Daily memory test, live results <span class="tag">placeholder</span></span>
+    <span class="ui-big off">—</span>
+    <span class="ui-caption">results over time</span>
+  </div>
+  <div class="txt">
   <p>The daily test runs once a day on a rented GPU when it is switched on. A summary of its results over time
   will go here, from <code>/api/memory</code>.</p>
+  </div>
+</article>
+
+</div>
 </div>
 </section>
-
-<section id="day">
-<h2><b>4</b>What it does each day</h2>
+<section class="slide" id="day">
+<div class="ui-title"><span class="ui-caption">04</span><h2>What it does each day</h2></div>
+<div class="body">
 <ul>
   <li><strong>Sleeps.</strong> A published sleep-wake circuit (Phillips &amp; Robinson 2007) decides when the
     model is awake, in NREM or in REM sleep, on the Tokyo clock. Undisturbed, it falls asleep around 23:56 and
@@ -153,7 +241,7 @@ code around it do.</p>
     up, posts or buys anything, and a guard blocks unsafe sites. Exchanges, trading, chart and token-launch sites are
     refused outright, never shown read-only; it never connects a wallet or clicks buy, sell or swap. Financial news may
     be read as news, like any other. What it reads becomes a stimulus to the model.</li>
-  <li><strong>A language model reads and remembers for him; his brain model chooses. It
+  <li><strong>A language model reads and remembers for him; his brain model chooses.</strong> It
     writes a short note on each page he reads and keeps the notes as a searchable memory that fades with time. Each
     Tokyo morning it proposes two or three day plans, and the brain model votes among them the way it votes among
     links; hunger and sleepiness still come first. While he sits at the computer it may write a short chat reply,
@@ -163,10 +251,11 @@ code around it do.</p>
   <li><strong>Gets chat messages as stimuli.</strong> Messages are filtered, then turned into input to the brain
     networks their words relate to. Some are replayed during REM sleep.</li>
 </ul>
+</div>
 </section>
-
-<section id="costs">
-<h2><b>5</b>Costs</h2>
+<section class="slide" id="costs">
+<div class="ui-title"><span class="ui-caption">05</span><h2>Costs</h2></div>
+<div class="body">
 <p>What it costs to run, per day. To be filled from the cost ledger once it exists.</p>
 <table>
   <tr><th>item</th><th>per day</th></tr>
@@ -178,10 +267,11 @@ code around it do.</p>
 <p class="src">One-off GPU validation runs: the first cost about $0.01 (<code>docs/spiking/results.md</code>).
 The reading-memory run behind the 6/6 figure cost about $0.033, and that whole task about $0.036 (PR #9;
 results in <code>docs/spiking/gpu_reading/</code>).</p>
+</div>
 </section>
-
-<section id="credits">
-<h2><b>6</b>Credits and licences</h2>
+<section class="slide" id="credits">
+<div class="ui-title"><span class="ui-caption">06</span><h2>Credits and licences</h2></div>
+<div class="body">
 <ul>
   <li><strong>MRI data:</strong> the <strong>MyConnectome project</strong>: Poldrack RA et al. (2015),
     <em>Long-term neural and physiological phenotyping of a single human</em>, Nature Communications 6:8885
@@ -254,17 +344,19 @@ results in <code>docs/spiking/gpu_reading/</code>).</p>
     in the MIT-licensed R package sleepR.</li>
   <li><strong>Code:</strong> <span class="tag">placeholder</span>The repository does not state a licence yet.</li>
 </ul>
+</div>
 </section>
-
-<section id="coin">
-<h2><b>7</b>Contract address</h2>
+<section class="slide" id="coin">
+<div class="ui-title"><span class="ui-caption">07</span><h2>Contract address</h2></div>
+<div class="body">
 <div class="box">
   <p>CA <code style="user-select:all">6WCtKQfkWurd77tCCAYWuL5TwyAvuovTzworfnfupump</code></p>
 </div>
+</div>
 </section>
-
 </main>
 <div id="note">SUB-01 · a model of brain activity built from public MRI data of the MyConnectome project. Not a mind, not the person.
 The character and his life are fiction.</div>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>

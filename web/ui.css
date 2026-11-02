@@ -78,3 +78,136 @@
   .ui-dot, .ui-in { animation:none !important; }
   * { transition-duration:.01ms !important; }
 }
+
+/* ============================================================================================================
+   v2 · "one deck" (2026-11-02, docs/design/decoded/SYSTEM.md). Every page is one slide of the same deck: the same
+   header (lockup · nav · state), the same pulse strip at the bottom, the same motion. Everything above stays and
+   keeps working; v2 only adds tokens and classes. */
+:root { --ui-blue:#3f7bff; --ui-blue2:#8fb3ff; --ui-r3:16px; --ui-pulse-h:28px; }
+
+/* header v2: the two-line lockup, like the title slide's wordmark */
+.ui-lockup { display:inline-flex; flex-direction:column; gap:3px; color:var(--ui-fg); text-decoration:none; line-height:1;
+  flex:none; border-radius:4px; }
+.ui-lockup b { font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
+.ui-lockup small { font-family:var(--ui-mono); font-weight:400; font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ui-dim); }
+.ui-state { display:flex; align-items:center; gap:12px; flex:none; white-space:nowrap; }
+.ui-clock { font-family:var(--ui-mono); font-size:11px; letter-spacing:.06em; color:var(--ui-fg2); font-variant-numeric:tabular-nums; }
+.ui-state .ui-counter { font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; min-width:5ch; text-align:right; }
+.ui-chip.live.off { background:transparent; border-color:var(--ui-line2); color:var(--ui-dim); }   /* the socket is down */
+.ui-chip.live.off .ui-dot { animation:none; }
+@media (max-width: 720px) {                    /* phones: lockup + state on one line, the six links scroll under them */
+  .ui-hdr:has(> .ui-lockup) { flex-wrap:wrap; row-gap:8px; column-gap:12px; padding:10px var(--ui-pad) 8px; }
+  .ui-hdr:has(> .ui-lockup) > .ui-nav { order:3; flex:1 0 100%; overflow-x:auto; scrollbar-width:none; margin:0 -9px; }
+  .ui-hdr:has(> .ui-lockup) > .ui-nav::-webkit-scrollbar { display:none; }
+  .ui-hdr:has(> .ui-lockup) > .ui-nav a { flex:none; }
+  .ui-state { gap:8px; }
+  .ui-state .ui-clock, .ui-state .ui-counter { font-size:10px; }
+}
+@media (max-width: 420px) {                    /* small phones: lockup and state still share the first line */
+  .ui-hdr:has(> .ui-lockup) { padding-left:12px; padding-right:12px; column-gap:10px; }
+  .ui-lockup small { letter-spacing:.12em; }
+  .ui-state .ui-chip { letter-spacing:.04em; padding:3px 7px; gap:5px; }
+  .ui-state .ui-counter { min-width:0; }
+}
+
+/* captions: the 10 px mono tracked uppercase line (alias of .ui-label) */
+.ui-caption { font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
+.ui-caption b { color:var(--ui-fg); font-weight:600; }
+
+/* segmented control: one bordered pill, buttons inside, the chosen one filled white */
+.ui-seg { display:inline-flex; align-items:center; gap:2px; padding:2px; border:1px solid var(--ui-line2); border-radius:999px; }
+.ui-seg > button { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; text-transform:lowercase;
+  color:var(--ui-dim); background:transparent; border:0; border-radius:999px; padding:4px 11px; cursor:pointer;
+  transition: background .15s var(--ui-ease), color .15s var(--ui-ease); }
+.ui-seg > button:hover { color:var(--ui-fg); background:rgba(255,255,255,.08); }
+.ui-seg > button.on, .ui-seg > button[aria-pressed="true"] { background:var(--ui-fg); color:#000; }
+
+/* the primary button: white fill, black text (.ui-btn stays the hairline pill) */
+.ui-btn.primary { background:var(--ui-fg); color:#000; border-color:var(--ui-fg); font-weight:600; }
+.ui-btn.primary:hover { background:var(--ui-fg2); border-color:var(--ui-fg2); color:#000; }
+.ui-btn:disabled, .ui-btn[aria-disabled="true"] { opacity:.4; cursor:default; }
+
+/* a big-number block: caption · number (+ a word beside it) · caption */
+.ui-num { display:grid; grid-template-columns:auto 1fr; align-items:baseline; column-gap:8px; row-gap:6px; min-width:0; }
+.ui-num > :not(.ui-big):not(.ui-word) { grid-column:1 / -1; }
+.ui-num > .ui-big { grid-column:1; }
+.ui-word { grid-column:2; font-family:var(--ui-sans); font-weight:500; font-size:14px; letter-spacing:-.01em; color:var(--ui-fg2);
+  line-height:1.1; }
+.ui-word.live { color:var(--ui-live2); } .ui-word.proj { color:var(--ui-proj); } .ui-word.blue { color:var(--ui-blue2); }
+
+/* rails: vertical stacks of .ui-num at the edges of a full-bleed page, hairlines between */
+.ui-rail { display:flex; flex-direction:column; gap:0; width:200px; pointer-events:auto; }
+.ui-rail > .ui-num { padding:14px 0; }
+.ui-rail > .ui-num + .ui-num { border-top:1px solid var(--ui-line); }
+.ui-rail .ui-big { font-size:clamp(32px, 3.4vw, 48px); }
+.ui-rail.left, .ui-rail.right { position:absolute; top:50%; transform:translateY(-50%); }
+.ui-rail.left { left:var(--ui-pad); } .ui-rail.right { right:var(--ui-pad); }
+@media (max-width: 720px) {                    /* phones: a rail is a horizontal scroll row in the page's flow */
+  .ui-rail, .ui-rail.left, .ui-rail.right { position:static; transform:none; flex-direction:row; width:auto; max-width:100%;
+    overflow-x:auto; scrollbar-width:none; box-sizing:border-box; }
+  .ui-rail::-webkit-scrollbar { display:none; }
+  .ui-rail > .ui-num { flex:none; min-width:132px; padding:10px 14px; }
+  .ui-rail > .ui-num:first-child { padding-left:0; }
+  .ui-rail > .ui-num + .ui-num { border-top:0; border-left:1px solid var(--ui-line); }
+}
+
+/* the HUD: a full-bleed page's overlay layer; clicks pass through to the scene, its children take them again */
+.ui-hud { position:fixed; inset:0; z-index:10; pointer-events:none; }
+.ui-hud > * { pointer-events:auto; }
+body[data-pulse] .ui-hud { bottom:var(--ui-pulse-h); }
+
+/* the contact sheet: tiles edge to edge, 1 px seams. The seams are each tile's 1 px ring (the line colour, opaque on
+   black) in a 1 px gap, so a short last row ends in black instead of a grey block of empty cells */
+.ui-sheet { display:grid; grid-template-columns:repeat(auto-fill, minmax(var(--ui-tile, 200px), 1fr)); gap:1px; padding:1px; }
+.ui-sheet > * { background:var(--ui-bg); min-width:0; margin:0; box-shadow:0 0 0 1px #1a1a1a; }
+
+/* the dock: a panel pinned at the bottom of a full-bleed page, above the pulse */
+.ui-dock { position:fixed; left:0; right:0; bottom:12px; margin:0 auto; width:min(920px, calc(100% - 2 * var(--ui-pad)));
+  z-index:20; background:var(--ui-panel); border:1px solid var(--ui-line2); border-radius:var(--ui-r3); }
+body[data-pulse] .ui-dock { bottom:calc(var(--ui-pulse-h) + 12px); }
+
+/* the .ui-in stagger: a page sets style="--i:2" on the third panel to enter (no --i: no delay, as in v1) */
+.ui-in { animation-delay:calc(var(--i, 0) * 70ms); }
+
+/* the title-slide headline: h1 800, a second line 600, a mono sub */
+.ui-title { color:var(--ui-fg); }
+.ui-title h1, .ui-title h2 { font-family:var(--ui-sans); color:var(--ui-fg); margin:0; letter-spacing:-.045em; line-height:.92; }
+.ui-title h1 { font-weight:800; font-size:clamp(40px, 7vw, 96px); }
+.ui-title h1 > span, .ui-title h1 > small, .ui-title h2 { display:block; font-weight:600; font-size:.82em; }
+.ui-title h2 { font-size:clamp(33px, 5.7vw, 79px); }
+.ui-title p { font-family:var(--ui-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim);
+  margin:16px 0 0; line-height:1.5; }
+
+/* the pulse strip (web/pulse.js): 28 px at the bottom of every page with body[data-pulse] */
+body[data-pulse] { padding-bottom:28px; }
+#ui-pulse { position:fixed; left:0; right:0; bottom:0; height:28px; z-index:40; display:flex; align-items:center;
+  background:#000; border-top:1px solid var(--ui-line); font-family:var(--ui-mono); font-size:10px; letter-spacing:.06em;
+  color:var(--ui-fg2); box-sizing:border-box; contain:strict; }
+#ui-pulse canvas { flex:1 1 auto; min-width:0; height:27px; display:block; }
+#ui-pulse .ui-pulse-vals { flex:none; display:flex; align-items:center; gap:10px; padding:0 var(--ui-pad) 0 12px;
+  white-space:nowrap; font-variant-numeric:tabular-nums; }
+#ui-pulse .ui-pulse-vals b { font-weight:600; }
+#ui-pulse .ui-pulse-stage[hidden] { display:none; }
+#ui-pulse .ui-pulse-stage { padding:1px 7px; font-size:9px; letter-spacing:.12em; color:var(--ui-blue2); border-color:var(--ui-blue); }
+@media (max-width: 520px) { #ui-pulse .ui-pulse-vals { gap:8px; padding-left:8px; } #ui-pulse .ui-pulse-stage { letter-spacing:.06em; } }
+
+/* focus: a 1 px white outline on every control (zero specificity: a page can still restyle it) */
+:where(a, button, input, select, textarea, summary, [tabindex], .ui-btn, .ui-seg > button, .ui-nav a, .ui-lockup):focus-visible {
+  outline:1px solid #fff; outline-offset:2px; }
+
+/* page to page: a 320 ms crossfade (cross-document view transitions; browsers without them just navigate) */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+::view-transition-old(root) { animation:320ms var(--ui-ease) both ui-vt-out; }
+::view-transition-new(root) { animation:320ms var(--ui-ease) both ui-vt-in; }
+@keyframes ui-vt-out { to { opacity:0; } }
+@keyframes ui-vt-in { from { opacity:0; } }
+
+/* reduced motion: no crossfade, no stagger, no pulsing dots, no transitions */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; }
+  .ui-dot, .ui-in, .ui-chip .ui-dot { animation:none !important; }
+  .ui-seg > button, .ui-btn, .ui-nav a { transition:none !important; }
+}
