@@ -402,7 +402,7 @@
 <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
   <div id="today" hidden>
   <div id="why"></div>
-  <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's AI budget is used up; back tomorrow.</span></div>
+  <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's reading budget is used up; back tomorrow.</span></div>
   </div>
 </div>
 
@@ -453,7 +453,7 @@
     <div class="s" id="s-why"></div>
     <div class="opts" id="s-opts" hidden><div class="h" id="s-opts-h">options considered · brain response</div><div id="s-rows"></div>
       <div class="s" id="s-reason"></div>
-      <div class="s" id="s-foot">An AI reads the page and lists options; his brain model picks.</div></div>
+      <div class="s" id="s-foot">The page is read for him and its options listed; his brain model picks.</div></div>
   </div>
   <div class="card" id="musiccard" hidden>
     <div class="k"><span>Now playing</span><span id="mu-k"></span></div>
@@ -485,8 +485,8 @@
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
     <div id="map"></div>
   </div>
-  <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
-    An AI reads each page for him and describes what he could do next; his brain model reacts to each option and chooses.</span>
+  <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. Each page is read for him and what he could do next is listed; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
+    Each page is read for him and what he could do next is listed; his brain model reacts to each option and chooses.</span>
     <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
   
   </section>
@@ -1301,7 +1301,7 @@ function showScreen(st){
   if (screenOn === st.device) panel(st);
 }
 let panelKey = null;
-const PAGE_FOOT = "An AI reads the page and lists options; his brain model picks.";
+const PAGE_FOOT = "The page is read for him and its options listed; his brain model picks.";
 function optRows(opts){
   return opts.map(o => {
     const v = Math.max(-1, Math.min(1, +o.value || 0)), w = Math.abs(v) * 50;
@@ -1565,8 +1565,8 @@ function renderPlan(){
     const o = steps.find(x => x.label === s.label);
     if (o) o.done = o.done && s.done; else steps.push({label:s.label, done:!!s.done});
   }
-  // a plan kept from yesterday while the AI rests was not voted today: say so
-  const head = p && p.source === "yesterday" ? "Today's plan (yesterday's, kept while the AI rests):" : "Today's plan (voted by his brain model):";
+  // a plan kept from yesterday while the reader rests was not voted today: say so
+  const head = p && p.source === "yesterday" ? "Today's plan (yesterday's, kept while the reader rests):" : "Today's plan (voted by his brain model):";
   put("plan", "hidden", !steps.length && !mindResting);
   put("p-text", "innerHTML", steps.length ? `<span class="h">${head}</span> `
     + steps.map(s => s.done ? `<s>${esc(s.label)}</s>` : esc(s.label)).join(", ") : "");
