@@ -290,7 +290,6 @@
   .i-mark { position:absolute; top:26px; left:32px; z-index:2; line-height:1; }
   .i-mark b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
   .i-mark span { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim); }
-  .i-count { position:absolute; top:28px; right:32px; z-index:2; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; color:var(--ui-dim); font-variant-numeric:tabular-nums; }
   .i-slide { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:84px 48px 104px;
     opacity:0; visibility:hidden; transition:opacity .4s var(--ui-ease), visibility 0s linear .4s; }
   .i-slide.on { opacity:1; visibility:visible; transition:opacity .4s var(--ui-ease), visibility 0s; }
@@ -343,7 +342,6 @@
   @media (pointer: coarse) {
     .i-hint .h-fine { display:none; } .i-hint .h-touch { display:inline; }
     .i-skip { display:flex; }
-    .i-count { right:68px; }
   }
   .i-dots { display:flex; gap:2px; pointer-events:auto; min-height:24px; }
   .i-dots button { width:24px; height:24px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:50%; }
@@ -357,8 +355,8 @@
   #i-replay:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
   #i-replay.flash { color:var(--ui-fg); background:rgba(255,255,255,.14); }
   @media (max-width:720px) {
-    .i-mark { top:18px; left:18px; } .i-count { top:20px; right:18px; }
-    @media (pointer: coarse) { .i-count { top:26px; right:66px; } .i-skip { top:12px; right:12px; } }
+    .i-mark { top:18px; left:18px; }
+    @media (pointer: coarse) { .i-skip { top:12px; right:12px; } }
     .i-slide { padding:64px 20px 92px; }
     .i-title .i-h { font-size:clamp(44px, 14vw, 120px); }
     .i-title .i-s { font-size:11.5px; max-width:30ch; margin-left:auto; margin-right:auto; }
@@ -481,7 +479,6 @@
 
 <div id="intro" role="dialog" aria-modal="true" aria-label="introduction" tabindex="-1">
   <div class="i-mark" aria-hidden="true"><b>SUB-01</b><span>brain model</span></div>
-  <span class="i-count" id="i-count" aria-live="polite">intro · 1 / 5</span>
   <button type="button" class="i-skip" id="i-skip" aria-label="skip the intro">✕</button>
   <section class="i-slide i-title on" aria-label="1 of 5">
     <h2 class="i-h"><span class="w1">A brain</span><span class="w2">decoded</span></h2>
@@ -517,7 +514,7 @@
 // ---------------------------------------------------------------- the intro deck (first, so a seen deck never flashes)
 const Intro = (() => {
   const box = document.getElementById("intro"), slides = [...box.querySelectorAll(".i-slide")], N = slides.length;
-  const dots = document.getElementById("i-dots"), count = document.getElementById("i-count"), hint = document.getElementById("i-hint");
+  const dots = document.getElementById("i-dots"), hint = document.getElementById("i-hint");
   const behind = ["hdr", "hero", "grid", "foot"].map(id => document.getElementById(id)).filter(Boolean);
   const KEY = "sub01.intro";
   let i = 0, open = false, back = null;
@@ -529,7 +526,6 @@ const Intro = (() => {
     i = k;
     slides.forEach((s, n) => s.classList.toggle("on", n === k));
     dots.querySelectorAll("button").forEach((b, n) => { b.setAttribute("aria-current", String(n === k)); b.tabIndex = n === k ? 0 : -1; });   // roving: only the current dot is tabbable
-    count.textContent = `intro · ${k + 1} / ${N}`;
     hint.classList.toggle("off", k !== 0);
   }
   function show(){
