@@ -183,6 +183,12 @@ the raw MRI needs `requirements.txt` and `./fetch_data.sh` (~900 MB): see [docs/
 
 All images in this README are our own screenshots of the pages, rendered in headless Chromium.
 
+## Use the brain in your own project
+
+The model alone, without the site, is a Python package: [sub01-brain](https://github.com/nocontentinhere4-art/sub01-brain)
+(MIT, the data inside, `pip install git+https://github.com/nocontentinhere4-art/sub01-brain`). This repository is the
+site around it; the model code here and there is the same, packaged.
+
 ## Contributing
 
 The model is open so that people who know more about brains, simulation or rendering can make it better. Start with

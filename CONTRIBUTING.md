@@ -20,6 +20,9 @@ them is a good first pull request.
 
 ## Where the model lives
 
+To work on the model itself rather than the site, use the package repository
+[sub01-brain](https://github.com/nocontentinhere4-art/sub01-brain): it has the model, the data and the tests alone.
+
 | Part | Files |
 |---|---|
 | The whole-brain model (regions, wiring, the slow layer, neuromodulators) | `brain_sim.py`, `twin/` |
