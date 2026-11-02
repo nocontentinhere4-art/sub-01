@@ -39,12 +39,6 @@
   /* the one line that is always on the first screen, before any tick: what he is (S10). Never hidden, never moved off */
   #fiction { margin-top:6px; font-size:11.5px; color:#d8d8e2; line-height:1.45; text-shadow:0 1px 8px #000, 0 0 3px #000, 0 0 1px #000; max-width:60ch; }   /* (readable over the white wall) */
   #fiction a { color:#b9b9c6; text-decoration:underline dotted; } #fiction a:hover { color:var(--fg); } #fiction .short { display:none; }
-  /* the coin's contract address (owner, 2026-10-11): the official one, to copy; no chart, no market link, no "buy" */
-  #ca { margin-top:7px; display:flex; align-items:center; gap:8px; font-size:11.5px; color:#d8d8e2; max-width:60ch; pointer-events:auto; text-shadow:0 1px 8px #000, 0 0 3px #000; }
-  #ca .k { color:var(--dim); letter-spacing:.14em; font-size:10.5px; flex:none; }
-  #ca .addr { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all; }
-  #ca button { flex:none; background:rgba(10,10,14,.7); color:var(--fg); border:1px solid #2a2a36; border-radius:4px; font:inherit; font-size:10.5px; padding:2px 7px; cursor:pointer; }
-  #ca button:hover { border-color:var(--or); color:var(--or); } #ca button.ok { border-color:#39f5a0; color:#39f5a0; }
   /* the night line under the story while he sleeps: when he fell asleep, what was replayed (R3) */
   #night { margin-top:6px; font-size:12px; color:#9fb4ff; line-height:1.5; text-shadow:0 1px 8px #000; max-width:60ch; }
   #night[hidden] { display:none; }
@@ -143,18 +137,6 @@
   #brainpip span { position:absolute; left:10px; bottom:8px; font-size:10px; letter-spacing:.08em; color:#c6c6d4; text-shadow:0 1px 4px #000; }
   #brainpip.still { background:radial-gradient(circle at 50% 45%, rgba(255,140,60,.28), rgba(10,10,14,.9) 70%); }
   #brainpip span::before { content:"◉ "; color:var(--st); }
-  /* the city popout (owner, 2026-10-11): a preview of city.subzerone.live with its live dot; the click opens the city in
-     its own window (the city refuses to be framed by other sites, so no iframe) */
-  #citypip { position:relative; flex:none; width:min(260px, 24vw); aspect-ratio:16/10; border:1px solid var(--line); border-radius:12px;
-    overflow:hidden; background:#0d0e13; display:block; text-decoration:none; box-shadow:0 10px 30px -14px rgba(0,0,0,.9); transition:border-color .25s, transform .25s; }
-  #citypip:hover { border-color:var(--or); transform:translateY(-1px); }
-  #citypip img { display:block; width:100%; height:100%; object-fit:cover; filter:saturate(.9); }
-  #citypip span { position:absolute; left:0; right:0; bottom:0; padding:18px 10px 8px; font-size:10px; letter-spacing:.08em; color:#e4e4ee; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    background:linear-gradient(transparent, rgba(5,5,7,.85)); text-shadow:0 1px 4px #000; }
-  #citypip b { font-weight:normal; color:#c6c6d4; }
-  #city-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#3a3a46; margin-right:6px; vertical-align:1px; transition:background .4s; }
-  #citypip.up #city-dot { background:#39f5a0; box-shadow:0 0 8px #39f5a0; animation:breathe 2.6s ease-in-out infinite; }
-  #citypip.up b { color:#39f5a0; }
   #honest a { color:var(--dim); white-space:nowrap; } #honest a:hover { color:var(--fg); }
   /* one line on desktop: the text is cut with an ellipsis, the /about link stays visible; hover or focus shows it all */
   #honest { display:flex; gap:8px; align-items:baseline; max-width:min(92ch, 100%); }
@@ -239,10 +221,6 @@
     #side { position:static; width:auto; max-height:none; margin:62vh 16px 0; }
     #corner { position:static; display:block; }
     #brainpip { display:block; width:auto; margin:12px 16px 0; }
-    /* phones: the corner column is hidden; the city card moves (room.js, on load) to just above the tabs as one strip */
-    #citypip { display:flex; align-items:center; gap:10px; width:auto; height:54px; aspect-ratio:auto; margin:0 12px 10px; border-radius:10px; }
-    #citypip img { width:104px; height:100%; flex:none; }
-    #citypip span { position:static; padding:0 10px 0 0; background:none; font-size:11px; }
     #honest .tx { white-space:normal; } #honest { display:block; }
     #honest { padding:12px 16px calc(22px + var(--dockh, 74px)); max-width:none; background:none; border-radius:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
     /* phones: the dock is a bar of its own, opaque, across the bottom: the cards scroll under it cleanly instead of their
@@ -338,7 +316,6 @@
   #brainpip { width:72px; height:72px; aspect-ratio:auto; border-radius:50%; box-shadow:none; }
   #brainpip iframe { width:300px; height:225px; transform:translate(-114px, -76px) scale(.5); transform-origin:center; }
   #brainpip span { display:none; }
-  #citypip { width:min(250px, 22vw); }
   /* the dream frame while he sleeps (R3): the eye's newest image over the room, above the brain thumbnail; a link to /world */
   #dream { position:fixed; left:var(--gap); bottom:calc(var(--gap) + 84px); width:min(220px, 24vw); z-index:5; display:block; text-decoration:none;
     color:#c6c6d4; font-size:10.5px; line-height:1.4; background:rgba(8,8,11,.6); border:1px solid var(--line); border-radius:var(--r); padding:6px;
@@ -364,7 +341,6 @@
     #tabs button.on { background:rgba(255,255,255,.1); }
     .pane { padding:8px 16px 32px; overflow:visible; }
     #corner { display:none; }
-    #citypip { width:auto; }           /* (the desktop width rule above comes later than the phone block) */
     #honest { padding:0; }
     #dock { position:static; padding:0; background:none; border:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
     #feed .ln:not(:last-child) { display:block; } #feed .ln { display:block; padding:5px 9px; border:1px solid var(--line); box-shadow:none; }
@@ -396,11 +372,10 @@
 <div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
 <div id="top">
-  <div id="brand"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a class="on" href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="city ext" target="_blank" rel="noopener">city</a></nav></div>
+  <div id="brand"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a class="on" href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
   <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
   <div id="story">connecting…</div>
   <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></span><span class="short">A simulated character. Not a person, not conscious. <a href="/about.html">about</a></span></div>
-  <div id="ca" hidden><span class="k">CA</span><span class="addr" id="ca-addr"></span><button id="ca-copy" type="button" title="copy the contract address">copy</button></div>
   <div id="night" hidden></div>
   <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
 <button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
@@ -497,7 +472,6 @@
 </div>
 
 <div id="corner">
-<a id="citypip" class="city" href="https://city.subzerone.live/" target="_blank" rel="noopener" title="open the city in its own window"><img src="/room/city_preview.jpg" alt="the city: SUB-01's neighbourhood in Tokyo" loading="lazy" decoding="async"><span><i id="city-dot"></i>the city · <b id="city-st">…</b></span></a>
 <a id="brainpip" href="/brain" title="open the brain"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
 </div>
 <a id="dream" href="/world.html" hidden title="an image an AI renders from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t"></span></a>
@@ -3551,39 +3525,6 @@ function put(id, prop, v){ const k = id + "." + prop; if (shown.get(k) === v) re
 let reTimer = 0, retry = 0, full = null, gotHello = false, tickAt = 0, tickWatch = 0, drawn = 0;
 const FULL_TXT = {ip:"too many tabs open on this address · retrying in a moment", all:"the room is full · retrying in a moment"},
       LOST_TXT = "connection lost · reconnecting…", SLOW_TXT = "cannot reach his room · still trying";
-// the city (city.subzerone.live): its pulse from /api/city (the server pings it, at most once a minute for everyone);
-// every "city" link opens it in its own window (a popout), or a new tab where popups are blocked
-function cityPulse(){
-  fetch("/api/city", {cache:"no-store"}).then(r => r.ok ? r.json() : null).then(c => {
-    if (!c) return;
-    if (c.url) document.querySelectorAll("a.city").forEach(a => { a.href = c.url; });
-    $("citypip").classList.toggle("up", !!c.up); $("city-st").textContent = c.up ? "live · open" : "offline right now";
-  }).catch(() => {});
-}
-cityPulse(); setInterval(cityPulse, 90000);
-{ // phones: the card is a strip just above the tabs; desktops: in the corner column (also after a rotation or resize)
-  const mq = matchMedia("(max-width: 900px)");
-  const place = () => { if (mq.matches) $("side").insertBefore($("citypip"), $("tabs")); else $("corner").insertBefore($("citypip"), $("brainpip")); };
-  place(); mq.addEventListener("change", place);
-}
-document.querySelectorAll("a.city").forEach(a => a.addEventListener("click", e => {
-  if (e.metaKey || e.ctrlKey || e.shiftKey) return;              // (the viewer wants a tab: keep the browser's behaviour)
-  const w = Math.min(1180, screen.availWidth - 40), h = Math.min(800, screen.availHeight - 60);
-  const win = window.open(a.href, "sub01city", `popup=yes,width=${w},height=${h},left=${Math.max(0, (screen.availWidth - w) / 2)},top=${Math.max(0, (screen.availHeight - h) / 2)}`);
-  if (win) { e.preventDefault(); win.focus(); }
-}));
-// the coin's contract address from the server (SUB01_CA or MINT): shown once set, with a copy button; nothing else
-function showCA(ca){
-  const ok = typeof ca === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ca);
-  $("ca").hidden = !ok; if (ok) $("ca-addr").textContent = ca;
-}
-$("ca-copy").onclick = async () => {
-  const b = $("ca-copy"), ca = $("ca-addr").textContent; let done = false;
-  try { await navigator.clipboard.writeText(ca); done = true; } catch (e) {}
-  if (!done) { const r = document.createRange(); r.selectNodeContents($("ca-addr")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
-  b.textContent = done ? "copied" : "select + copy"; b.classList.toggle("ok", done);
-  setTimeout(() => { b.textContent = "copy"; b.classList.remove("ok"); }, 1800);
-};
 function offline(text){ $("live").classList.remove("on"); $("story").textContent = text; put("chip", "textContent", "…");
   for (const k of ["story.innerHTML", "chip.textContent", "chip.background"]) shown.delete(k); }   // (the next tick rewrites them)
 function reconnect(ms){ clearTimeout(reTimer); reTimer = setTimeout(() => { reTimer = 0; connect(); }, ms); }
@@ -3606,7 +3547,7 @@ function connect(){
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.type === "full") { full = m.why === "ip" ? "ip" : "all"; offline(FULL_TXT[full]); return; }
-    if (m.type === "hello") { gotHello = true; $("live").classList.add("on"); showCA(m.ca); }
+    if (m.type === "hello") { gotHello = true; $("live").classList.add("on"); }
     if (m.type === "tick") { tickAt = drawn; retry = 0; }
     if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
