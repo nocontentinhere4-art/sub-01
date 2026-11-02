@@ -1424,7 +1424,7 @@ if (!RM) {
 }
 
 // ---------------------------------------------------------------- the frame loop
-const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 30;
+const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 30 : 60;   // the brain at 60 on desktop (one brain left, 2 November), 30 on phones
 let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0, respWaitAt = 0, respDrawn = null, respDrawnV = -1, lastGlow = 0;
 // breath runs 0.7 (desynchronised) to 1.15 (in step): the blooms and the hero's light follow it, eased by CSS
 const glowWas = {r:"", h:""}, glowEl = {r:$("r-cv"), h:$("hero")};
@@ -1463,11 +1463,11 @@ function frame(pnow){
       }
       if (!RM && pnow - lastGlow >= 100) { lastGlow = pnow; glow(breath, !!(respMk && respMk.rel)); }
       // RESPONSE: on an event it is redrawn only when its snapshot changes (the 3 s peak search) or the canvas resizes;
-      // before the first event it shows the live brain, dimmed, at 5 fps
+      // before the first event it shows the live brain, dimmed, at the brain rate
       const mk = respMk;
       if (mk && mk.rel) {
         if ((respDrawn !== mk || respDrawnV !== mk.v || respBrain.need) && respBrain.draw(mk.rel, t, 1)) { respDrawn = mk; respDrawnV = mk.v; }
-      } else if (pnow - respWaitAt >= 200 || respBrain.need) { respWaitAt = pnow; respDrawn = null; respBrain.draw(relDraw.live, t, 0.7); }
+      } else { respDrawn = null; respBrain.draw(relDraw.live, t, 0.7); }   // before the first event: the live brain, dimmed, at the brain rate
     }
   } catch (e) { console.warn("live: frame", e); }
 }
