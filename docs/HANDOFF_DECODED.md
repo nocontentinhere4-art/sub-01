@@ -78,6 +78,13 @@ save tokens, and checks the work.
 - Fold: on desktop `#grid` is 100dvh minus the header and the hero (min 560 px); the viewport fills its row (no 16:9 lock). ≤1100 and ≤720 keep the stacked layouts. The hero image is `web/hero_brain.webp` (the server registers image/webp).
 - Chat rows from `hello` are ordered by age on the next tick's clock, `(now − minute + 1440) % 1440`, oldest first (stable); a fallback applies after 3 s.
 - Under reduced motion the hero rotation is off (the counter stays 01 / 05).
+- WebGL1 refuses to link a program whose shared uniform has different precisions in the two shaders (the brains were blank
+  everywhere until the vertex shader got `precision mediump float;`, d8079e1). A canvas that once gave a WebGL context never
+  gives a 2D one: the fallback swaps in a fresh canvas.
+- Arousal = clamp(50 + 30·log2(NE)) (spec amended 2026-11-02): with NE/2·100 the trace sat at 100 for minutes, because the
+  model's noradrenaline runs 1.8–2.6 while he listens to music. Each legend item carries its formula in a `title`.
+- The test suite takes about 25 min on a 4-core box; two tests (`test_brain_decides.py::test_vote_is_cheap`,
+  `test_neurons3d.py::test_cpu_frames_are_compact_and_honest`) fail under CPU load and pass alone.
 
 ## How to continue (the coordinator's loop)
 1. `python3 -m pip install -r requirements-server.txt pytest` (on Python 3.13 the `chess` wheel fails to build: download the

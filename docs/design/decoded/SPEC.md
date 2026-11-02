@@ -79,7 +79,7 @@ Brain geometry (static, already served): web/brain.json {nodes:[{name,group,p:[x
 ## Readouts (page-side; all are model readouts, label them so)
  rel(g) = groups[g] / EMA25s(groups[g]); R(x) = clamp(50 + 40*log2(x), 0, 100)  (50 = his own baseline)
  Attention      = R(mean(rel attention, rel salience, rel visual))
- Arousal        = clamp(neuro.NE/2*100)                          (noradrenaline level, 1.0 = resting wake)
+ Arousal        = clamp(50 + 30*log2(neuro.NE))                  (noradrenaline on a log scale, 1.0 = resting wake = 50; NE/2*100 sat at 100 for minutes: NE runs 1.8-2.6 while he listens to music)
  Cognitive load = R(mean(rel control, rel default)) blended 70/30 with clamp(neuro.ACh/2*100)
  Neural activity= R(mean over regions of act[i]/EMA25s(act[i]))  (or from groups if act is costly)
  Big score on the LIVE brain panel = Attention. The RESPONSE panel freezes at the last event (dopamine burst, chat
