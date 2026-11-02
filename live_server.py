@@ -16,6 +16,7 @@ import base64
 import struct
 import json
 import math
+import mimetypes
 import os
 import random
 import re
@@ -28,7 +29,7 @@ from pathlib import Path
 
 import aiohttp
 import numpy as np
-from aiohttp import web
+from aiohttp import web, web_fileresponse
 
 from brain_sim import Brain
 from chat import (RULES, TEACH_MAX_WORDS, TEACH_PER_DAY, NICK_MAX, Dedupe, RateLimiter, TeachLimits,
@@ -70,6 +71,14 @@ except Exception as _e:
     print("spiking routes unavailable:", type(_e).__name__, flush=True)
 from spiking.words import half_cue_ok              # torch-free, like pod_manager
 from spiking import live as spiking_live           # numpy only: his spiking neurons in the day, a child process (#55)
+
+# .webp is missing from some systems' mimetypes tables, and aiohttp's static handler keeps its own table (not the
+# mimetypes one), so the type goes into both or hero_brain.webp is served as application/octet-stream
+mimetypes.add_type("image/webp", ".webp")
+try:
+    web_fileresponse.CONTENT_TYPES.add_type("image/webp", ".webp")
+except AttributeError:                       # an aiohttp without its own table falls back to mimetypes
+    pass
 
 HERE = Path(__file__).parent
 START = time.monotonic()        # import time: the startup log line says how long the process took to listen (a deploy gap)
@@ -142,21 +151,6 @@ def b58decode(text):
         n = n * 58 + B58.index(c)
     raw = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
     return b"\0" * (len(text) - len(text.lstrip("1"))) + raw
-
-
-DEFAULT_CA = "6WCtKQfkWurd77tCCAYWuL5TwyAvuovTzworfnfupump"      # the coin's contract address (owner, 2026-10-11)
-CITY_URL = os.environ.get("SUB01_CITY_URL", "https://city.subzerone.live/").strip()   # the city: his neighbourhood site
-
-
-def coin_address(mint=""):
-    """The coin's contract address for the pages (owner, 2026-10-11): SUB01_CA, else MINT, else DEFAULT_CA. The pages
-    show it as it is, with a copy button and no market link: not advice, only the official address, so nobody has to
-    trust one pasted in the chat (where addresses stay blocked). Not a Solana address (32 bytes of base58): nothing."""
-    ca = (os.environ.get("SUB01_CA") or mint or DEFAULT_CA or "").strip()
-    try:
-        return ca if ca and len(b58decode(ca)) == 32 else ""
-    except ValueError:
-        return ""
 
 
 def b58encode(b):
@@ -351,11 +345,9 @@ def local_accounts():
 
 
 class Live:
-    ca = ""                            # the coin's address (set in __init__; a bare instance in tests has none)
     def __init__(self, mint, demo, time_scale=1.0, data_dir=HERE / "data", start=None, trust_proxy=False):
         self.brain = Brain()
         self.mint, self.demo = mint, demo
-        self.ca = coin_address(mint)       # shown on the pages (hello, /api/config); "" until the owner sets it
         self.trust_proxy = trust_proxy
         self.store = Store(data_dir)
         saved, mem = self.store.load()
@@ -1906,7 +1898,7 @@ class Live:
                                 "replies": getattr(self, "replies", [])[-10:],
                                 "rules": [[cond, list(groups)] for cond, groups in RULES], "world": WORLD,
                                 "music": self.music.public(self.music.now) if getattr(self, "music", None) else None,
-                                "audience": self.audience_hello(ws), "ca": self.ca})
+                                "audience": self.audience_hello(ws)})
             await ws.send_json(self.nights())
             if self.last_frame:
                 await ws.send_json(self.eye_frame())
@@ -2096,7 +2088,7 @@ async def viewer_cookie(request, handler):
 # links visitors may still have from before the launch, sent to the page they meant
 OLD_PATHS = {"/login": "/", "/room/": "/room", "/home": "/", "/index": "/", "/live": "/", "/live.html": "/",
              "/sees": "/world.html", "/brain.html": "/brain", "/diary.html": "/diary", "/about": "/about.html",
-             "/city": CITY_URL, "/life": "/life.html", "/map": "/life.html"}   # the city site; the old map at /map
+             "/life": "/life.html", "/map": "/life.html"}   # the old map at /map
 # (/room is a page of its own now, so it is not in here: a redirect registered first would shadow its route)
 
 NOT_FOUND_PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
@@ -2331,26 +2323,9 @@ async def main(args):
     async def config(request):                    # browser config (Maps JS keys are referrer-restricted by design)
         key = os.environ.get("GOOGLE_MAPS_KEY", "")
         referer = f"{request.headers.get('X-Forwarded-Proto', request.scheme)}://{request.host}/"
-        return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else "", "ca": live.ca})
+        return web.json_response({"gmaps": key if key and await gmaps_works(key, referer) else ""})
     app.router.add_get("/api/config", config)
 
-    city_state = {"up": False, "checked": 0.0}
-
-    async def city(request):
-        """The city site's pulse for the room's popout card: one GET of its front page at most every 60 s (shared by
-        every viewer), up = 200. The city forbids being framed by other sites (frame-ancestors 'self'), so the card is
-        a preview and a live dot, and the click opens the city in its own window."""
-        if time.time() - city_state["checked"] > 60:
-            city_state["checked"] = time.time()
-            try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as http, \
-                        http.get(CITY_URL, headers={"User-Agent": "SUB-01 room (city pulse)"}) as r:
-                    city_state["up"] = r.status == 200
-            except Exception:
-                city_state["up"] = False
-        return web.json_response({"url": CITY_URL, "up": city_state["up"], "checked": int(city_state["checked"])},
-                                 headers={"Cache-Control": "no-store"})
-    app.router.add_get("/api/city", city)
     # the brain, decoded live, is the front page; the room moved to /room (the 3D room, web/room.html)
     app.router.add_get("/", lambda r: web.FileResponse(HERE / "web" / "live.html", headers=NOCACHE))
     app.router.add_get("/room", lambda r: web.FileResponse(HERE / "web" / "room.html", headers=NOCACHE))
