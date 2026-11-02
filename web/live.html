@@ -161,7 +161,7 @@
   .cl .tx { min-width:0; overflow-wrap:anywhere; }
   .cl .nk { color:var(--ui-fg); font-weight:600; margin-right:5px; }
   .cl .nets { font-family:var(--ui-mono); font-size:10px; color:var(--ui-dim); }
-  .cl .tm { font-family:var(--ui-mono); font-size:9.5px; color:var(--ui-faint); margin-left:4px; }
+  .cl .tm { font-family:var(--ui-mono); font-size:9.5px; color:var(--ui-faint); white-space:nowrap; }
   .cl.me .av { background:#fff; color:#000; border-color:#fff; font-weight:700; }
   .cl.me .tx { color:#fff; }
   .cl.sys { color:var(--ui-dim); font-family:var(--ui-mono); font-size:10.5px; }
@@ -230,12 +230,95 @@
     #f-ack { transition:none !important; }
     #hero-h, #hero-s { transition:none !important; }
   }
+
+  /* ---------------------------------------------------------------- the intro deck: five slides over the page, once a session */
+  html.intro-open, html.intro-open body { overflow:hidden; }
+  #intro { position:fixed; inset:0; z-index:100; background:#000; color:var(--ui-fg); overflow:hidden; cursor:default;
+    transition:opacity .35s var(--ui-ease); }
+  #intro.out { opacity:0; pointer-events:none; }
+  #intro:focus { outline:none; }
+  .i-mark { position:absolute; top:26px; left:32px; z-index:2; line-height:1; }
+  .i-mark b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
+  .i-mark span { display:block; margin-top:3px; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim); }
+  .i-count { position:absolute; top:28px; right:32px; z-index:2; font-family:var(--ui-mono); font-size:11px; letter-spacing:.08em; color:var(--ui-dim); font-variant-numeric:tabular-nums; }
+  .i-slide { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:84px 48px 104px;
+    opacity:0; visibility:hidden; transition:opacity .4s var(--ui-ease), visibility 0s linear .4s; }
+  .i-slide.on { opacity:1; visibility:visible; transition:opacity .4s var(--ui-ease), visibility 0s; }
+  .i-slide .i-h, .i-slide .i-s, .i-slide .i-fig, .i-slide .i-act { opacity:0; transform:translateY(12px);
+    transition:opacity .4s var(--ui-ease), transform .4s var(--ui-ease); }
+  .i-slide.on .i-h, .i-slide.on .i-s, .i-slide.on .i-fig, .i-slide.on .i-act { opacity:1; transform:none; }
+  .i-slide.on .i-s { transition-delay:80ms; } .i-slide.on .i-fig, .i-slide.on .i-act { transition-delay:160ms; }
+  .i-h { margin:0; font-family:var(--ui-sans); font-weight:800; letter-spacing:-.045em; line-height:.95;
+    font-size:clamp(36px, min(5.6vw, 9vh), 92px); }
+  .i-s { margin:18px 0 0; font-family:var(--ui-mono); font-size:15px; line-height:1.6; color:var(--ui-fg2); max-width:44ch; text-wrap:balance; }
+  /* 01: the title */
+  .i-title { flex-direction:column; text-align:center; }
+  .i-title .i-h { font-size:clamp(44px, min(9vw, 12vh), 140px); line-height:.92; }
+  .i-title .i-h span { display:block; }
+  .i-title .i-h .w1 { font-weight:800; } .i-title .i-h .w2 { font-weight:600; }
+  .i-title .i-s { margin-top:16px; font-size:13px; max-width:none; color:var(--ui-fg2); }
+  .i-title .i-fig { flex:0 1 auto; min-height:0; display:flex; justify-content:center; margin-top:6px; }
+  .i-title .i-fig img { height:45vh; max-height:100%; width:auto; max-width:92vw; object-fit:contain; opacity:.8;
+    -webkit-mask-image:radial-gradient(ellipse 56% 54% at 50% 50%, #000 40%, transparent 78%); mask-image:radial-gradient(ellipse 56% 54% at 50% 50%, #000 40%, transparent 78%); }
+  /* 02 to 04: text left, the picture right */
+  .i-split { gap:clamp(32px, 6vw, 110px); }
+  .i-split .i-txt { flex:0 1 520px; min-width:0; }
+  .i-split .i-fig { flex:0 0 auto; position:relative; display:flex; justify-content:center; }
+  .i-split .i-fig img { display:block; height:min(64vh, 620px); width:auto; opacity:.9;
+    -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 80%); mask-image:radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 80%); }
+  .i-fig.hot::after { content:""; position:absolute; inset:0; pointer-events:none; mix-blend-mode:screen;
+    background:radial-gradient(ellipse 13% 9% at 36% 30%, rgba(255,200,90,.75), rgba(255,120,40,.35) 45%, transparent 100%),
+               radial-gradient(ellipse 12% 8% at 63% 56%, rgba(255,150,60,.7), rgba(255,70,40,.3) 45%, transparent 100%); }
+  .i-keys { list-style:none; margin:0; padding:0; display:grid; gap:18px; font-family:var(--ui-sans); font-weight:700; letter-spacing:-.02em;
+    font-size:clamp(22px, 2.4vw, 34px); }
+  .i-keys li { display:flex; align-items:center; gap:16px; white-space:nowrap; }
+  .i-keys i { width:12px; height:12px; border-radius:50%; background:currentColor; flex:none; }
+  /* 05: one column, the way in */
+  .i-last { flex-direction:column; text-align:center; }
+  .i-last .i-s { margin-left:auto; margin-right:auto; }
+  .i-act { margin-top:30px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .i-act .btn-primary { font-size:13px; padding:10px 22px; text-transform:none; letter-spacing:.04em; }
+  .i-link { font:inherit; font-family:var(--ui-mono); font-size:11px; letter-spacing:.04em; color:var(--ui-dim); background:none; border:0; padding:2px 4px;
+    cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--ui-line2); }
+  .i-link:hover { color:var(--ui-fg); }
+  /* the foot: the hint on the title, the dots everywhere */
+  .i-foot { position:absolute; left:0; right:0; bottom:26px; z-index:2; display:flex; flex-direction:column; align-items:center; gap:12px; pointer-events:none; }
+  .i-hint { font-family:var(--ui-mono); font-size:10.5px; letter-spacing:.1em; color:var(--ui-dim); transition:opacity .3s var(--ui-ease); }
+  .i-hint.off { opacity:0; }
+  .i-dots { display:flex; gap:2px; pointer-events:auto; }
+  .i-dots button { width:24px; height:24px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+  .i-dots button::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--ui-faint); transition:background .2s var(--ui-ease), transform .2s var(--ui-ease); }
+  .i-dots button:hover::before { background:var(--ui-dim); }
+  .i-dots button[aria-current="true"]::before { background:var(--ui-fg); transform:scale(1.25); }
+  .i-dots button:focus-visible { outline-offset:0; }
+  /* the header's way back in */
+  #i-replay { font:inherit; color:var(--ui-dim); background:none; border:0; padding:5px 9px; border-radius:999px; cursor:pointer; text-transform:lowercase;
+    transition:color .2s var(--ui-ease), background .2s var(--ui-ease); }
+  #i-replay:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
+  #i-replay.flash { color:var(--ui-fg); background:rgba(255,255,255,.14); }
+  @media (max-width:720px) {
+    .i-mark { top:18px; left:18px; } .i-count { top:20px; right:18px; }
+    .i-slide { padding:64px 20px 92px; }
+    .i-title .i-h { font-size:clamp(44px, 14vw, 120px); }
+    .i-title .i-s { font-size:11.5px; max-width:30ch; margin-left:auto; margin-right:auto; }
+    .i-title .i-fig img { height:auto; max-height:40vh; width:auto; max-width:100%; }
+    .i-split { flex-direction:column; gap:24px; text-align:left; align-items:stretch; }
+    .i-split .i-txt { flex:none; }
+    .i-split .i-fig img { height:auto; max-height:40vh; max-width:100%; }
+    .i-h { font-size:clamp(34px, 10vw, 56px); }
+    .i-s { font-size:13px; }
+    .i-keys { gap:12px; font-size:22px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #intro, .i-slide, .i-slide.on, .i-slide .i-h, .i-slide .i-s, .i-slide .i-fig, .i-slide .i-act, .i-hint { transition:none !important; }
+  }
 </style>
 </head>
 <body>
 <header class="ui-hdr" id="hdr">
   <a class="ui-wordmark" href="/">SUB-01</a>
   <nav class="ui-nav" aria-label="pages"><a class="on" href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav>
+  <button type="button" id="i-replay" title="replay the intro">intro</button>
   <div class="ui-spacer"></div>
   <div class="h-state">
     <span class="ui-chip live off" id="h-live"><i class="ui-dot"></i><span id="h-live-t">connecting</span></span>
@@ -332,8 +415,105 @@
   <a class="go" href="/brain">open the 3D model →</a>
 </footer>
 
+<div id="intro" role="dialog" aria-modal="true" aria-label="introduction" tabindex="-1">
+  <div class="i-mark" aria-hidden="true"><b>SUB-01</b><span>brain model</span></div>
+  <span class="i-count" id="i-count" aria-live="polite">01 / 05</span>
+  <section class="i-slide i-title on" aria-label="1 of 5">
+    <h2 class="i-h"><span class="w1">A brain</span><span class="w2">decoded</span></h2>
+    <p class="i-s">a simulation of one person's real brain wiring, running live</p>
+    <div class="i-fig"><img src="/hero_brain.webp" alt="the brain's fibre tracts, seen from the side" width="1400" height="954" decoding="async"></div>
+  </section>
+  <section class="i-slide i-split" aria-label="2 of 5">
+    <div class="i-txt"><h2 class="i-h">Real wiring.</h2><p class="i-s">214 brain regions from one public MRI scan, joined by its real fibre tracts.</p></div>
+    <div class="i-fig"><img src="/intro_brain_top.webp" alt="the fibre tracts seen from above" width="1200" height="1748" decoding="async"></div>
+  </section>
+  <section class="i-slide i-split" aria-label="3 of 5">
+    <div class="i-txt"><h2 class="i-h">Simulated activity.</h2><p class="i-s">A model runs on that wiring, day and night. A model, not a mind: it does not feel or think.</p></div>
+    <div class="i-fig hot"><img src="/intro_brain_top.webp" alt="the same wiring, two regions running above their baseline" width="1200" height="1748" decoding="async"></div>
+  </section>
+  <section class="i-slide i-split" aria-label="4 of 5">
+    <div class="i-txt"><h2 class="i-h">Four readouts.</h2><p class="i-s">Attention · Arousal · Cognitive load · Neural activity. Read from the model, not measured from anyone. 50 is its own baseline.</p></div>
+    <div class="i-fig"><ul class="i-keys">
+      <li style="color:var(--ui-attn)"><i></i>Attention</li><li style="color:var(--ui-arousal)"><i></i>Arousal</li>
+      <li style="color:var(--ui-load)"><i></i>Cognitive load</li><li style="color:var(--ui-neural)"><i></i>Neural activity</li></ul></div>
+  </section>
+  <section class="i-slide i-last" aria-label="5 of 5">
+    <h2 class="i-h">Send a stimulus.</h2>
+    <p class="i-s">Type a message. It enters the model, and the RESPONSE panel shows what changed. Replies are fiction, AI-written.</p>
+    <div class="i-act"><button type="button" class="btn-primary" id="i-enter">Enter the live view →</button>
+      <button type="button" class="i-link" id="i-later">replay the intro later from the header</button></div>
+  </section>
+  <div class="i-foot"><span class="i-hint" id="i-hint">→ next · esc skip</span>
+    <div class="i-dots" id="i-dots" role="group" aria-label="slides"></div></div>
+</div>
+
 <script>
 "use strict";
+// ---------------------------------------------------------------- the intro deck (first, so a seen deck never flashes)
+const Intro = (() => {
+  const box = document.getElementById("intro"), slides = [...box.querySelectorAll(".i-slide")], N = slides.length;
+  const dots = document.getElementById("i-dots"), count = document.getElementById("i-count"), hint = document.getElementById("i-hint");
+  const behind = ["hdr", "hero", "grid", "foot"].map(id => document.getElementById(id)).filter(Boolean);
+  const KEY = "sub01.intro";
+  let i = 0, open = false, back = null;
+  const seen = () => { try { return sessionStorage.getItem(KEY) === "1"; } catch (e) { return false; } };
+  const mark = () => { try { sessionStorage.setItem(KEY, "1"); } catch (e) {} };
+  dots.innerHTML = slides.map((_, k) => `<button type="button" data-k="${k}" aria-label="slide ${k + 1} of ${N}"></button>`).join("");
+  function go(k){
+    k = Math.max(0, Math.min(N - 1, k)); if (k === i && slides[k].classList.contains("on")) return;
+    i = k;
+    slides.forEach((s, n) => s.classList.toggle("on", n === k));
+    dots.querySelectorAll("button").forEach((b, n) => b.setAttribute("aria-current", String(n === k)));
+    count.textContent = `${String(k + 1).padStart(2, "0")} / ${String(N).padStart(2, "0")}`;
+    hint.classList.toggle("off", k !== 0);
+  }
+  function show(){
+    open = true; mark(); back = document.activeElement;
+    box.hidden = false; box.classList.remove("out");
+    document.documentElement.classList.add("intro-open");
+    behind.forEach(el => { el.inert = true; });
+    slides.forEach(s => s.classList.remove("on")); i = -1; go(0);
+    box.focus({preventScroll:true});
+  }
+  function close(focusEl){
+    if (!open) return; open = false;
+    document.documentElement.classList.remove("intro-open");
+    behind.forEach(el => { el.inert = false; });
+    box.classList.add("out");
+    const done = () => { if (!open) box.hidden = true; };
+    matchMedia("(prefers-reduced-motion: reduce)").matches ? done() : setTimeout(done, 360);
+    const f = focusEl || (back && back !== document.body && document.contains(back) ? back : null);
+    if (f) f.focus({preventScroll:true}); else if (document.activeElement && box.contains(document.activeElement)) document.activeElement.blur();
+  }
+  function focusables(){ return [...box.querySelectorAll("button")].filter(b => b.offsetParent !== null && getComputedStyle(b).visibility !== "hidden"); }
+  document.addEventListener("keydown", e => {
+    if (!open) return;
+    const k = e.key, onBtn = e.target.closest && e.target.closest("button");
+    if (k === "Escape") { e.preventDefault(); close(); }
+    else if (k === "ArrowRight" || k === "PageDown" || (k === " " && !onBtn)) { e.preventDefault(); go(i + 1); }
+    else if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); go(i - 1); }
+    else if (k === "Home") { e.preventDefault(); go(0); } else if (k === "End") { e.preventDefault(); go(N - 1); }
+    else if (k === "Tab") {                                    // the focus stays inside the deck
+      const f = focusables(); if (!f.length) { e.preventDefault(); return; }
+      const at = f.indexOf(document.activeElement);
+      if (e.shiftKey && at <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && (at === -1 || at === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+  box.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (b) { if (b.dataset.k !== undefined) go(+b.dataset.k); return; }
+    e.clientX < innerWidth / 2 ? go(i - 1) : go(i + 1);
+  });
+  document.getElementById("i-enter").addEventListener("click", () => close());
+  const replay = document.getElementById("i-replay");
+  document.getElementById("i-later").addEventListener("click", () => {
+    close(replay); replay.classList.add("flash"); setTimeout(() => replay.classList.remove("flash"), 1600);
+  });
+  replay.addEventListener("click", () => show());
+  if (seen()) box.hidden = true; else show();
+  return {show, close};
+})();
 // ============================================================================================================
 // SUB-01 · live. One WebSocket (/ws?rate=5&q=1); the math runs per message (a few hundred floats), every DOM and
 // canvas write runs in one requestAnimationFrame loop. All readouts are formulas over the model's simulated activity.
@@ -581,26 +761,27 @@ function renderHello(){
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 function nearBottom(){ return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 40; }
-function addLine(html, cls){
+function addLine(html, cls, title){
   const stick = nearBottom();
-  const d = document.createElement("div"); d.className = "cl " + (cls || ""); d.innerHTML = html;
+  const d = document.createElement("div"); d.className = "cl " + (cls || ""); d.innerHTML = html; if (title) d.title = title;
   chatEl.appendChild(d); chatCount++;
   while (chatEl.children.length > 30) chatEl.firstChild.remove();
   if (stick) chatEl.scrollTop = chatEl.scrollHeight;
 }
+const tm = t => t ? `<span class="tm"> · ${esc(t)}</span>` : "";
 function chatLine(c){
   if (!c || !c.text) return;
   const nick = c.nick ? String(c.nick) : "viewer";
-  const nets = Array.isArray(c.networks) && c.networks.length ? ` <span class="nets">→ ${esc(c.networks.slice(0, 4).join(" · "))}</span>` : "";
-  const sleep = c.asleep ? ` <span class="nets">(through the sleep at ${Math.round((+c.gain || 0) * 100)}%)</span>` : "";
-  addLine(`<span class="av">${esc(nick[0] || "v")}</span><span class="tx"><span class="nk">${esc(nick)}</span>${esc(trunc(c.text, 200))}${nets}${sleep}<span class="tm">${esc(c.t)}</span></span>`);
+  const nets = Array.isArray(c.networks) && c.networks.length ? `entered through ${c.networks.slice(0, 4).join(" · ")}` : "";
+  const sleep = c.asleep ? `through the sleep at ${Math.round((+c.gain || 0) * 100)}%` : "";
+  addLine(`<span class="av">${esc(nick[0] || "v")}</span><span class="tx"><span class="nk">${esc(nick)}</span>${esc(trunc(c.text, 200))}${tm(c.t)}</span>`, "", [nets, sleep].filter(Boolean).join(" · "));
 }
 function replyLine(r){
   if (!r || !r.text) return;
-  addLine(`<span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${r.to ? `<span class="nets">@${esc(r.to)} </span>` : ""}${esc(trunc(r.text, 280))} <span class="tag">his reply · AI-written</span><span class="tm">${esc(r.t)}</span></span>`, "me");
+  addLine(`<span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${r.to ? `<span class="nets">@${esc(r.to)} </span>` : ""}${esc(trunc(r.text, 280))} <span class="tag">his reply · AI-written</span>${tm(r.t)}</span>`, "me");
 }
 function sysLine(t, text, nets){
-  addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${Array.isArray(nets) && nets.length ? ` → ${esc(nets.slice(0, 4).join(" · "))}` : ""}<span class="tm">${esc(t)}</span></span>`, "sys");
+  addLine(`<span class="av">◇</span><span class="tx">${esc(text)}${tm(t)}</span>`, "sys", Array.isArray(nets) && nets.length ? `entered through ${nets.slice(0, 4).join(" · ")}` : "");
 }
 let ackTimer = 0;
 function ack(text, ok){                       // one short line under the input; it fades back to nothing after 6 s
