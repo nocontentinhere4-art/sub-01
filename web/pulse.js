@@ -1,6 +1,8 @@
 // SUB-01 · pulse.js (defer, every page with <body data-pulse>). The pulse strip: 28 px at the bottom of the page, the
 // four model readouts of the last 60 s scrolling right to left, their values at the right, the sleep stage when he is
 // not awake. It also keeps the header's clock (#ui-clock) and live chip (#ui-live, #ui-live-t) up to date.
+// The readouts are named attention, alertness, effort, activity (phones: AT · AL · EF · AC). window.SUB01Pulse.spike()
+// sends a bright pulse along the strip (any page may call it; it also fires when the socket receives a "chat" message).
 // The readouts are formulas over the model's simulated activity (as on web/live.html), not measured from anyone.
 // One WebSocket (/ws?rate=5&q=1) per page; <body data-pulse="feed"> opens none: the page passes its own messages to
 // window.SUB01Pulse.feed(msg) and its socket state to window.SUB01Pulse.online(bool).
@@ -17,28 +19,40 @@
   const $ = id => document.getElementById(id);
   const RM = matchMedia("(prefers-reduced-motion: reduce)");
   const STAGE = {NREM:"NREM · asleep", REM:"REM · dreaming"};
-  const KEYS = ["a", "r", "l", "n"], LETTER = {a:"A", r:"R", l:"L", n:"N"},
-        NAME = {a:"attention", r:"arousal", l:"cognitive load", n:"neural activity"};
+  const KEYS = ["a", "r", "l", "n"], LETTER = {a:"AT", r:"AL", l:"EF", n:"AC"},
+        NAME = {a:"attention", r:"alertness", l:"effort", n:"activity"};
   const COL = {a:"#ffffff", r:"#5aa9ff", l:"#ffd166", n:"#2ee6c5"};
   try { const cs = getComputedStyle(document.documentElement), g = k => cs.getPropertyValue(k).trim();
     COL.a = g("--ui-attn") || COL.a; COL.r = g("--ui-arousal") || COL.r; COL.l = g("--ui-load") || COL.l; COL.n = g("--ui-neural") || COL.n; } catch (e) {}
 
   // ---------------------------------------------------------------- the strip
   const root = document.createElement("div");
-  root.id = "ui-pulse"; root.setAttribute("role", "img"); root.setAttribute("aria-label", "live readouts");
-  root.title = "Attention · Arousal · Cognitive load · Neural activity, the last 60 s. Model readouts, not measured from anyone. 50 = his own baseline.";
+  root.id = "ui-pulse"; root.setAttribute("role", "group"); root.setAttribute("aria-label", "live readouts");
+  root.title = "Attention · alertness · effort · activity, the last 60 s. Model readouts, not measured from anyone. 50 = his own baseline.";
   const cv = document.createElement("canvas"); cv.setAttribute("aria-hidden", "true");
   const vals = document.createElement("div"); vals.className = "ui-pulse-vals";
   const stageEl = document.createElement("span"); stageEl.className = "ui-chip ui-pulse-stage"; stageEl.hidden = true;
+  stageEl.setAttribute("aria-live", "polite"); stageEl.setAttribute("aria-atomic", "true");   // the only live region
   const row = document.createElement("span"); row.className = "ui-pulse-row";
-  const num = {};
+  const num = {}, sr = {};
+  const cap = t => t[0].toUpperCase() + t.slice(1);
+  const mk = (cls, text, attrs) => { const e = document.createElement("span"); e.className = cls; e.textContent = text;
+    if (attrs) for (const a in attrs) e.setAttribute(a, attrs[a]); return e; };
   KEYS.forEach((k, i) => {
-    if (i) row.append(" · ");
-    const b = document.createElement("b"); b.textContent = LETTER[k]; b.style.color = COL[k]; b.title = NAME[k];
+    // real text: a visually hidden "Attention 61" for screen readers, the visible short form (words, or letters on phones)
+    // aria-hidden; the numbers are never a live region
+    const item = document.createElement("span"); item.className = "ui-pulse-item";
+    sr[k] = mk("ui-vh", `${cap(NAME[k])} --`);
+    const vis = document.createElement("span"); vis.setAttribute("aria-hidden", "true");
+    const b = document.createElement("b"); b.style.color = COL[k]; b.title = cap(NAME[k]);
+    b.append(mk("ui-pw", NAME[k]), mk("ui-pl", LETTER[k]));
     const v = document.createElement("span"); v.textContent = "--"; num[k] = v;
-    row.append(b, " ", v);
+    vis.append(b, " ", v); item.append(sr[k], vis);
+    if (i) row.append(mk("ui-pulse-sep", " · ", {"aria-hidden":"true"}));
+    row.append(item);
   });
-  vals.append(stageEl, row); root.append(cv, vals); body.append(root);
+  const spikeEl = mk("ui-pulse-spike", "", {"aria-hidden":"true"}), flashEl = mk("ui-pulse-flash", "", {"aria-hidden":"true"});
+  vals.append(stageEl, row); root.append(cv, spikeEl, flashEl, vals); body.append(root);
   const ctx = cv.getContext("2d");
 
   // ---------------------------------------------------------------- state and readouts (per tick: arithmetic only)
@@ -109,7 +123,8 @@
     if (S.clock) put($("ui-clock"), "clock", `${S.clock} ${S.tz || "Tokyo"}`);
     const st = S.stage && STAGE[S.stage];
     stageEl.hidden = !st; if (st) put(stageEl, "stage", st);
-    if (S.last) for (const k of KEYS) put(num[k], k, String(Math.round(S.readS[k])));
+    if (S.last) for (const k of KEYS) { const t = String(Math.round(S.readS[k]));
+      put(num[k], k, t); put(sr[k], "s" + k, `${cap(NAME[k])} ${t}`); }
   }
 
   // ---------------------------------------------------------------- drawing: 10 fps, nothing while hidden
@@ -159,10 +174,30 @@
   addEventListener("resize", () => { W = 0; });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { W = 0; dirtyText = true; frame(); } });
 
+  // ---------------------------------------------------------------- the spike: someone sent a stimulus
+  // a 24 px bright pulse travels the strip left to right in 900 ms (ease-out) and fades; under reduced motion the whole
+  // strip flashes for 300 ms. A second call within 500 ms is the same stimulus (the sender's page and the echo): ignored.
+  let spikeAt = 0;
+  function spike(){
+    try {
+      const now = performance.now();
+      if (document.hidden || now - spikeAt < 500 || !spikeEl.animate) return;
+      spikeAt = now;
+      if (RM.matches) { flashEl.animate([{opacity:1}, {opacity:0}], {duration:300, easing:"ease-out"}); return; }
+      const w = Math.max(24, root.clientWidth || window.innerWidth);
+      spikeEl.animate([
+        {transform:"translateX(-24px)", opacity:1, easing:"ease-out"},
+        {transform:`translateX(${w}px)`, opacity:1, offset:.82},
+        {transform:`translateX(${w}px)`, opacity:0}
+      ], {duration:1100, easing:"linear"});
+    } catch (e) { /* the strip is decoration: never throw */ }
+  }
+
   // ---------------------------------------------------------------- the socket (or the page's own, in feed mode)
   function handle(m){
     if (!m || typeof m !== "object") return;
     if (m.type === "tick") { retry = 0; onTick(m); }
+    else if (m.type === "chat") spike();
     else if (m.type === "full") { full = (+m.retry > 0 ? +m.retry : 30) * 1000; }
   }
   let retry = 0, full = 0, ws = null;
@@ -183,6 +218,7 @@
   window.SUB01Pulse = Object.freeze({
     feed: m => { try { handle(m); } catch (e) {} },                  // feed mode: the page's messages
     online: on => { if (!on) setConn(false); },                         // feed mode: the page's socket closed (a tick reopens)
+    spike,                                                              // a bright pulse along the strip (any page, any time)
     read: () => ({...S.readS, stage:S.stage, clock:S.clock, tz:S.tz, viewers:S.viewers, conn:S.conn}),
   });
   renderText();

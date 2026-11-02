@@ -38,7 +38,8 @@
   const counter = document.getElementById("ui-counter");
   if (counter) {
     counter.textContent = slide ? `${pad(slide)} / ${pad(DECK.length)}` : "—";
-    counter.setAttribute("aria-label", slide ? `page ${slide} of ${DECK.length}` : "a note, outside the deck");
+    counter.setAttribute("aria-label", slide ? `page ${slide} of ${DECK.length} · ← → or [ ] change page` : "a note, outside the deck");
+    if (slide) counter.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight BracketLeft BracketRight");
   }
   const at = slide || (DECK.indexOf(here) + 1);          // the keys also work on a deck page that has not declared itself
 

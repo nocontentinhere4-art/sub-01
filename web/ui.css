@@ -4,7 +4,7 @@
    the .ui-* classes; nothing here styles bare tags, so the older pages keep their own layouts. */
 :root {
   --ui-bg: #000;            --ui-bg2: #0a0a0c;         --ui-panel: #0e0e11;       --ui-panel2: #141418;
-  --ui-fg: #fff;            --ui-fg2: #c9c9d1;         --ui-dim: #7d7d8a;         --ui-faint: #4a4a56;
+  --ui-fg: #fff;            --ui-fg2: #c9c9d1;         --ui-dim: #9494a1;         --ui-faint: #8a8a98;
   --ui-line: rgba(255,255,255,.1);                     --ui-line2: rgba(255,255,255,.18);
   --ui-live: #ff2d55;       --ui-live2: #ff6b8a;       --ui-proj: #2ee6c5;        --ui-warn: #ffb020;
   --ui-attn: #ffffff;       --ui-arousal: #5aa9ff;     --ui-load: #ffd166;        --ui-neural: #2ee6c5;
@@ -21,7 +21,7 @@
   font-family: var(--ui-mono); font-size:12px; letter-spacing:.02em; }
 .ui-wordmark { font-family: var(--ui-sans); font-weight:800; font-size:18px; letter-spacing:-.03em; line-height:1;
   color:var(--ui-fg); text-decoration:none; margin:0; }
-.ui-wordmark small { display:block; font-family:var(--ui-mono); font-weight:400; font-size:9px; letter-spacing:.14em;
+.ui-wordmark small { display:block; font-family:var(--ui-mono); font-weight:400; font-size:11px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--ui-dim); margin-top:3px; }
 .ui-nav { display:flex; gap:2px; }
 .ui-nav a { color:var(--ui-dim); text-decoration:none; padding:5px 9px; border-radius:999px; text-transform:lowercase;
@@ -33,12 +33,12 @@
 .ui-counter { color:var(--ui-dim); font-variant-numeric: tabular-nums; }
 
 /* small uppercase label, as in the reference's panel captions */
-.ui-label { font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
+.ui-label { font-family:var(--ui-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
 .ui-label b { color:var(--ui-fg); font-weight:600; }
 
 /* chips */
 .ui-chip { display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px; font-family:var(--ui-mono);
-  font-size:10px; letter-spacing:.12em; text-transform:uppercase; border:1px solid var(--ui-line2); color:var(--ui-fg2); }
+  font-size:11px; letter-spacing:.12em; text-transform:uppercase; border:1px solid var(--ui-line2); color:var(--ui-fg2); }
 .ui-chip.live { border-color:transparent; background:var(--ui-live); color:#fff; }
 .ui-chip.proj { border-color:var(--ui-proj); color:var(--ui-proj); }
 .ui-chip.ai   { border-color:var(--ui-line2); color:var(--ui-dim); }
@@ -66,9 +66,10 @@
 .ui-input { font:inherit; font-family:var(--ui-mono); font-size:12px; color:var(--ui-fg); background:var(--ui-panel2);
   border:1px solid var(--ui-line2); border-radius:999px; padding:8px 14px; outline:none; }
 .ui-input:focus { border-color:var(--ui-fg2); }
+.ui-input:focus-visible { outline:2px solid #fff; outline-offset:1px; box-shadow:0 0 0 1px #000; }
 
 /* the honesty line: always visible, never covered */
-.ui-honest { font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
+.ui-honest { font-family:var(--ui-mono); font-size:12px; line-height:1.5; color:var(--ui-dim); }
 .ui-honest a { color:var(--ui-fg2); }
 
 /* motion: a page may add .ui-in to things that enter */
@@ -89,7 +90,7 @@
 .ui-lockup { display:inline-flex; flex-direction:column; gap:3px; color:var(--ui-fg); text-decoration:none; line-height:1;
   flex:none; border-radius:4px; }
 .ui-lockup b { font-family:var(--ui-sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
-.ui-lockup small { font-family:var(--ui-mono); font-weight:400; font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+.ui-lockup small { font-family:var(--ui-mono); font-weight:400; font-size:11px; letter-spacing:.16em; text-transform:uppercase;
   color:var(--ui-dim); }
 .ui-state { display:flex; align-items:center; gap:12px; flex:none; white-space:nowrap; }
 .ui-clock { font-family:var(--ui-mono); font-size:11px; letter-spacing:.06em; color:var(--ui-fg2); font-variant-numeric:tabular-nums; }
@@ -102,7 +103,7 @@
   .ui-hdr:has(> .ui-lockup) > .ui-nav::-webkit-scrollbar { display:none; }
   .ui-hdr:has(> .ui-lockup) > .ui-nav a { flex:none; }
   .ui-state { gap:8px; }
-  .ui-state .ui-clock, .ui-state .ui-counter { font-size:10px; }
+  .ui-state .ui-clock, .ui-state .ui-counter { font-size:11px; }
 }
 @media (max-width: 420px) {                    /* small phones: lockup and state still share the first line */
   .ui-hdr:has(> .ui-lockup) { padding-left:12px; padding-right:12px; column-gap:10px; }
@@ -111,8 +112,8 @@
   .ui-state .ui-counter { min-width:0; }
 }
 
-/* captions: the 10 px mono tracked uppercase line (alias of .ui-label) */
-.ui-caption { font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
+/* captions: the 11 px mono tracked uppercase line (alias of .ui-label) */
+.ui-caption { font-family:var(--ui-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-dim); }
 .ui-caption b { color:var(--ui-fg); font-weight:600; }
 
 /* segmented control: one bordered pill, buttons inside, the chosen one filled white */
@@ -182,19 +183,29 @@ body[data-pulse] .ui-dock { bottom:calc(var(--ui-pulse-h) + 12px); }
 /* the pulse strip (web/pulse.js): 28 px at the bottom of every page with body[data-pulse] */
 body[data-pulse] { padding-bottom:28px; }
 #ui-pulse { position:fixed; left:0; right:0; bottom:0; height:28px; z-index:40; display:flex; align-items:center;
-  background:#000; border-top:1px solid var(--ui-line); font-family:var(--ui-mono); font-size:10px; letter-spacing:.06em;
+  background:#000; border-top:1px solid var(--ui-line); font-family:var(--ui-mono); font-size:11px; letter-spacing:.06em;
   color:var(--ui-fg2); box-sizing:border-box; contain:strict; }
 #ui-pulse canvas { flex:1 1 auto; min-width:0; height:27px; display:block; }
 #ui-pulse .ui-pulse-vals { flex:none; display:flex; align-items:center; gap:10px; padding:0 var(--ui-pad) 0 12px;
   white-space:nowrap; font-variant-numeric:tabular-nums; }
 #ui-pulse .ui-pulse-vals b { font-weight:600; }
+#ui-pulse .ui-pulse-row .ui-pw { display:inline; } #ui-pulse .ui-pulse-row .ui-pl { display:none; }
+#ui-pulse .ui-vh { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0);
+  clip-path:inset(50%); white-space:nowrap; border:0; }
+/* the spike (SUB01Pulse.spike()): a 24 px bright pulse that travels the strip left to right; reduced motion: a flash */
+#ui-pulse .ui-pulse-spike { position:absolute; left:0; top:0; bottom:0; width:24px; opacity:0; pointer-events:none; will-change:transform,opacity;
+  background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.85) 46%, #fff 50%, rgba(255,255,255,.85) 54%, rgba(255,255,255,0));
+  box-shadow:0 0 2px 2px rgba(255,255,255,.55); }
+#ui-pulse .ui-pulse-flash { position:absolute; inset:0; opacity:0; pointer-events:none; background:rgba(255,255,255,.4); }
 #ui-pulse .ui-pulse-stage[hidden] { display:none; }
-#ui-pulse .ui-pulse-stage { padding:1px 7px; font-size:9px; letter-spacing:.12em; color:var(--ui-blue2); border-color:var(--ui-blue); }
+#ui-pulse .ui-pulse-stage { padding:1px 7px; font-size:11px; letter-spacing:.12em; color:var(--ui-blue2); border-color:var(--ui-blue); }
+@media (max-width: 720px) { #ui-pulse .ui-pulse-row .ui-pw { display:none; } #ui-pulse .ui-pulse-row .ui-pl { display:inline; } }
 @media (max-width: 520px) { #ui-pulse .ui-pulse-vals { gap:8px; padding-left:8px; } #ui-pulse .ui-pulse-stage { letter-spacing:.06em; } }
 
-/* focus: a 1 px white outline on every control (zero specificity: a page can still restyle it) */
+/* focus: a 2 px white outline with a 1 px dark ring inside it, so it shows on white pills too (zero specificity: a page
+   can still restyle it) */
 :where(a, button, input, select, textarea, summary, [tabindex], .ui-btn, .ui-seg > button, .ui-nav a, .ui-lockup):focus-visible {
-  outline:1px solid #fff; outline-offset:2px; }
+  outline:2px solid #fff; outline-offset:1px; box-shadow:0 0 0 1px #000; }
 
 /* page to page: a 320 ms crossfade (cross-document view transitions; browsers without them just navigate) */
 @media (prefers-reduced-motion: no-preference) {

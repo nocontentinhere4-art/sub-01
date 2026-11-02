@@ -26,7 +26,7 @@ The page declares itself with `<body data-deck="02" data-pulse>` (`data-pulse` =
     … page …
     <script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 
-`.ui-lockup`: two lines, like the title slide (SUB-01 bold 16px, "brain model" 9px mono tracked under it).
+`.ui-lockup`: two lines, like the title slide (SUB-01 bold 16px, "brain model" 11px mono tracked under it).
 The ONE live chip lives in the header. No other LIVE chip anywhere (panels, viewports, HUDs).
 Pages that had extra links (about on tastes, map on life) keep them after the six.
 
@@ -43,10 +43,10 @@ Pages that had extra links (about on tastes, map on life) keep them after the si
   also work with Alt/AltGr (an Italian keyboard needs them to type a bracket).
 
 ## web/pulse.js (defer, every page with `body[data-pulse]`)
-Creates `<div id="ui-pulse" role="img" aria-label="live readouts">` fixed at the bottom: 28 px tall, full width,
+Creates `<div id="ui-pulse" role="group" aria-label="live readouts">` fixed at the bottom: 28 px tall, full width,
 black, top hairline. Inside: a canvas with the four readouts of the last 60 s scrolling right to left
-(attention `--ui-attn`, arousal `--ui-arousal`, cognitive load `--ui-load`, neural activity `--ui-neural`, 1 px
-lines, 50 = baseline as a faint dashed line), and at the right a mono row `A 61 · R 70 · L 54 · N 49` (10 px) plus
+(attention `--ui-attn`, alertness `--ui-arousal`, effort `--ui-load`, activity `--ui-neural`, 1 px
+lines, 50 = baseline as a faint dashed line), and at the right a mono row `attention 61 · alertness 70 · effort 54 · activity 49` (11 px) plus
 the stage chip when not AWAKE ("NREM · asleep", "REM · dreaming"). Formulas, from live.html: rel(g) = groups[g] /
 EMA25s(groups[g]); R(x) = clamp(50 + 40·log2 x); Attention = R(mean(rel attention, salience, visual)); Arousal =
 clamp(50 + 30·log2(NE)); Load = 0.7·R(mean(rel control, default)) + 0.3·clamp(ACh/2·100); Neural = R(mean_i act_i /
@@ -54,12 +54,25 @@ EMA25s(act_i)) from `aq`. One WebSocket `/ws?rate=5&q=1` per page, reconnect wit
 hidden, 10 fps. It also writes `#ui-clock` ("20:51 Tokyo") and `#ui-live-t` ("live · 3 watching" / "offline").
 ui.css gives `body[data-pulse] { padding-bottom: 28px }` so nothing hides under the strip.
 
+Names and accessibility (11-02, audience fixes): the readouts are attention, alertness, effort, activity (formerly
+attention, arousal, cognitive load, neural activity; the formulas are unchanged); the visible row is words above 720 px
+("attention 61 · alertness 70 · effort 54 · activity 49") and AT · AL · EF · AC on phones, and every item carries a
+visually hidden full name and value ("Attention 61"). The wrapper is `role="group" aria-label="live readouts"`, the canvas
+`aria-hidden`; the only live region is the stage chip (`aria-live="polite"`), never the numbers. `window.SUB01Pulse.spike()`
+(any page, guard it with `window.SUB01Pulse && SUB01Pulse.spike()`) sends a white 24 px pulse with a 2 px glow along the strip,
+left edge to right edge in 900 ms (ease-out), then a 200 ms fade; under reduced motion the strip flashes for 300 ms instead.
+pulse.js calls it itself on every `chat` message from the socket (also in feed mode, through `feed()`), so every open page
+shows a stimulus sent from anywhere; calls less than 500 ms apart count as one (the sender's call and the echo). Tokens: `--ui-dim`
+#9494a1 and `--ui-faint` #8a8a98 (both at least 4.5:1 on #141418); text never below 11 px (`.ui-honest` 12 px); the focus ring
+is a 2 px white outline with a 1 px black ring inside it (also `.ui-input:focus-visible`). The deck counter's aria-label reads
+"page 2 of 6 · ← → or [ ] change page" and carries `aria-keyshortcuts`.
+
 ## Classes (web/ui.css v2; everything v1 stays and keeps working)
 - tokens v1 + `--ui-blue:#3f7bff; --ui-blue2:#8fb3ff; --ui-r3:16px;`
 - `.ui-lockup`, `.ui-state`, `.ui-clock`, `.ui-counter` (header)
 - `.ui-seg` segmented control: one bordered pill, `button` children, `.on` filled white with black text
 - `.ui-btn.primary` white fill, black text; `.ui-btn` stays the hairline pill
-- `.ui-caption` 10 px mono tracked uppercase dim (same as `.ui-label`, alias)
+- `.ui-caption` 11 px mono tracked uppercase dim (same as `.ui-label`, alias)
 - `.ui-num` a big-number block: `.ui-caption` above, `.ui-big` (+ optional `.ui-word` next to it), `.ui-caption` below
 - `.ui-rail` a vertical stack of `.ui-num` with hairlines between (HUD rails on 3D pages); `.ui-rail.right`
   pins to the right edge, `.ui-rail.left` to the left; on phones rails become a horizontal scroll row
@@ -67,7 +80,7 @@ ui.css gives `body[data-pulse] { padding-bottom: 28px }` so nothing hides under 
 - `.ui-sheet` the contact-sheet grid: tiles edge to edge, 1 px seams (`gap:1px; background:var(--ui-line)`)
 - `.ui-dock` a bottom dock for a full-bleed page: a panel pinned above the pulse, max-width 920 px, centred
 - `.ui-title` the title-slide headline block: `h1` 800 + a second line 600, `p` mono sub
-- focus-visible: 1 px white outline on every control
+- focus-visible: 2 px white outline + 1 px black inner ring on every control
 
 ## Motion
 Page crossfade 320 ms; panels enter with the `.ui-in` stagger; big numbers tween 300 ms; the pulse breathes
