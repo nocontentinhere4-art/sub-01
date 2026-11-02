@@ -47,7 +47,7 @@
   #orient { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1; }
   #orient span { position:absolute; left:0; top:0; display:flex; align-items:center; gap:6px; font-family:var(--ui-mono); font-size:9.5px;
     letter-spacing:.18em; text-transform:uppercase; color:var(--ui-dim); white-space:nowrap; opacity:0; will-change:transform, opacity; }
-  #orient span i { width:5px; height:5px; border:1px solid var(--ui-dim); border-radius:50%; flex:none; }
+  #orient span i { width:5px; height:5px; border:1px solid var(--ui-dim); border-radius:50%; flex:none; } /* dot-ok: orientation marks, 5 px, not a data layer */
   body.mini #orient, body.zooming #orient, body.closeup #orient { display:none; }
 
   /* ---- header (markup and look from ui.css; here only where it sits) ---- */
@@ -72,30 +72,33 @@
   #st.swap #sub { opacity:0; transform:translateY(-6px); }
 
   /* the right rail: the model's levels as big numbers */
-  #rail { position:absolute; right:var(--gut); top:calc(var(--hdr-h) + 22px); width:var(--rail-w);
+  #meters { position:absolute; right:var(--gut); top:calc(var(--hdr-h) + 22px); width:var(--rail-w);
     max-height:calc(100vh - var(--hdr-h) - var(--pulse-h) - 48px); overflow-y:auto; scrollbar-width:none;
     display:flex; flex-direction:column; text-align:left; }
-  #rail::-webkit-scrollbar { display:none; }
-  #rail .rail-k { padding-bottom:8px; color:var(--ui-faint); letter-spacing:.12em; }
-  #rail .ui-num { padding:min(9px, 1.1vh) 0 min(10px, 1.2vh); border-top:1px solid var(--ui-line); row-gap:min(4px, .5vh); }
-  #rail .ui-big { font-size:clamp(26px, min(2.3vw, 4.2vh), 36px); line-height:.95; transition:color .4s var(--ease); }
-  #rail .ui-num > .ui-caption:first-child { color:var(--ui-fg2); }
-  #rail .ui-num > .ui-caption:last-child { color:var(--ui-faint); letter-spacing:.12em; }
-  #rail .b { position:relative; display:block; height:2px; margin:3px 0 1px; background:rgba(255,255,255,.08); }
-  #rail .b i { display:block; height:100%; width:0; background:var(--ui-fg2); transition:width .35s var(--ease); }
-  #rail .b.ref::after { content:""; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:rgba(255,255,255,.5); }
-  #rail .sl .b i { background:var(--ui-blue, #3f7bff); }
+  #meters::-webkit-scrollbar { display:none; }
+  #meters { transform:none; }   /* ui.css centres .ui-rail.right with a transform; only the entry animation hid it (reduced motion showed it) */
+  #meters .rail-k { padding-bottom:8px; color:var(--ui-faint); letter-spacing:.12em; line-height:1.5; }
+  .vh { position:absolute !important; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; border:0; }
+  #meters .ui-num { padding:min(9px, 1.1vh) 0 min(10px, 1.2vh); border-top:1px solid var(--ui-line); row-gap:min(4px, .5vh); }
+  #meters .ui-big { font-size:clamp(26px, min(2.3vw, 4.2vh), 36px); line-height:.95; transition:color .4s var(--ease); }
+  #meters .ui-num > .ui-caption { color:var(--ui-fg2); }   /* one plain word under each number */
+  #meters .ui-num > #mt-dab { color:var(--ui-faint); }
+  #meters .b { position:relative; display:block; height:2px; margin:3px 0 1px; background:rgba(255,255,255,.08); }
+  #meters .b i { display:block; height:100%; width:0; background:var(--ui-fg2); transition:width .35s var(--ease); }
+  #meters .b.ref::after { content:""; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:rgba(255,255,255,.5); }
+  #meters .sl .b i { background:var(--ui-blue, #3f7bff); }
   #da { display:block; width:100%; height:28px; margin:2px 0 1px; }
   #mt-dab { color:var(--ui-faint); font-size:9px; letter-spacing:.1em; }
 
   /* bottom-left: the busiest network, the honesty line, the way into his day */
   #foot { position:absolute; left:var(--gut); bottom:calc(var(--pulse-h) + 18px); width:var(--left-w); transition:opacity .4s var(--ease); }
   #busy .ui-big { font-size:clamp(34px, 3vw, 48px); }
-  #rail .ui-word { font-size:12px; }
+  #meters .ui-word { font-size:12px; }
   #busy-w { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #mt-top { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:.1em; }
   #honest { margin:16px 0 0; font-family:var(--ui-mono); font-size:10px; line-height:1.5; letter-spacing:.04em; color:var(--ui-dim); }
   #day-t { margin-top:12px; }
+  body.dayopen #busy, body.dayopen #honest { visibility:hidden; }
 
   /* bottom-centre: the dock (layer, specimen, the stimulus) */
   #dock { position:absolute; bottom:calc(var(--pulse-h) + 16px); left:calc(var(--gut) + var(--left-w) + 24px); right:calc(var(--gut) + var(--rail-w) + 24px);
@@ -108,7 +111,9 @@
   .ui-seg { max-width:100%; overflow-x:auto; scrollbar-width:none; }
   .ui-seg::-webkit-scrollbar { display:none; }
   .ui-seg .sep { width:1px; align-self:stretch; margin:3px 4px; background:var(--ui-line2); flex:none; }
+  #layers { flex-wrap:wrap; }
   #layers button.off { color:var(--ui-faint); }
+  #more-t { display:none; }
   #layers button.on.off { background:var(--ui-fg2); color:#000; }
   .capline { display:flex; align-items:center; gap:10px; min-width:0; font-family:var(--ui-mono); font-size:10.5px; letter-spacing:.03em;
     color:var(--ui-dim); line-height:1.5; }
@@ -143,16 +148,18 @@
   #n3labels span { position:absolute; transform:translate(-100%, -50%); font-family:var(--ui-mono); font-size:9.5px; color:var(--ui-fg2); pointer-events:none;
     padding-right:6px; text-shadow:0 1px 4px #000; white-space:nowrap; }
   body.zooming #foot { opacity:.35; }
-  body.closeup #rail, body.closeup #st { opacity:0; pointer-events:none; }
+  body.closeup #meters, body.closeup #st { opacity:0; pointer-events:none; }
   body.closeup #dock { background:rgba(0,0,0,.86); }
 
   /* ---- his day: a drawer of tiles (what the model did today), contact-sheet seams ---- */
-  #day { position:fixed; z-index:20; left:0; top:var(--hdr-h); bottom:var(--pulse-h); width:min(420px, 100vw); display:flex; flex-direction:column;
+  #day { position:fixed; z-index:20; left:0; top:var(--hdr-h); max-height:calc(100vh - var(--hdr-h) - var(--pulse-h)); width:min(420px, 100vw); display:flex; flex-direction:column;
     background:rgba(0,0,0,.9); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); border-right:1px solid var(--ui-line);
     transform:translateX(-102%); visibility:hidden; transition:transform .45s var(--ease), visibility 0s linear .45s; }
   #day.open { transform:none; visibility:visible; transition:transform .45s var(--ease), visibility 0s; }
   .day-h { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; border-bottom:1px solid var(--ui-line); }
   .day-h b { display:block; font-family:var(--ui-sans); font-weight:800; font-size:22px; letter-spacing:-.04em; color:var(--ui-fg); margin-bottom:4px; }
+  #cards { max-height:calc(100vh - var(--dock-h) - var(--hdr-h) - var(--pulse-h) - 120px); }   /* the drawer stops above the dock: chat stays reachable */
+  #cards [hidden] { display:none !important; }   /* an empty card is really hidden */
   .day-sheet { flex:1; min-height:0; overflow-y:auto; grid-template-columns:minmax(0, 1fr); align-content:start; scrollbar-width:thin; scrollbar-color:#333 transparent; }
   .tile { display:block; min-width:0; padding:16px; background:#000; color:inherit; text-decoration:none; transition:background .2s var(--ease); }
   a.tile:hover { background:#08080b; }
@@ -187,13 +194,16 @@
   #ticker { display:flex; flex-direction:column; gap:6px; margin-top:8px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.5; color:var(--ui-dim); }
   #ticker div:first-child { color:var(--ui-fg2); }
   #ticker b { color:var(--ui-fg); font-weight:500; }
+  /* runtime notes (keys, switches) live here, folded: never on the page itself */
+  .status { margin-top:10px; }
+  .status summary { cursor:pointer; font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-faint); }
   #neurons { min-width:0; }
   #neurons .nx { background:transparent; border:0; padding:0; font-family:var(--ui-mono); }
   #neurons .nx summary { font-size:10px; letter-spacing:.16em; color:var(--ui-dim); }
   #neurons .nx[data-live="1"] summary b, #neurons .nx-row i { color:var(--ui-fg); }
 
   /* ---- the room's mini (/brain?mini): the brain only ---- */
-  body.mini #hdr, body.mini #hud, body.mini #day, body.mini #vignette, body.mini #ui-pulse { display:none !important; }
+  body.mini #hdr, body.mini #hud, body.mini #meters, body.mini #day, body.mini #vignette, body.mini #ui-pulse { display:none !important; }
 
   /* ---- motion: the HUD enters in a stagger ---- */
   /* .ui-in with --i (ui.css v2): state line, rail, foot, dock enter 70 ms apart */
@@ -206,7 +216,8 @@
     #honest { display:none; }
     #hdr .ui-counter { display:none; }
   }
-  /* ≤ 720 (phones): the page scrolls; the brain, then the levels as a row, the controls, his day */
+  /* ≤ 720 (phones): the page scrolls, in this order and nothing else: the brain, the state line, four numbers in a
+     row, the view control (inside: behind "more views"), the stimulus input, one pill for his day (a full-screen drawer) */
   @media (max-width:720px) {
     :root { --gut:14px; }
     html, body { overflow:auto; height:auto; }
@@ -216,37 +227,40 @@
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
     #hdr .ui-clock { display:none; }
     body { display:flex; flex-direction:column; }
-    #hdr { order:0; } #st { order:1; } #scene { order:2; } #rail { order:3; } #dock { order:4; } #foot { order:5; } #day { order:6; }
-    #scene { position:relative; inset:auto; height:56vh; height:56svh; flex:none; }
+    #hdr { order:0; } #scene { order:1; } #st { order:2; } #meters { order:3; } #dock { order:4; } #foot { order:5; }
+    #scene { position:relative; inset:auto; height:52vh; height:52svh; flex:none; }
     #vignette { display:none; }
     #hud { display:contents; }
-    #st { position:relative; left:auto; top:auto; max-width:none; padding:18px var(--gut) 0; }
-    #st .ui-caption { margin-bottom:8px; }
+    #st { position:relative; left:auto; top:auto; max-width:none; padding:14px var(--gut) 0; }
+    #st > .ui-caption { display:none; }
     .ui-seg { flex-wrap:wrap; border-radius:16px; }
     .ui-seg .sep { display:none; }
     #story { font-size:clamp(24px, 7.4vw, 32px); }
-    #sub { font-size:10px; }
-    #rail { position:static; width:auto; max-height:none; flex-direction:row; overflow-x:auto; padding:6px var(--gut) 4px; gap:0;
-      border-top:1px solid var(--ui-line); border-bottom:1px solid var(--ui-line); scroll-snap-type:x proximity; }
-    #rail .rail-k { display:none; }
-    #rail .ui-num { flex:0 0 auto; width:126px; border-top:0; border-left:1px solid var(--ui-line); padding:8px 12px; scroll-snap-align:start; }
-    #rail .ui-num:first-of-type { border-left:0; padding-left:0; }
-    #rail .ui-big { font-size:30px; }
+    #sub { font-size:10px; margin-top:8px; }
+    /* the four the strip does not carry as words: dopamine, noradrenaline, tiredness, sync */
+    #meters { position:static; width:auto; max-width:none; max-height:none; overflow:visible; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr));
+      padding:10px var(--gut) 8px; margin-top:14px; gap:0; border-top:1px solid var(--ui-line); border-bottom:1px solid var(--ui-line); }
+    #meters .rail-k { grid-column:1 / -1; padding-bottom:6px; font-size:9px; letter-spacing:.1em; }
+    #mt-5ht, #mt-ach, #mt-debt, #da, #mt-dab { display:none !important; }
+    #meters .ui-num { min-width:0; width:auto; border-top:0; border-left:1px solid var(--ui-line); padding:4px 6px; align-content:start; }
+    #meters .ui-num#mt-da { border-left:0; padding-left:0; }
+    #meters .ui-big { font-size:26px; }
+    #meters .ui-word { margin-left:2px; font-size:10px; }
+    #meters .ui-num > .ui-caption { font-size:8.5px; letter-spacing:.02em; line-height:1.35; }
     #dock { position:static; margin:12px var(--gut) 0; max-width:none; padding:12px; }
     .grp { flex-wrap:wrap; width:100%; }
-    .grp > .ui-caption { width:100%; }
-    #foot { position:static; width:auto; padding:18px var(--gut) 8px; }
-    #honest { display:block; }
-    #day-t { display:none; }
-    #day { position:static; width:auto; transform:none; visibility:visible; background:transparent; border-right:0; border-top:1px solid var(--ui-line);
-      -webkit-backdrop-filter:none; backdrop-filter:none; margin-top:14px; transition:none; }
-    #day-x { display:none; }
-    .day-sheet { overflow:visible; }
+    .grp > .ui-caption { width:auto; }
+    #more-t { display:inline; }
+    body:not(.moreviews) #grp-anat, body:not(.moreviews) #dock .capline, body:not(.moreviews) #anatcap { display:none; }
+    #foot { position:static; width:auto; padding:12px var(--gut) 14px; }
+    #busy, #honest { display:none; }
+    #day { z-index:40; top:0; bottom:0; width:100vw; max-height:none; border-right:0; }
+    #cards { max-height:none; }
     #n3scale { bottom:12px; }
-    body.closeup #rail, body.closeup #st { opacity:1; }
+    body.closeup #meters, body.closeup #st { opacity:1; }
   }
   @media (prefers-reduced-motion: reduce) {
-    #story, #sub, #day, #note, #foot, #rail .ui-big, #rail .b i { transition:none !important; }
+    #story, #sub, #day, #note, #foot, #meters .ui-big, #meters .b i { transition:none !important; }
   }
 </style>
 </head>
@@ -271,26 +285,26 @@
 
 <div id="scene"><div id="orient" aria-hidden="true"></div></div><div id="vignette"></div>
 
-<div class="ui-hud" id="hud">
+<main class="ui-hud" id="hud">
   <!-- the state line: what he does, in one big line; the stage, Tokyo time and place in one mono line -->
-  <div class="ui-title ui-in" style="--i:1" id="st" aria-live="polite">
+  <div class="ui-title ui-in" style="--i:1" id="st">
     <span class="ui-caption">02 · the brain model, now</span>
     <h1 id="story">connecting…</h1>
     <p id="sub"></p>
   </div>
 
   <!-- the levels in the model, read from the tick (no extra request); written by metersTick() -->
-  <aside class="ui-rail right ui-in" style="--i:2" id="rail" aria-label="levels in the model">
-    <div class="ui-caption rail-k">100 = awake, at rest</div>
-    <div class="ui-num" id="mt-da"><span class="ui-caption">dopamine</span><span class="ui-big v">—</span><span class="b ref"><i></i></span>
-      <canvas id="da" width="328" height="56" aria-label="dopamine over the last two minutes"></canvas>
-      <span class="ui-caption" id="mt-dab">no burst in 10 min</span><span class="ui-caption">reward · wanting</span></div>
-    <div class="ui-num" id="mt-5ht"><span class="ui-caption">serotonin</span><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">mood · patience</span></div>
-    <div class="ui-num" id="mt-ne"><span class="ui-caption">noradrenaline</span><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">alertness · arousal</span></div>
-    <div class="ui-num" id="mt-ach"><span class="ui-caption">acetylcholine</span><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">attention · learning</span></div>
-    <div class="ui-num sl" id="mt-tired"><span class="ui-caption">tiredness</span><span class="ui-big v">—</span><span class="ui-word">%</span><span class="b"><i></i></span><span class="ui-caption">sleep pressure</span></div>
-    <div class="ui-num sl" id="mt-debt"><span class="ui-caption">sleep debt</span><span class="ui-big v">—</span><span class="ui-word">h</span><span class="b"><i></i></span><span class="ui-caption">hours owed</span></div>
-    <div class="ui-num" id="mt-sync"><span class="ui-caption">sync</span><span class="ui-big v">—</span><span class="ui-word">%</span><span class="b"><i></i></span><span class="ui-caption">regions in step</span></div>
+  <aside class="ui-rail right ui-in" style="--i:2" id="meters" aria-label="levels in the model">
+    <div class="ui-caption rail-k">model index · 100 = awake at rest · not measured from anyone</div>
+    <span class="vh">simulated levels in the model: a model's variables, not feelings</span><span class="vh" id="mt-stage"></span>
+    <div class="ui-num" id="mt-da"><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">dopamine · wanting</span>
+      <canvas id="da" width="328" height="56" aria-label="dopamine over the last two minutes"></canvas><span class="ui-caption" id="mt-dab">no burst in 10 min</span></div>
+    <div class="ui-num" id="mt-5ht"><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">serotonin · mood</span></div>
+    <div class="ui-num" id="mt-ne"><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">noradrenaline · alertness</span></div>
+    <div class="ui-num" id="mt-ach"><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">acetylcholine · learning</span></div>
+    <div class="ui-num sl" id="mt-tired"><span class="ui-big v">—</span><span class="ui-word">%</span><span class="b"><i></i></span><span class="ui-caption">tiredness</span></div>
+    <div class="ui-num sl" id="mt-debt"><span class="ui-big v">—</span><span class="ui-word">h</span><span class="b"><i></i></span><span class="ui-caption">sleep debt · hours owed</span></div>
+    <div class="ui-num" id="mt-sync"><span class="ui-big v">—</span><span class="ui-word">%</span><span class="b"><i></i></span><span class="ui-caption">sync · regions in step</span></div>
   </aside>
 
   <!-- bottom-left: the busiest network vs its own baseline, the honesty line, his day -->
@@ -307,15 +321,15 @@
   <!-- bottom-centre: what is drawn, and the stimulus -->
   <div class="ui-dock ui-in" style="--i:4" id="dock">
     <div class="dk-row">
-      <div class="grp"><span class="ui-caption">layer</span>
-        <div class="ui-seg" id="layers" role="group" aria-label="layers"><button class="on" data-l="fibres">fibres</button><button class="on" data-l="cortex">cortex</button><button data-l="regions">regions</button><button data-l="sci" title="standard tractography colours: red left-right, green front-back, blue up-down">colours</button><button data-l="neurons" title="his spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div></div>
+      <div class="grp"><span class="ui-caption">view</span>
+        <div class="ui-seg" id="layers" role="group" aria-label="view"><button class="on" data-l="fibres" title="fibres: the real wiring from the scan">wires</button><button class="on" data-l="cortex" title="cortex: the outer surface of the brain">surface</button><button data-l="regions" title="regions: the cortex's areas, lit when active">areas</button><button data-l="sci" title="colours: standard tractography colours, red left-right, green front-back, blue up-down">colours</button><button data-l="neurons" title="neurons: simulated spiking neurons inside the brain, each drawn as a small real cell">neurons</button></div>
+        <button class="linkb" id="more-t" aria-expanded="false" aria-controls="grp-anat">more views</button></div>
       <!-- brain_anatomy hook (G9, #99): the brain as a real specimen (web/brain_anatomy.js, loaded on the first click) -->
-      <div class="grp"><span class="ui-caption">specimen</span>
-        <div class="ui-seg" id="anat" role="group" aria-label="specimen"><button data-v="glow" class="on" title="the model's own look: additive fibres and a rim-lit cortex">glow</button><button data-v="fresh" title="a fresh specimen: pinkish-grey cortex, glistening pia">fresh</button><button data-v="fixed" title="fixed and cut open: his own T1 scan on the cut, grey and white matter">dissected</button><button data-v="bundles" title="his real fibres as muted white-matter bundles, coloured by direction">bundles</button><i class="sep"></i><button data-a="vessels" title="cerebral arteries (atlas, fitted to his brain)">vessels</button><button data-a="nerves" title="the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button></div></div>
+      <div class="grp" id="grp-anat"><span class="ui-caption">inside</span>
+        <div class="ui-seg" id="anat" role="group" aria-label="inside"><button data-v="glow" class="on" title="glow: the model's own look, additive fibres and a rim-lit cortex">glow</button><button data-v="fresh" title="fresh: a fresh specimen, pinkish-grey cortex, glistening pia">fresh</button><button data-v="fixed" title="dissected: fixed and cut open, the T1 scan on the cut, grey and white matter">cut open</button><button data-v="bundles" title="bundles: the real fibres as muted white-matter bundles, coloured by direction">bundles</button><i class="sep"></i><button data-a="vessels" title="vessels: cerebral arteries (atlas, fitted to the scan)">vessels</button><button data-a="nerves" title="nerves: the cranial nerves the atlas has (II, IV, V1), the pituitary">nerves</button></div></div>
     </div>
-    <div class="dk-row" id="n3close"><div class="grp"><span class="ui-caption">close-up</span>
-      <div class="ui-seg" role="group" aria-label="close-up"><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button><button id="n3dive" title="one continuous zoom: the brain, a cortical column at true size, the tissue">dive ↓</button></div></div></div>
-    <div class="capline"><span id="viewcap">the model's own look · his real fibres, lit by simulated activity</span><button class="linkb" id="capmore-t" aria-expanded="false" aria-controls="anatcap">sources</button></div>
+    <div class="dk-row" id="n3close"><div class="grp"><span class="ui-caption">close-up</span><div class="ui-seg" role="group" aria-label="close-up"><button data-k="cortex">cortex</button><button data-k="striatum">striatum</button><button data-k="thalamus">thalamus</button><button data-k="hippocampus">hippocampus</button><button data-k="amygdala">amygdala</button><button data-k="" title="back to the whole brain">whole brain</button><button id="n3dive" title="one continuous zoom: the brain, a cortical column at true size, the tissue">dive ↓</button></div></div></div>
+    <div class="capline"><span id="viewcap">the model's own look · the real fibres from the scan, lit by simulated activity</span><button class="linkb" id="capmore-t" aria-expanded="false" aria-controls="anatcap">sources</button></div>
     <div id="cutrow" hidden><span class="ui-caption">cut</span><button class="ui-btn" id="anat-axis" title="which way the cut runs">coronal</button><input id="anat-cut" type="range" min="0" max="1" step="0.005" value="0.5" title="where the cut is" aria-label="where the cut is"></div>
     <div id="anatcap" hidden></div>
     <div id="n3cap" hidden title="click for the details"></div>
@@ -323,12 +337,12 @@
       aria-label="a stimulus for the model" title="each message reaches the model as a stimulus · 200 characters · no links, addresses or tickers"><button class="ui-btn primary">send</button></form>
     <div id="note" role="status"></div>
   </div>
-</div>
+</main>
 
 <!-- his day: what the model did today (his screens, desk, music, sleep, diary, what he sees, teach, the spiking network) -->
 <aside id="day" aria-label="his day">
   <div class="day-h"><div><b>His day</b><span class="ui-caption">what the model did · fiction around a real wiring</span></div><button class="ui-btn" id="day-x">close</button></div>
-  <div class="ui-sheet day-sheet">
+  <div class="ui-sheet day-sheet" id="cards">
     <section class="tile" id="c-night">
       <div class="k"><span id="n-k">Sleep</span><span id="n-date"></span></div>
       <div class="t" id="n-t">no night recorded yet</div>
@@ -363,13 +377,12 @@
       <div class="m" id="desk-m"></div>
     </section>
     <section class="tile" id="screens">
-      <div class="k"><span>His screens</span><span id="sc-k">…</span></div>
-      <div class="m" id="sc-b"></div>
+      <div class="k"><span>His screens</span><span id="sc-k"></span></div>
       <div class="m" id="sc-share"></div>
-      <div class="m" id="sc-src"></div>
       <div class="m" id="sc-music"></div><div id="sc-music-p"></div>
       <div id="sc-tt"></div>
       <ul id="sc-last"></ul>
+      <details class="status" id="sc-status"><summary>status</summary><div class="m" id="sc-b"></div><div class="m" id="sc-src"></div></details>
     </section>
     <section class="tile" id="teach">
       <div class="k"><span>Teach him something</span><span id="t-left"></span></div>
@@ -416,12 +429,17 @@ const camera = new THREE.PerspectiveCamera(32, 1, 1, 3000);
 camera.up.set(0, 0, 1); camera.position.set(-300, 170, 108);
 if (MINI) camera.position.multiplyScalar(0.72);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
+// the slow turn is motion: off when the viewer asks for reduced motion (and when that setting changes)
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)");
+controls.enableDamping = true; controls.autoRotate = !REDUCED.matches; controls.autoRotateSpeed = 0.35;
+REDUCED.addEventListener && REDUCED.addEventListener("change", () => { if (!zoom) controls.autoRotate = !REDUCED.matches; });
 let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, cortexIdx = null, n3wall = -1e9, n3net = null;
+let DENS = 1;                              // the fibres' density: 1 at desktop size, less when the brain is drawn small (additive lines saturate)
 function resize(){
   const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h;
   // a portrait phone: widen the view so the whole brain fits across (the landscape framing, turned); desktop keeps 32°
   camera.fov = !MINI && w < h ? Math.min(52, 2 * Math.atan(Math.tan(16 * Math.PI / 180) * 1.25 * h / w) * 180 / Math.PI) : 32;
+  DENS = MINI ? 1 : Math.max(0.35, Math.min(1, Math.min(w, h) / 900));
   if (!MINI && innerWidth > 720) camera.setViewOffset(w, h, Math.round(w * 0.012), Math.round(h * 0.035), w, h); else camera.clearViewOffset();
   camera.updateProjectionMatrix();
   if (n3d) n3d.resize(renderer.domElement.height, camera.fov);
@@ -437,8 +455,8 @@ if ("ResizeObserver" in window && !MINI) {
 
 // ---------- neurons: his live spiking neurons as small real cells inside the brain (#62, #88; web/neurons3d.js) ----------
 // Only real frames from a live spiking network light them; with none, the cells stand still and say they are offline.
-const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron.";
-const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible.";
+const N3_CAPTION = "Simulated spiking neurons (1M on GPU / 20k on CPU) inside the real wiring of one person's brain; each drawn cell stands for a sampled model neuron; a model, not a mind.";
+const N3_HONEST = "Shapes are real reconstructed neurons (public databases); thickness, spines and myelin are drawn from published typical values. The simulated network uses point neurons (no dendrites are simulated); cells are enlarged and pulses slowed to be visible. A model, not a mind.";
 const N3_STATIC = "static cells, no activity";
 let n3morph = null;                                  // neurons_morph.json: the forest's real cells (fetched with the toggle)
 const N3_OFFLINE = "neurons offline — the 1M network runs while he is awake when the GPU is on";
@@ -521,7 +539,7 @@ function forestLine(st){                            // what the forest draws, an
 // back out reverses it. The scale bar is always true: at brain scale it measures the brain (the forest's cells are
 // drawn ~6x), from the column on it measures the cells too.
 const ZOOM = { start: 110, exit: 170, colIn: [30, 80], brainOut: [6, 40], handoff: 0.9, colView: 5.5, blockUm: 1400 };
-const N3_COLUMN_HONEST = "Shapes are real data from named public datasets: the cells are NeuroMorpho.Org reconstructions of human cortical neurons and the layers are measured in H01 (human temporal cortex, Shapson-Coe et al. 2024, CC BY 4.0); here they are drawn at true size. The activity is simulated by a network of point neurons (no dendrites are simulated).";
+const N3_COLUMN_HONEST = "Shapes are real data from named public datasets: the cells are NeuroMorpho.Org reconstructions of human cortical neurons and the layers are measured in H01 (human temporal cortex, Shapson-Coe et al. 2024, CC BY 4.0); here they are drawn at true size. The activity is simulated by a network of point neurons (no dendrites are simulated). A model, not a mind.";
 let zoom = null, zoomBrain = 1, zoomBack = null;
 window.zoomBrain = 1;
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -685,7 +703,10 @@ function neuronsText(){
 }
 setInterval(neuronsText, 1000);
 const STAGES = {AWAKE:[1,0,0], NREM:[0,1,0], REM:[0,0,1]};
-const CHIP = {AWAKE:"#ff9a3c", NREM:"#4d7cff", REM:"#c26bff"};
+// awake = the site's baseline blue (SYSTEM.md: blue = the brain at baseline, no orange); the room's mini keeps its warm look
+const CHIP = {AWAKE: MINI ? "#ff9a3c" : "#3f7bff", NREM:"#4d7cff", REM:"#c26bff"};
+const WARM = MINI ? "mix(vec3(1.0, 0.46, 0.12), vec3(1.0, 0.82, 0.55), dcol.z)" : "mix(vec3(0.25, 0.48, 1.0), vec3(0.62, 0.76, 1.0), dcol.z)";
+const PATCH = MINI ? "vec3(1.0, 0.78, 0.56)" : "vec3(0.7, 0.82, 1.0)";
 const CHIPTXT = {AWAKE:"AWAKE", NREM:"DEEP SLEEP", REM:"REM"};
 const STAGEW = {AWAKE:"awake", NREM:"deep sleep", REM:"REM sleep"}, STAGEC = {AWAKE:"s-awake", NREM:"s-nrem", REM:"s-rem"};
 const GROUPS = ["attention","control","default","fear","limbic","memory","other","relay","reward","salience","somatomotor","visual"];
@@ -744,7 +765,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
       void main(){
         float tp = info.x, tgt = info.y, fid = info.z, raw = info.w;
         float drive = clamp((max(actAt(nodes.x), actAt(nodes.y)) - 1.1) / 0.9, 0.0, 1.0);   // above its own baseline
-        vec3 warm = mix(vec3(1.0, 0.46, 0.12), vec3(1.0, 0.82, 0.55), dcol.z) * 0.8 + dcol * 0.25;
+        vec3 warm = ${WARM} * 0.8 + dcol * 0.25;
         float shimmer = 0.68 + 0.12 * pow(0.5 + 0.5 * sin(raw * 6.0 - time * 1.5 + fid * 40.0), 2.0) + 0.45 * drive;   // a slow, broad wave (same mean as before)
         vec3 cool = mix(vec3(0.12, 0.25, 0.95), vec3(0.35, 0.6, 1.0), dcol.x);
         float sweep = 0.25 + 1.4 * pow(0.5 + 0.5 * sin(position.y * 0.045 - time * 1.1), 10.0);
@@ -796,7 +817,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
           gl_Position = projectionMatrix * mv; }`,
       fragmentShader: `uniform vec3 tint; uniform float strength; varying vec3 vN; varying vec3 vV; varying float vPatch;
         void main(){ float rim = pow(1.0 - abs(dot(vN, vV)), 3.0);
-          gl_FragColor = vec4(tint * rim * strength + vec3(1.0, 0.78, 0.56) * vPatch * 0.6 * rim, 1.0); }`,   // rim-lit like the surface itself: the folds don't stack into a blob
+          gl_FragColor = vec4(tint * rim * strength + ${PATCH} * vPatch * 0.6 * rim, 1.0); }`,   // rim-lit like the surface itself: the folds don't stack into a blob
       transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide,
     });
     const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m);
@@ -812,7 +833,7 @@ let lastReplay = null, heard = null, doing = "", where = "", sleepInfo = null, s
 function story(){
   const now = performance.now();
   if (heard && now - heard.at < 9000) return heard.asleep   // asleep, a word gets through at the sleep's gain, no more (R3: never "heard" as if awake)
-    ? `asleep; <em>“${esc(heard.text)}”</em> reaches him at ${Math.round((heard.gain || 0) * 100)}%${(heard.gain || 0) < 0.3 ? ", barely" : ""}`
+    ? `<em>“${esc(heard.text)}”</em> reaches him through the sleep at ${Math.round((heard.gain || 0) * 100)}%${(heard.gain || 0) < 0.3 ? ", barely" : ""}`
     : `heard <em>“${esc(heard.text)}”</em>`;
   if (stage === "REM") return lastReplay && now - lastReplay.at < 300000
     ? `dreaming of <em>“${esc(lastReplay.text)}”</em>`
@@ -824,7 +845,7 @@ function subline(){
   if (!sleepInfo) return "";
   const now = performance.now(), st = `<span class="${STAGEC[stage] || ""}">${esc(STAGEW[stage] || stage)}</span>`;
   let third = where;
-  if (heard && now - heard.at < 9000) third = heard.asleep ? "through the sleep" : "the signal travels his real fibres";
+  if (heard && now - heard.at < 9000) third = heard.asleep ? "sleep lets little through" : "the signal travels the real fibres";
   else if (stage === "REM" && lastReplay && now - lastReplay.at < 300000) third = `replaying a message from ${esc(lastReplay.received)}`;
   else if (stage === "NREM") third = "slow waves, front to back";
   else if (stage !== "AWAKE") third = `stimulus gain ${Math.round(sleepInfo.gain * 100)}%${sleepInfo.woken_tonight ? ` · woken ${sleepInfo.woken_tonight}×` : ""}`;
@@ -1044,6 +1065,7 @@ function metersTick(m){
     if (typeof sl.debt === "number") meter("mt-debt", sl.debt, 0, 12, sl.debt.toFixed(1));
   }
   if (typeof m.sync === "number") meter("mt-sync", m.sync, 0, 1, String(Math.round(m.sync * 100)));
+  if (sl && sl.stage) mtPut("mt-stage", `stage: ${STAGEW[sl.stage] || sl.stage}`);   // for screen readers; the state line shows it
   daBurstLine();
 }
 // the 3 networks most above their own ~25 s baseline, from the activity vector and the running base the page keeps
@@ -1077,8 +1099,8 @@ function screenEmbed(el, src, h, label){
 function renderScreens(d){
   if (!d || MINI) return;
   const b = d.browser || {};
-  $("sc-k").textContent = b.state === "up" ? "browser up" : b.state === "off" ? "browser off" : `browser ${b.state || "?"}`;
-  $("sc-b").textContent = (b.why ? `${b.why} (since ${b.since})` : `since ${b.since}`) + ((d.notes || []).length ? ` · ${d.notes[d.notes.length - 1].text}` : "");
+  $("sc-k").textContent = b.state === "up" ? "open now" : "";   // the browser's state, keys and switches: in the folded status
+  $("sc-b").textContent = `browser ${b.state || "?"} · ` + (b.why ? `${b.why} (since ${b.since})` : `since ${b.since}`) + ((d.notes || []).length ? ` · ${d.notes[d.notes.length - 1].text}` : "");
   const share = Object.entries((d.today || {}).share || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   $("sc-share").textContent = share.length ? "today: " + share.map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ") : "today: nothing on his screens yet";
   const bl = (d.sources || {}).blocked || [];
@@ -1086,7 +1108,8 @@ function renderScreens(d){
   $("sc-src").textContent = [bl.length ? "sources set aside: " + bl.map(x => `${x.label} (${x.why}, until ${x.until})`).join(" · ") : "",
     yt ? (yt.key_set ? `YouTube API: ${yt.units_used}/${yt.units_cap} units today` : "YouTube API key not set") : "", ...fd].filter(Boolean).join(" · ");
   const mu = d.music || {}, now = mu.now;
-  $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist} · ${mu.source}` : (mu.source ? `no music playing · ${mu.source}` : "");
+  $("sc-music").textContent = now ? `now playing: ${now.title} — ${now.artist}` : "";
+  if (mu.source) $("sc-src").textContent = [$("sc-src").textContent, `music: ${mu.source}`].filter(Boolean).join(" · ");
   screenEmbed($("sc-music-p"), now && now.embed, (now && now.embed_height) || 80, mu.label || "Spotify (official embed)");
   const tt = (d.last || []).find(x => x.embed);
   screenEmbed($("sc-tt"), tt && tt.embed.src, 340, tt ? `${tt.embed.label}: ${tt.title}` : "");
@@ -1137,7 +1160,9 @@ function connect(){
       tick(`${esc(m.t)} · taught <b>“${esc(m.text.slice(0, 60))}”</b>${m.nick ? ` by ${esc(m.nick)}` : ""} → ${esc(m.networks.join(", "))}`);
       fire(m.text, m.networks, m.asleep, m.gain); if (!MINI) loadTaught(); return;
     }
-    if (m.type === "chat_ack") { ack(m.ok ? "sent as a stimulus · watch it travel" : `not sent: ${m.reason}`, m.ok); return; }
+    if (m.type === "chat_ack") { ack(m.ok ? "sent as a stimulus · watch it travel" : `not sent: ${m.reason}`, m.ok);
+      if (m.ok) window.SUB01Pulse && SUB01Pulse.spike && SUB01Pulse.spike();   // the strip jumps with the message (pulse.js, when it has spike)
+      return; }
     if (m.type !== "tick") return;
     const sl = m.sleep;
     if (sl) {
@@ -1213,14 +1238,14 @@ function anatLoad(){
                     c.hidden = !capMore || !html;
                     if (c.dataset.h !== html) { c.dataset.h = html; c.innerHTML = html; } }}); return anat; });
 }
-const VIEWCAP = {glow: "the model's own look · his real fibres, lit by simulated activity, drawn ~100× slower than real",
-  fresh: "a fresh specimen · his own cortex, cerebellum and brainstem from his MRI · colours approximate",
-  fixed: "fixed and cut open · the cut shows his own T1 scan: grey matter, white matter, dark ventricles",
-  bundles: "white-matter bundles · his real fibres, coloured by direction; the cortex a ghost"};
+const VIEWCAP = {glow: "the model's own look · the real fibres from the scan, lit by simulated activity, drawn ~100× slower than real",
+  fresh: "the cortex, cerebellum and brainstem from the scan · colours approximate",
+  fixed: "cut open · the cut shows the T1 scan: grey matter, white matter, dark ventricles",
+  bundles: "white-matter bundles · the real fibres from the scan, coloured by direction; the cortex a ghost"};
 let viewNow = "glow";
 function viewCap(){
   const on = a => { const b = document.querySelector(`#anat button[data-a="${a}"]`); return b && b.classList.contains("on"); };
-  const t = VIEWCAP[viewNow] + (on("vessels") ? " · arteries from an atlas, fitted to him" : "") + (on("nerves") ? " · cranial nerves from an atlas" : "");
+  const t = VIEWCAP[viewNow] + (on("vessels") ? " · arteries from an atlas, fitted to the scan" : "") + (on("nerves") ? " · cranial nerves from an atlas" : "");
   if ($("viewcap").textContent !== t) $("viewcap").textContent = t;
 }
 function anatView(v){
@@ -1235,8 +1260,8 @@ document.querySelectorAll("#anat button[data-a]").forEach(b => b.onclick = () =>
   anatLoad().then(a => a.setLayer(b.dataset.a, on)).catch(() => {}); });
 $("anat-axis").onclick = () => { const b = $("anat-axis"); b.textContent = ANAT_AXES[(ANAT_AXES.indexOf(b.textContent) + 1) % 3]; if (anat) anat.setCut(b.textContent, +$("anat-cut").value); };
 $("anat-cut").oninput = () => { if (anat) anat.setCut(null, +$("anat-cut").value); };
-{ const qs = new URLSearchParams(location.search), q = qs.get("view");                   // the default view: fresh brain (?view=glow: the page's own look)
-  const v0 = ["glow", "fresh", "fixed", "bundles"].includes(q) ? q : (MINI ? "glow" : "fresh");
+{ const qs = new URLSearchParams(location.search), q = qs.get("view");                   // the default view: glow, the blue fibres (?view=fresh: the specimen)
+  const v0 = ["glow", "fresh", "fixed", "bundles"].includes(q) ? q : "glow";
   if (v0 !== "glow") anatView(v0);
   for (const a of (qs.get("layers") || "").split(",")) { const b = document.querySelector(`#anat button[data-a="${a}"]`); if (b) b.click(); } }
 // "sources": the module's own provenance line (what is his MRI, what is an atlas, licences), opened on request
@@ -1244,13 +1269,16 @@ let capMore = false;
 $("capmore-t").onclick = () => { capMore = !capMore; $("capmore-t").setAttribute("aria-expanded", capMore);
   $("capmore-t").textContent = capMore ? "hide sources" : "sources";
   const c = $("anatcap"); if (!capMore) { c.hidden = true; return; }
-  if (!c.dataset.h) c.innerHTML = "his real fibres and cortex come from one person's public MRI (diffusion and T1); the specimen views add atlas parts, each named with its source and licence when shown; credits on /about";
+  if (!c.dataset.h) c.innerHTML = "the fibres and cortex come from one person's public MRI (diffusion and T1); the specimen views add atlas parts, each named with its source and licence when shown; credits on /about";
   c.hidden = false; };
 $("n3cap").onclick = () => $("n3cap").classList.toggle("open");
+// phones: the inside views fold behind one link
+$("more-t").onclick = () => { const on = document.body.classList.toggle("moreviews"); $("more-t").setAttribute("aria-expanded", on);
+  $("more-t").textContent = on ? "fewer views" : "more views"; };
 // ---------- end of the brain_anatomy hook ----------
 { const day = $("day"), t = $("day-t"), phone = matchMedia("(max-width:720px)");
-  const set = open => { day.classList.toggle("open", open); t.setAttribute("aria-expanded", open); t.textContent = open ? "close his day" : "his day · diary, screens, sleep";
-    day.inert = !open && !phone.matches; };
+  const set = open => { day.classList.toggle("open", open); document.body.classList.toggle("dayopen", open); t.setAttribute("aria-expanded", open); t.textContent = open ? "close his day" : "his day · diary, screens, sleep";
+    day.inert = !open; };
   t.onclick = () => set(!day.classList.contains("open")); $("day-x").onclick = () => { set(false); t.focus(); };
   addEventListener("keydown", e => { if (e.key === "Escape" && day.classList.contains("open")) { set(false); t.focus(); } });
   phone.addEventListener("change", () => set(day.classList.contains("open"))); set(false); }
@@ -1322,7 +1350,7 @@ function frame(now){
   if (fibreMat) {
     const u = fibreMat.uniforms;
     u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
-    u.opacity.value = OPACITY * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.85 * n3dim) * zoomBrain;   // neurons on: the fibres step well back (#88 B); gone inside the column (#99)
+    u.opacity.value = OPACITY * DENS * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.85 * n3dim) * zoomBrain;   // neurons on: the fibres step well back (#88 B); gone inside the column (#99)
     if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
     u.pulseT.value = pulse.t;
   }
