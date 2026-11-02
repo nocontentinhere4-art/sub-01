@@ -55,14 +55,14 @@
   #hero.swap #hero-s { opacity:0; transform:translateY(-8px); }
   #hero.enter #hero-h, #hero.enter #hero-s { opacity:0; transform:translateY(14px); transition:none; }
 
-  /* the grid: [LIVE brain] [screen + timeline] [feed + RESPONSE brain] */
+  /* the grid: [screen + timeline] [feed + RESPONSE brain] (the left brain was removed on 2 November, owner: it had no function) */
   /* desktop: header + hero + grid = one screen (the footer scrolls in below); never crushed under 560px */
   #grid { display:grid; gap:var(--ui-gap); padding:0 var(--gut); max-width:1720px; margin:0 auto;
     height:calc(100vh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--foot-px, 60px)); height:calc(100dvh - var(--hdr) - var(--hero-px, var(--hero-h)) - var(--foot-px, 60px)); min-height:560px;
-    grid-template-columns:var(--c1) minmax(0, 1fr) var(--c3); grid-template-rows:minmax(0, 1fr) var(--row2);
-    grid-template-areas:"live view feed" "live time resp"; }
+    grid-template-columns:minmax(0, 1fr) var(--c3); grid-template-rows:minmax(0, 1fr) var(--row2);
+    grid-template-areas:"view feed" "time resp"; }
   #brains { display:contents; }
-  #p-live { grid-area:live; } #p-view { grid-area:view; } #p-time { grid-area:time; } #p-feed { grid-area:feed; } #p-resp { grid-area:resp; }
+  #p-view { grid-area:view; } #p-time { grid-area:time; } #p-feed { grid-area:feed; } #p-resp { grid-area:resp; }
   .ui-panel { position:relative; min-width:0; }
   .fill { position:absolute; inset:0; display:flex; flex-direction:column; min-height:0; }
 
@@ -237,7 +237,7 @@
   @media (max-width:1100px) {
     #grid { height:auto; min-height:0; grid-template-columns:minmax(0, 1fr) 300px; grid-template-rows:auto 330px auto;
       grid-template-areas:"view feed" "time feed" "brains brains"; }
-    #brains { display:grid; grid-area:brains; grid-template-columns:1fr 1fr; gap:var(--ui-gap); }
+    #brains { display:grid; grid-area:brains; grid-template-columns:minmax(0, 1fr); gap:var(--ui-gap); }
     #p-live, #p-resp { grid-area:auto; height:430px; }
     #stage { flex:none; aspect-ratio:16/9; }
     /* the strip under his screen keeps its row while empty: when a title or a track arrives nothing below moves */
@@ -399,17 +399,6 @@
 
 <div id="grid">
   <div id="brains">
-    <section class="ui-panel brainp ui-in d1" id="p-live" aria-label="live brain, top view">
-      <div class="fill">
-        <div class="bhead"><span class="ui-label" id="l-head"><b>LIVE</b> · --:--</span></div>
-        <div class="bcv loading" id="l-cv"><img class="poster" src="/intro_brain_top.webp" alt="" aria-hidden="true" width="1200" height="1748" decoding="async"><i class="bloom" aria-hidden="true"></i><canvas id="l-canvas" aria-label="his brain model seen from above, coloured by each region's activity vs its own baseline"></canvas>
-          <span class="orient">front</span></div>
-        <div class="bfoot">
-          <div class="bnum"><span class="ui-big" id="l-num">—</span><span class="bword mid" id="l-word"></span></div>
-          <div class="ui-label bcap" id="l-cap">ATTENTION · LIVE</div>
-        </div>
-      </div>
-    </section>
     <section class="ui-panel brainp ui-in d4" id="p-resp" aria-label="the brain's reaction to the last event">
       <div class="fill">
         <div class="bhead"><span class="ui-label" id="r-head"><b>RESPONSE</b></span><span class="tag" id="r-kind" hidden></span></div>
@@ -1098,12 +1087,12 @@ class BrainView {
     c.globalCompositeOperation = "source-over";
   }
 }
-const liveBrain = new BrainView($("l-canvas")), respBrain = new BrainView($("r-canvas"));
+const respBrain = new BrainView($("r-canvas"));
 loadBrain().then(g => {
   S.nodes = g.nodes;
-  liveBrain.setGeometry(g); respBrain.setGeometry(g);
-  $("l-cv").classList.remove("loading"); $("r-cv").classList.remove("loading");
-}).catch(e => { console.warn("live: brain.json", e); $("l-cv").classList.remove("loading"); $("r-cv").classList.remove("loading"); });
+  respBrain.setGeometry(g);
+  $("r-cv").classList.remove("loading");
+}).catch(e => { console.warn("live: brain.json", e); $("r-cv").classList.remove("loading"); });
 
 // ---------------------------------------------------------------- timeline
 const tl = $("tl"), tlc = tl.getContext("2d"), tip = $("tip");
@@ -1340,7 +1329,7 @@ function tweenTo(id, v){
   const tw = tween[id] || (tween[id] = {from:v, to:v, t0:0, cur:v, fl:0}); if (Math.round(v) === Math.round(tw.to)) return;
   const now = performance.now();
   if (!RM && Math.abs(v - tw.to) >= 5 && now - tw.fl > 2000 && (id === "l-num" || id === "r-num")) {
-    tw.fl = now; const el = $(id); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 160);
+    tw.fl = now; const el = $(id); if (el) { el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 160); }
   }
   tw.from = tw.cur; tw.to = v; tw.t0 = now;
 }
@@ -1361,20 +1350,20 @@ function renderLive(){
       put("l-num", c ? String(c.a) : "—"); put("lg-a", c ? String(c.a) : "—"); put("lg-r", c ? String(c.r) : "—");
       put("lg-l", c ? String(c.l) : "—"); put("lg-n", c ? String(c.n) : "—"); put("r-num", c ? String(c.a) : "—");
       put("l-word", c ? "last seen here" : "");
-      for (const id of ["l-num", "lg-a", "lg-r", "lg-l", "lg-n", "r-num"]) $(id).classList.toggle("stale", !!c);
+      for (const id of ["lg-a", "lg-r", "lg-l", "lg-n", "r-num"]) $(id).classList.toggle("stale", !!c);
       const ttl = c ? "the last value this browser saw; the live value replaces it on the first tick" : "";
-      for (const id of ["l-num", "r-num"]) $(id).title = ttl;
+      $("r-num").title = ttl;
     }
     put("l-cap", "ATTENTION · LIVE"); putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
     return;
   }
   if (staleOn !== false) {
     staleOn = false;
-    for (const id of ["l-num", "lg-a", "lg-r", "lg-l", "lg-n", "r-num"]) { $(id).classList.remove("stale"); $(id).title = ""; }
+    for (const id of ["lg-a", "lg-r", "lg-l", "lg-n", "r-num"]) { $(id).classList.remove("stale"); $(id).title = ""; }
     for (const id of ["l-num", "r-num"]) { const tw = tween[id]; if (!tw) tween[id] = {from:S.readS.a, to:S.readS.a, t0:0, cur:S.readS.a, fl:0}; }
   }
   const v = S.readS.a; tweenTo("l-num", v);
-  const [w, cls] = level(v); put("l-word", w); $("l-word").className = "bword " + cls;
+  const [w, cls] = level(v); put("l-word", w);
   put("l-cap", S.stage && S.stage !== "AWAKE" ? `ATTENTION · ASLEEP · ${S.stage}` : "ATTENTION · LIVE");
   putH("l-head", `<b>LIVE</b> · ${esc(S.clock || "--:--")}`);
   put("lg-r", String(Math.round(S.readS.r))); put("lg-l", String(Math.round(S.readS.l))); put("lg-n", String(Math.round(S.readS.n)));
@@ -1438,11 +1427,10 @@ if (!RM) {
 const FPS_TL = PHONE ? 10 : 20, FPS_BRAIN = PHONE ? 15 : 30;
 let lastTl = 0, lastBrain = 0, lastDom = 0, lastView = 0, respWaitAt = 0, respDrawn = null, respDrawnV = -1, lastGlow = 0;
 // breath runs 0.7 (desynchronised) to 1.15 (in step): the blooms and the hero's light follow it, eased by CSS
-const glowWas = {l:"", r:"", h:""}, glowEl = {l:$("l-cv"), r:$("r-cv"), h:$("hero")};
+const glowWas = {r:"", h:""}, glowEl = {r:$("r-cv"), h:$("hero")};
 function glow(breath, frozen){
   const u = clamp((breath - 0.7) / 0.45, 0, 1);
   const set = (k, prop, v) => { if (glowWas[k + prop] === v) return; glowWas[k + prop] = v; glowEl[k].style.setProperty(prop, v); };
-  set("l", "--bl", (0.45 + 0.5 * u).toFixed(2)); set("l", "--bs", (0.96 + 0.06 * u).toFixed(3));
   set("r", "--bl", frozen ? "0.8" : (0.3 + 0.3 * u).toFixed(2)); set("r", "--bs", frozen ? "1" : (0.96 + 0.04 * u).toFixed(3));
   set("h", "--hb", (2 * u - 1).toFixed(2));
 }
@@ -1473,7 +1461,6 @@ function frame(pnow){
         if (!relDraw.live || relDraw.live.length !== T.length) relDraw.live = T.slice();
         else { const L = relDraw.live; for (let i = 0; i < L.length; i++) L[i] += (T[i] - L[i]) * e; }
       }
-      liveBrain.draw(relDraw.live, t, breath);
       if (!RM && pnow - lastGlow >= 100) { lastGlow = pnow; glow(breath, !!(respMk && respMk.rel)); }
       // RESPONSE: on an event it is redrawn only when its snapshot changes (the 3 s peak search) or the canvas resizes;
       // before the first event it shows the live brain, dimmed, at 5 fps
