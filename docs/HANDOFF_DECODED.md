@@ -1,9 +1,10 @@
-# SUB-01 — handoff: the "decoded" redesign (state on 2026-11-02)
+# SUB-01 — handoff: the "decoded" redesign (state on 2026-11-02, evening)
 
-Read this first in a new session, then `docs/design/decoded/SPEC.md` (the shared spec every agent built from), then
-`docs/HANDOFF.md` (the project's standing handoff: pages, modules, hard rules). Branch: `claude/compassionate-fermat-piv6wx`
-in `nocontentinhere4-art/sub-01` (the live site repo; `sub-01-brain` is an older snapshot, `sub01-brain` the standalone
-brain package — leave both alone).
+Read this first in a new session, then `docs/design/decoded/SYSTEM.md` (the "one deck" design system v2: the chrome, tokens
+and rules every page follows, and the spec for any new page), then `docs/design/decoded/SPEC.md` (the shared data and
+readout spec every agent built from), then `docs/HANDOFF.md` (the project's standing handoff: pages, modules, hard rules).
+Branch: `claude/compassionate-fermat-piv6wx` in `nocontentinhere4-art/sub-01` (the live site repo; `sub-01-brain` is an
+older snapshot, `sub01-brain` the standalone brain package — leave both alone).
 
 ## The owner's request (verbatim intent)
 "Let's get back to where it all began. Update this old version and make it all brand new, starting with animations,
@@ -20,8 +21,9 @@ save tokens, and checks the work.
 1. `/` → `web/live.html` (the brain-first dashboard, NEW). `/room` → `web/room.html` (was `/`). `/brain` → `web/index.html`
    (the deep 3D brain, unchanged). Old links redirect (`OLD_PATHS` in live_server.py).
 2. Nav on every page: live · brain · room · diary · sees (then about / map where a page had them). The city link was
-   removed (decision 7).
+   removed (decision 7). Superseded by decision 17 (the numbered deck: 01 live · 02 brain · 03 room · 04 diary · 05 sees · 06 about).
 3. Design system: `web/ui.css` (tokens + header chrome + chips + big numbers). Pages load it before their own CSS.
+   Now v2, with the one-deck classes (decision 17).
 4. Voice: bold declarative headlines, honest mono sub-lines; his chat replies keep the casual voice from `mind.py`
    (commit 7069cd1) and are shown tagged "his reply" (the "AI-written" tag was removed on 2026-11-02, see decision 14).
 5. Readouts are MODEL readouts, formulas in the spec; labelled "not measured from anyone" wherever shown.
@@ -48,6 +50,23 @@ save tokens, and checks the work.
 13. **Motion** (owner: "make everything beautiful and hypnotic"). A radial bloom under each brain breathes with the model's synchrony (CSS variables `--bl` and `--bs`, set at most 10 times a second). The attention trace has a glow and the playhead has a 0.5 Hz halo. A big number that moves 5 points or more flashes (at most once per 2 s). The grid fades in over 600 ms after the deck closes, the hero image's opacity breathes ±8 % with the same sync, and panel borders lift on hover. All of it is off under `prefers-reduced-motion`. Measured cost: 0 fps under software GL (20.5 → 20.9). The room iframe is a separate, open cost (see the open items).
 14. **No AI wording on any page** (owner, 2026-11-02: "remove everything that says AI, AI written"). The tags read "his reply", "his notes" and "why". The diary and world pages say images are "rendered from the brain model's state". The room's page-reader lines say "the page is read for him". `about.html` keeps one factual sentence: a language model writes the notes, plans and replies. **This supersedes the hard rule "AI-written text is labelled" in `docs/HANDOFF.md`** (owner decision, 2026-11-02). The mechanism is still stated on `about.html`.
 15. **Writing pass** (owner, 2026-11-02). No fragment-for-punch headlines ("Stimuli in. Readouts out." became "Send it a message.") and no "day and night". Two writing plugins were enabled on the owner's account but could not be loaded in that session, so the pass was done by hand.
+16. **"Too many LIVE"** (owner, 2026-11-02 evening). One live chip, in the header only. No other LIVE chip on any page (panels, viewports, HUDs). The viewer count sits with the clock in the pulse strip (decision 17).
+17. **"Rebuild EVERYTHING"** (owner, 2026-11-02 evening: "room, brain and everything, same style everywhere, use design references, something never seen"). The result is the "one deck" system, specified in `docs/design/decoded/SYSTEM.md`. Every page is one numbered slide of the same deck: 01 live · 02 brain · 03 room · 04 diary · 05 sees · 06 about. Each page has one header with a two-line lock-up, the one live chip, a Tokyo clock and a counter. The shared code:
+    - `web/deck.js`: marks the current nav link, fills the counter, takes ← → and `[` `]` between slides, and runs a 320 ms page crossfade through cross-document view transitions. `body[data-keys]` lets a page use the arrow keys itself.
+    - `web/pulse.js`: a 28 px live strip at the bottom of each page that declares `data-pulse`, with the four readouts, the clock and the viewer count, a visually hidden text equivalent, and a spike that travels along the strip on every chat message (`SUB01Pulse.spike()`).
+    - `web/ui.css` v2: the lock-up, state, segmented control, primary button, number blocks, rails, hud, sheet, dock and title classes.
+18. **Sees one at a time** (owner). The sees page was first rebuilt as a contact sheet grid. The owner rejected it ("I hate it") and chose "one at a time". Now sees shows one eye frame with a filmstrip, and diary shows one night with its date headline, one dream image and a filmstrip. On both pages the arrow keys move within the page and `[` `]` change slide.
+19. **Simulated audience** (owner: "simulate thousands of users and change based on what they like"). A simulated audience of six segments reviewed the screenshots: traders on phones 35 %, casual viewers 25 %, non-native readers 15 %, designers 10 %, neuroscientists 10 %, accessibility users 5 %. The consensus changes were applied:
+    - room first on phones (front page); tap hints and a close button on the intro for touch;
+    - plain words: alertness, mental effort, brain activity, "his normal", "what lit up", "send him a message";
+    - captions at 11 px minimum, and greys that pass contrast (`--ui-dim` #9494a1, `--ui-faint` #8a8a98);
+    - a 2 px focus ring;
+    - no developer lines on the brain page, which opens on the blue glow with plain view labels;
+    - diary and sees empty states as one sentence over a faint fibre plate;
+    - the room's fiction caption on its own bar;
+    - the pulse spike on a sent message.
+    The segments are simulated reviewers, so the result is a review aid, not user research.
+20. **Pages rebuilt** (owner decisions 16 to 19, applied). Front page: the deck header (counter 01 / 06) and the footer inside the first screen. Brain (`/brain`): full-bleed brain under the deck chrome, a title-style state line, a rail of seven numbers, two segmented controls, a "his day" drawer holding the old cards, `?mini` unchanged. Room (`/room`): full-bleed scene, state line, a bottom dock with vote · chat · teach · more, reactions in the dock row, the brain square, today and camera pills, corner marks, `?embed` unchanged. Diary and sees: see decision 18. About (`/about.html`): numbered slides with result tiles. Life, tastes and fibres: chrome only.
 
 ## State of the work
 | piece | owner | state |
@@ -57,7 +76,7 @@ save tokens, and checks the work.
 | `web/live.html` (the dashboard) + `docs/design/decoded/README.md` | page agent | **built, committed** (2313055, then the front-page commits 1f2a327 and 1a6e1c3) |
 | Animation + voice polish pass on `web/live.html` | page agent | **done, committed** (1f2a327, 1a6e1c3): fold layout, hero image, brain colour rule, RESPONSE waiting state, fps caps, chat order across midnight, scientific register; verified with screenshots at 1440×900, 1280×800, 1024×768 and 390×844, after a chat event, under reduced motion and in the asleep state (`--time-scale 60 --start 23:50`), 0 JS errors |
 | Full review: `tools/review_shots.py` on all routes, desktop + phone | coordinator | **done**: 0 JS errors, no horizontal scroll (the /room phone shot needs a longer screenshot timeout than the script's 30 s; the page itself is fine) |
-| `python3 -m pytest -q tests/` | coordinator | **done**: 1863 passed, 43 skipped, 5 failed; all 5 already fail on main (`tests/test_boy_mh.py` node stub; `decider` missing on the test stubs in `test_reading.py` and `test_tastes_faster.py`; `test_spiking_live.py` GPU label; `test_spiking_ops.py` flaky connection) |
+| `python3 -m pytest -q tests/` (before the one-deck rebuild) | coordinator | **done**: 1863 passed, 43 skipped, 5 failed; all 5 already fail on main (`tests/test_boy_mh.py` node stub; `decider` missing on the test stubs in `test_reading.py` and `test_tastes_faster.py`; `test_spiking_live.py` GPU label; `test_spiking_ops.py` flaky connection) |
 | City removal (decision 7) | page agent + server agent | **done, committed** (e2d7d3a, c5a243a) |
 | Front page half the words, three-line hero, chat line format (decision 10) | owner (decision) | **done, committed** (6c90d1a, 0237ec7) |
 | Intro deck on the first visit per session (decision 11) | owner (decision) | **done, committed** (dc00bd0) |
@@ -65,23 +84,32 @@ save tokens, and checks the work.
 | Motion polish: blooms, glow, halo, flashes, grid fade-in (decision 13) | owner (decision) | **done, committed** (20f1c92); no measurable cost under software GL |
 | No AI wording on any page (decision 14) | owner (decision) | **done, committed** (8b29e26, 112a96c, 20f1c92); the API tags followed (167c6f7) |
 | Writing pass by hand (decision 15) | owner (decision) | **done** (the plugins could not load in that session) |
+| One live chip, header only (decision 16) | owner (decision) | **done, committed** (0c3ccab and the deck commits after it) |
+| One deck: `deck.js`, `pulse.js`, `ui.css` v2 and every page's header (decision 17) | owner (decision) | **done, committed** (66cf739 shared layer, 0c3ccab front page, 5d4fd56 brain, 051a71c room, 1c4a279 diary and sees, a166888 frames); about and the life/tastes/fibres chrome in the same series |
+| Sees one at a time, diary one night (decision 18) | owner (decision) | **done, committed** (1c4a279, a166888, 07d8081); the contact sheet grid was rejected and removed |
+| Simulated audience round and its consensus changes (decision 19) | owner (decision) | **done, committed** (3b0c017 front page, fb5d06c brain, 07d8081 room, diary and sees, 17b3cab room caption, 66cf739 shared layer) |
+| Viewer count | owner | in the pulse strip with the clock; the front page has no strip (`/` omits `data-pulse`, see SYSTEM.md) |
+| Tests after the one-deck rebuild | coordinator | **1860 passed, 43 skipped, 5 failed** after the last fix (6 before it). The 5 failing tests are the pre-existing ones: `test_boy_mh`, `test_reading`, `test_spiking_live`, `test_spiking_ops`, `test_tastes_faster`. Tests were updated to follow the pages (1afcafa and the test commits): `test_neurons3d` (plain button words, same order), `test_neurons_morph` (the specimen caption may name the cerebellum; the neuron captions may not), `test_brain_anatomy` (glow is the default), `test_glance_cam`, `test_screens` (about's coin section is one line; the room caption keeps "a simulated life · Not a person, not conscious") |
+| Jury review: a blind critic on the crawl screenshots, plus an audit (the `/jury` skill) | coordinator | **run on the local build.** The audit's real fails were fixed (15c2440: meta descriptions on room and about, a main landmark on the room, named image links, the about lead as the h1). The two remaining audit fails are false positives (JavaScript template strings read as links). The score card goes in `docs/design/decoded/JURY.md`, written later by the coordinator |
+| Docs for the one deck: this file, `decoded/README.md`, `SYSTEM.md` | docs | **done** (2026-11-02 evening) |
 | Docs: this file, `SPEC.md`, `decoded/README.md`, `OPERATIONS.md`, `HANDOFF.md` | docs agent | **done** |
 
 ## Open items (what remains)
-- **Real GPU check.** Fps and brain colours were measured only under software GL (rAF 12.8 → 20.6 fps at 1440 px; 91–100 %
-  of lit brain pixels blue-dominant at 1440 and 390 px). Check on a device: the caps are 30 fps on desktop, 15 on phones.
-- **Room embed, screenshot viewport and dopamine markers, on a live server.** The demo runs with `BROWSE=0` (no
-  `life.screen`) and has no dopamine events, so none of them is checked on a live server yet. The room embed (decision 12) has been run in headless Chromium only.
-- **Room iframe cost.** Under software GL the room iframe shares the main thread and drops the dashboard's rAF from 20.9 to 1.4 fps while it renders. On a real GPU it is capped at 30 fps and the cost is expected to be small, but that is NOT measured. Measure on the owner's Mac and on a phone. If it costs too much, pause the room while the brains draw, or lower its resolution in embed mode.
-- **Headless room T-pose.** The room shows a T-pose in headless runs. That is the software GL animation state, not a page bug.
-- **Owner decision: `about.html`'s section "The coin".** Left in place with the MINT code; reduced to one contract-address line in 3430e25. Remove or keep.
-- **Owner decision: the chat-reply voice.** His replies keep the casual voice from `mind.py`. Should they take the
-  scientific register too?
-- **Clips for X posts** (`clips.py`, see docs/HANDOFF.md): every frame still carries the corner label "AI · fictional character" and the hashtags #AI #AIgenerated. Left as is: labelling generated media on a platform is the owner's call.
-- **Server label:** `live_server.py` still sends `mind_read.tag` as "notes written by an AI" (and `tests/test_mind_live.py` checks it). The page does not show that string (it shows "his notes"). Change it with the next server edit, and then the SPEC line for `mind_read`.
-- **Rust:** answered (decision 9). Nothing to do unless performance becomes a problem.
+From the jury review and the audience round:
+- **Real GPU and phone checks.** Brain glow fps and the room-in-viewport cost are not measured on a real GPU. The earlier numbers came from software GL only (rAF 12.8 → 20.6 fps at 1440 px; 91–100 % of lit brain pixels blue-dominant at 1440 and 390 px). The caps are 30 fps on desktop and 15 on phones. Measure on the owner's Mac and on a phone. If the room costs too much, pause it while the brains draw, or lower its resolution in embed mode.
+- **Headless room T-pose.** The room's T-pose in headless runs is a renderer artefact (software GL), not a page bug.
+- **Phone diary scroll.** On phones a portrait dream image makes the diary scroll.
+- **Server-written night text.** The night text the server writes still says "replayed"; the page copy was changed to plain words ("played again").
+- **X-post clips.** Every frame still carries the corner label "AI · fictional character" and the hashtags #AI #AIgenerated. Left as is: labelling generated media on a platform is the owner's call.
+- **Audit warnings.** No `og:` tags, no robots.txt, no sitemap, thin text on sees, and the 404 page has no h1.
 
-## Facts the page agent learned (keep)
+Carried over from the earlier list (not in the jury or audience results, still open):
+- **Embed, screenshot viewport and dopamine markers on a live server.** The demo runs with `BROWSE=0` (no `life.screen`) and has no dopamine events, so none of them is checked on a live server yet.
+- **Owner decision: `about.html`'s section "The coin".** Left in place with the MINT code; reduced to one contract-address line in 3430e25. Remove or keep.
+- **Owner decision: the chat-reply voice.** His replies keep the casual voice from `mind.py`. Should they take the scientific register too?
+- **Server label:** `live_server.py` still sends `mind_read.tag` as "notes written by an AI" (and `tests/test_mind_live.py` checks it). The page does not show that string (it shows "his notes"). Change it with the next server edit, and then the SPEC line for `mind_read`.
+
+## Facts learned while building (keep)
 - brain.json's mesh is in the nodes' `p` space, not `q` (`q` belongs to cortex.bin, used by /brain): map vertices to regions with `p`.
 - The q=1 tick's `groups` has 13 keys (the spec's 11 plus `insula` and `language`).
 - Plan / notes arrive only on change, so the page also reads `/api/mind` on load and every 60 s, and `/api/decisions`, `/api/music` on load.
@@ -95,13 +123,11 @@ save tokens, and checks the work.
 - Chat rows from `hello` are ordered by age on the next tick's clock, `(now − minute + 1440) % 1440`, oldest first (stable); a fallback applies after 3 s.
 - The hero rotates three lines every 8 s (`HERO` in `web/live.html`); its counter reads 01 / 03.
 - Under reduced motion the hero rotation is off (the counter stays 01 / 03).
-- WebGL1 refuses to link a program whose shared uniform has different precisions in the two shaders (the brains were blank
-  everywhere until the vertex shader got `precision mediump float;`, d8079e1). A canvas that once gave a WebGL context never
-  gives a 2D one: the fallback swaps in a fresh canvas.
-- Arousal = clamp(50 + 30·log2(NE)) (spec amended 2026-11-02): with NE/2·100 the trace sat at 100 for minutes, because the
-  model's noradrenaline runs 1.8–2.6 while he listens to music. Each legend item carries its formula in a `title`.
-- The test suite takes about 25 min on a 4-core box; two tests (`test_brain_decides.py::test_vote_is_cheap`,
-  `test_neurons3d.py::test_cpu_frames_are_compact_and_honest`) fail under CPU load and pass alone.
+- WebGL1 refuses to link a program whose shared uniform has different precisions in the two shaders (the brains were blank everywhere until the vertex shader got `precision mediump float;`, d8079e1). A canvas that once gave a WebGL context never gives a 2D one: the fallback swaps in a fresh canvas.
+- Arousal = clamp(50 + 30·log2(NE)) (spec amended 2026-11-02): with NE/2·100 the trace sat at 100 for minutes, because the model's noradrenaline runs 1.8–2.6 while he listens to music. Each legend item carries its formula in a `title`.
+- The test suite takes about 25 min on a 4-core box; two tests (`test_brain_decides.py::test_vote_is_cheap`, `test_neurons3d.py::test_cpu_frames_are_compact_and_honest`) fail under CPU load and pass alone.
+- The room's fiction caption keeps its pinned wording, "a simulated life · Not a person, not conscious" (`test_screens`).
+- The brain page's glow is its default view. The specimen caption may name the cerebellum; the neuron captions may not (`test_neurons_morph`).
 
 ## How to continue (the coordinator's loop)
 1. `python3 -m pip install -r requirements-server.txt pytest` (on Python 3.13 the `chess` wheel fails to build: download the
@@ -110,6 +136,8 @@ save tokens, and checks the work.
    and LOOK at the PNGs (desktop and phone, every route). Fix: overlaps, empty panels, unreadable text, horizontal scroll, JS errors.
 3. The front page is built and polished (see the state table). For any change to it, repeat step 2 and check the shots at
    1440×900, 1280×800, 1024×768 and 390×844, a chat event, reduced motion the asleep state (`--time-scale 60 --start 23:50`), and the intro deck (its key is `sub01.intro` in sessionStorage; clear it to see the deck again).
+   Every page is a slide of the one deck: for any new page, or any change to the chrome, follow `docs/design/decoded/SYSTEM.md`
+   (the spec for the deck order, the header markup, `deck.js`, `pulse.js`, the ui.css v2 classes and the motion).
    Then work through the open items above.
 4. `python3 -m pytest -q tests/` (spiking tests skip without torch; browser tests without Chromium) and the smoke test.
 5. Commit in small, descriptive commits (house style: one line saying what changed and why, no model names), push to the
@@ -122,7 +150,7 @@ save tokens, and checks the work.
 ## Hard rules (short form; the full list is in docs/HANDOFF.md)
 A model, not a mind: never claim feeling, thought, consciousness or life. The character is fiction. Never name or hint
 at the scanned person (credit lives on /about.html only). No coin promotion, no trade tape, no secrets in git or logs.
-No text is labelled as AI-written (superseded 2026-11-02, decision 14). Keep the password gate. No new third-party scripts/fonts beyond the CDNs already used.
+No text is labelled as AI-written (superseded 2026-11-02, decision 14). No "AI" wording on any page. Keep the password gate. No new third-party scripts/fonts beyond the CDNs already used.
 
 ## About "mods"
 The owner installed Claude Code mods (github.com/nateherkai/claude-code-mods: Cache Keeper, Collision Guard, Goal
