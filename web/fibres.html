@@ -15,6 +15,13 @@
   body.clean #hud, body.clean #foot { display:none; }
   #hud h1.ui-wordmark { background:none; color:#fff; padding:0; font-size:20px; letter-spacing:-.03em; vertical-align:middle; }
   #hud nav.ui-nav { pointer-events:auto; font-size:12px; }
+  @media (max-width:720px) {   /* nav on its own full-width row, scrollable without a bar */
+    #hud { left:12px; right:12px; top:12px; }
+    #hud nav.ui-nav { display:flex !important; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:8px 0 0 -9px !important; }
+    #hud nav.ui-nav::-webkit-scrollbar { display:none; }
+    #hud nav.ui-nav a { flex:none; }
+    #foot { left:12px; right:12px; }
+  }
 </style>
 </head>
 <body>

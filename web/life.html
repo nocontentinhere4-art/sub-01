@@ -70,6 +70,16 @@
   #hud h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; font-size:18px; letter-spacing:-.03em; vertical-align:middle; }
   #hud nav#nav { display:inline-flex; flex-wrap:wrap; vertical-align:middle; margin-left:12px; font-size:12px; pointer-events:auto; }
   #hud nav#nav a { margin-right:0; }
+  @media (max-width:720px) {   /* the nav takes its own full-width row (scrollable, no bar), the doing text stays clear of the map */
+    #hud { left:12px; right:12px; top:10px; max-width:none; }
+    #hud nav#nav { display:flex; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:12px 0 0 -9px; }
+    #hud nav#nav::-webkit-scrollbar { display:none; }
+    #hud nav#nav a { flex:none; }
+    #hud #doing, #hud #meta, #hud #thought { max-width:calc(60% - 12px); }
+    #doing { font-size:14px; }
+    #tools { right:12px; top:8px; }
+    #map { top:84px; }
+  }
 </style>
 <link rel="stylesheet" href="/neurons.css">
 </head>
