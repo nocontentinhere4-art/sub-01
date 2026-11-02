@@ -193,7 +193,7 @@ def test_captions_say_what_is_his_and_what_is_atlas(check):
 def test_hook_credits_and_about():
     html = (WEB / "index.html").read_text()
     assert html.count("brain_anatomy hook (G9") >= 3 and 'data-v="fresh"' in html and 'data-v="fixed"' in html and 'data-a="nerves"' in html
-    assert '(MINI ? "glow" : "fresh")' in html and "glows" not in html                     # fresh is the default view; the mini keeps the page's look
+    assert '["glow", "fresh", "fixed", "bundles"].includes(q) ? q : "glow"' in html and "glows" not in html   # glow is the default view (owner, 2026-11-02); ?view=fresh keeps the specimen
     js = (WEB / "brain_anatomy.js").read_text()
     assert "A model, not a mind" in js and "nothing is invented" in js
     credits = (ANAT / "CREDITS.md").read_text()

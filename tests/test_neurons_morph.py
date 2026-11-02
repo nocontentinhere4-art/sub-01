@@ -130,7 +130,9 @@ def test_brain_page_wording():
     assert "no live network: static cells, no activity" in html
     assert re.search(r'id="n3close".*data-k="cortex".*data-k="striatum".*data-k="thalamus".*data-k="hippocampus"'
                      r'.*data-k="amygdala"', html)
-    assert "cerebellum" not in html.lower() and "purkinje" not in html.lower()
+    assert "purkinje" not in html.lower()
+    n3 = " ".join(re.findall(r'N3_[A-Z_]+\s*=\s*[`"]([^`"]*)', html)).lower()           # the neuron captions only: the
+    assert "cerebellum" not in n3                                                 # specimen caption may name the cerebellum mesh
     for text in (html.lower(), (ROOT / "web" / "neurons3d.js").read_text().lower()):
         assert "his real neurons" not in text and "scanned person's neurons" not in text
 

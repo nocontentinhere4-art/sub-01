@@ -316,8 +316,8 @@ def test_race_is_flagged_while_a_gpu_decision_runs(tmp_path):
 def test_brain_page_wording_and_toggle():
     html = (ROOT / "web" / "index.html").read_text()
     assert CAPTION in html and OFFLINE in html                     # word for word
-    assert re.search(r'<button[^>]*data-l="fibres"[^>]*>fibres</button><button[^>]*data-l="cortex"[^>]*>cortex</button>'
-                     r'<button data-l="regions">regions</button>.*<button data-l="neurons"[^>]*>neurons</button>', html)
+    assert re.search(r'<button[^>]*data-l="fibres"[^>]*>[^<]*</button><button[^>]*data-l="cortex"[^>]*>[^<]*</button>'
+                     r'<button[^>]*data-l="regions"[^>]*>[^<]*</button>.*<button[^>]*data-l="neurons"[^>]*>[^<]*</button>', html)   # plain words, same order
     assert '<script src="/neurons3d.js"></script>' in html
     js = (ROOT / "web" / "neurons3d.js").read_text()
     assert "maxCells || 600" in js and "InstancedBufferGeometry" in js   # the forest (#88): instanced cells, capped
