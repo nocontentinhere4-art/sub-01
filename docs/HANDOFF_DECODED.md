@@ -30,10 +30,17 @@ coordinator that plans, allocates (Haiku/Sonnet/Opus agents to save tokens) and 
 | piece | owner | state |
 |---|---|---|
 | Research, plan, spec, `web/ui.css`, routes, redirects, feed fields, smoke paths, README/HANDOFF tables, `tests/test_feed.py`, `clips.py` → `/room` | coordinator + Haiku agent | **done, committed** (baad99b and the commit that carries this file) |
-| New nav + header on `web/index.html, room.html, diary.html, world.html, tastes.html, about.html, life.html, fibres.html` | Sonnet agent | built; its report is summarised below if it arrived before the handoff, otherwise review the diff |
-| `web/live.html` (the dashboard) + `docs/design/decoded/README.md` | Opus agent | first version built (~70 KB); see its README for done / not done |
+| New nav + header on `web/index.html, room.html, diary.html, world.html, tastes.html, about.html, life.html, fibres.html` | Sonnet agent | **done, committed**: ui.css linked first on all 8 pages, nav + `on` class right everywhere, 0 JS errors at 1280 and 390; open: eyeball the narrow-width nav wrap on /brain, /life.html and /fibres.html |
+| `web/live.html` (the dashboard) + `docs/design/decoded/README.md` | Opus agent | **built, committed**: loads with 0 JS errors at 1440/1024/390, chat round-trip works; raw-WebGL top-view brains (cortex strokes + connectome fibres, colour = region vs own 25 s baseline), 4-trace timeline with markers/scrub, viewport (embed → screenshot → away card), feed, footer. Not done: asleep state unverified; phone LIVE brain over-saturated and RESPONSE brain blank before an event at 390px; fps unconfirmed on real GPUs (software GL gave 2–5 fps; draw brains at 30 fps, stop redrawing a frozen RESPONSE); RESPONSE shows "--" until the first event; chat order wrong across midnight; the LIVE panel's big Attention number sits below the fold at 1440×900 (make the panel fit the viewport); no final polish pass against the references |
 | Animation + voice polish pass on `web/live.html` | planned (Opus) | **not started** |
 | Full review: `tools/review_shots.py` on a demo server (all routes, desktop + phone, JS errors, h-scroll), `python3 -m pytest -q tests/`, `BROWSE=0 python3 tests/smoke_demo.py` | coordinator | **not done** for the page work |
+
+## Facts the page agent learned (keep)
+- brain.json's mesh is in the nodes' `p` space, not `q` (`q` belongs to cortex.bin, used by /brain): map vertices to regions with `p`.
+- The q=1 tick's `groups` has 13 keys (the spec's 11 plus `insula` and `language`).
+- Plan / notes arrive only on change, so the page also reads `/api/mind` on load and every 60 s, and `/api/decisions`, `/api/music` on load.
+- Python Playwright is NOT installed in the cloud image; Node Playwright is (`NODE_PATH=/opt/node-tools/node_modules node …`), and `tools/review_shots.py` needs `pip install playwright` (do not run `playwright install`; the browser is at /opt/pw-browsers/chromium).
+- The demo server needs ~20 s to start and dies with its shell; start it with `setsid` or `nohup`.
 
 ## How to continue (the coordinator's loop)
 1. `python3 -m pip install -r requirements-server.txt pytest` (on Python 3.13 the `chess` wheel fails to build: download the
