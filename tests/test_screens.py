@@ -544,7 +544,7 @@ def test_no_trading_content_on_any_page():
     assert '"chart"' not in room and "chart:[" not in room          # no chart screen on the monitor, no chart activity anchor
     assert "mood.market" not in (WEB / "world.html").read_text()
     about = re.sub(r"\s+", " ", (WEB / "about.html").read_text())
-    assert "never shown: no chart, no trade feed" in about and "read-only: it never connects" not in about
+    assert "Contract address" in about and "trade feed" not in about and "read-only: it never connects" not in about   # the coin section is one address line (owner, 2026-11-02)
 
 
 def test_room_first_screen_says_he_is_a_fictional_character():

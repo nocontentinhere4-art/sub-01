@@ -41,7 +41,8 @@ def test_bed_zoom_wide_screens_only_and_only_a_clip_held_phone():
 def test_wired_after_the_page_camera_and_put_back_after_the_render():
     html = (WEB / "room.html").read_text()
     assert 'import { createGlanceCam } from "./room/glance_cam.js";' in html
-    line = next(l for l in html.splitlines() if "GCAM.apply(" in l)
+    lines = html.splitlines(); i = next(k for k, l in enumerate(lines) if "GCAM.apply(" in l)
+    line = "\n".join(lines[i:i + 8])                                   # the frame loop: the embed's drift sits between apply and restore
     assert line.index("controls.update()") < line.index("keepClear()") < line.index("GCAM.apply(") < line.index("renderer.render(scene, camera)") < line.index("GCAM.restore(camera, controls)"), line
     assert "follow && performance.now() - userMovedAt > 20000" in line          # (only while the camera follows him)
     js = (WEB / "room" / "boy_mh.js").read_text()
