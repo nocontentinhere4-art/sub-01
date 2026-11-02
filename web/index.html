@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · brain</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="description" content="A brain model on one person's real MRI wiring, drawn in 3D as it runs. Not measured from anyone.">
+<link rel="canonical" href="/brain">
 <link rel="stylesheet" href="/ui.css">
 <link rel="stylesheet" href="/neurons.css">
 <style>
@@ -40,7 +41,13 @@
   :where(.ui-sheet) { display:grid; gap:1px; background:var(--ui-line); }
 
   /* ---- the scene ---- */
-  #scene { position:fixed; inset:0; }
+  #scene { position:fixed; inset:0; background:#030305; }
+  /* the poster: a still of the glow view (web/brain_poster.webp, 1600×900), painted from the first frame and faded out
+     (600 ms) once the live view has drawn its first lit frame; if WebGL never starts, it simply stays */
+  #poster { position:absolute; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; pointer-events:none; user-select:none;
+    transition:opacity .6s var(--ease); }
+  #poster.gone { opacity:0; }
+  body.mini #poster { display:none; }
   #vignette { position:fixed; inset:0; pointer-events:none;
     background:radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(0,0,0,.72) 100%); }
   /* orientation marks: front / back / left / right / top, pinned to the brain as it turns */
@@ -48,21 +55,27 @@
   #orient span { position:absolute; left:0; top:0; display:flex; align-items:center; gap:6px; font-family:var(--ui-mono); font-size:9.5px;
     letter-spacing:.18em; text-transform:uppercase; color:var(--ui-dim); white-space:nowrap; opacity:0; will-change:transform, opacity; }
   #orient span i { width:5px; height:5px; border:1px solid var(--ui-dim); border-radius:50%; flex:none; } /* dot-ok: orientation marks, 5 px, not a data layer */
-  body.mini #orient, body.zooming #orient, body.closeup #orient { display:none; }
+  body.mini #orient, body.zooming #orient, body.closeup #orient, body:not([data-lit]) #orient { display:none; }   /* (not over the poster) */
 
   /* ---- header (markup and look from ui.css; here only where it sits) ---- */
   #hdr { position:fixed; top:0; left:0; right:0; z-index:30; padding:12px var(--gut); gap:18px;
     background:linear-gradient(rgba(0,0,0,.78), rgba(0,0,0,.35) 70%, rgba(0,0,0,0)); }
 
+  #main:focus { outline:none; }   /* the skip link's target */
+
   /* ---- the HUD ---- */
   #hud { position:fixed; inset:0; z-index:5; pointer-events:none; }
   #hud > * { pointer-events:auto; }
   /* the state line: what he does, big; one mono line under it */
-  #st { position:absolute; left:var(--gut); top:calc(var(--hdr-h) + 22px); max-width:min(760px, calc(100vw - var(--rail-w) - 4 * var(--gut)));
+  #st { position:absolute; left:var(--gut); top:calc(var(--hdr-h) + 22px); max-width:min(560px, 40vw, calc(100vw - var(--rail-w) - 4 * var(--gut)));
     pointer-events:none !important; }
+  /* a soft dark scrim behind the headline column, so a long line reads over the glow (it fades out before the brain's centre) */
+  #st::before { content:""; position:absolute; z-index:-1; left:calc(-1 * var(--gut)); top:-40px; width:calc(100% + 18vw); height:calc(100% + 110px);
+    background:radial-gradient(farthest-side at 0% 42%, rgba(0,0,0,.66), rgba(0,0,0,.38) 55%, rgba(0,0,0,0)); pointer-events:none; }
   #st .ui-caption { display:block; margin-bottom:12px; }
   #story { margin:0; font-family:var(--ui-sans); font-weight:800; font-size:clamp(28px, min(3.8vw, 6.4vh), 56px); letter-spacing:-.045em;
-    line-height:.98; text-wrap:balance; text-shadow:0 2px 30px rgba(0,0,0,.9); }
+    line-height:.98; text-wrap:balance; text-shadow:0 2px 30px rgba(0,0,0,.9); max-width:16ch; }
+  #story.long { font-size:clamp(24px, min(2.6vw, 4.6vh), 38px); line-height:1.04; max-width:22ch; }   /* a heard message, a long activity */
   #story em { font-style:normal; font-weight:600; color:var(--ui-fg2); }
   #sub { margin:12px 0 0; font-family:var(--ui-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ui-fg2);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 10px #000; }
@@ -110,6 +123,10 @@
   .grp > .ui-caption { flex:none; width:68px; white-space:nowrap; }
   .ui-seg { max-width:100%; overflow-x:auto; scrollbar-width:none; }
   .ui-seg::-webkit-scrollbar { display:none; }
+  .ui-seg > button { min-height:24px; display:inline-flex; align-items:center; justify-content:center; }
+  .linkb { min-height:24px; display:inline-flex; align-items:center; }
+  #dock .ui-btn, #day .ui-btn, #foot .ui-btn { min-height:24px; }
+  .status summary { min-height:24px; display:flex; align-items:center; }
   .ui-seg .sep { width:1px; align-self:stretch; margin:3px 4px; background:var(--ui-line2); flex:none; }
   #layers { flex-wrap:wrap; }
   #layers button.off { color:var(--ui-faint); }
@@ -170,7 +187,7 @@
   .tile .m { margin-top:6px; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-dim); overflow-wrap:anywhere; }
   .tile .m.err, #t-note.err { color:var(--ui-live2); }
   .tile .q { font-style:italic; font-weight:500; }
-  .tile img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; margin-bottom:10px; border-radius:var(--ui-r, 6px); background:#0a0a0c; }
+  .tile img { display:block; width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; margin-bottom:10px; border-radius:var(--ui-r, 6px); background:#0a0a0c; }
   .tile ul { list-style:none; margin:8px 0 0; padding:0; font-family:var(--ui-mono); font-size:10.5px; line-height:1.55; color:var(--ui-dim); }
   #music .mu { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
   #music .mu img { width:52px; height:52px; aspect-ratio:1/1; margin:0; flex:none; }
@@ -199,7 +216,7 @@
   .status summary { cursor:pointer; font-family:var(--ui-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ui-faint); }
   #neurons { min-width:0; }
   #neurons .nx { background:transparent; border:0; padding:0; font-family:var(--ui-mono); }
-  #neurons .nx summary { font-size:10px; letter-spacing:.16em; color:var(--ui-dim); }
+  #neurons .nx summary { font-size:10px; letter-spacing:.16em; color:var(--ui-dim); min-height:24px; }
   #neurons .nx[data-live="1"] summary b, #neurons .nx-row i { color:var(--ui-fg); }
 
   /* ---- the room's mini (/brain?mini): the brain only ---- */
@@ -227,12 +244,17 @@
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
     #hdr .ui-clock { display:none; }
     body { display:flex; flex-direction:column; }
+    #main { display:flex; flex-direction:column; order:1; min-width:0; }
     #hdr { order:0; } #scene { order:1; } #st { order:2; } #meters { order:3; } #dock { order:4; } #foot { order:5; }
     #scene { position:relative; inset:auto; height:52vh; height:52svh; flex:none; }
+    #scene { overflow:hidden; }
+    #poster { object-fit:contain; transform:scale(1.25); }   /* the portrait view widens its field: the poster's brain at about the live size */
     #vignette { display:none; }
     #hud { display:contents; }
     #st { position:relative; left:auto; top:auto; max-width:none; padding:14px var(--gut) 0; }
     #st > .ui-caption { display:none; }
+    #st::before { display:none; }
+    #story, #story.long { max-width:none; }
     .ui-seg { flex-wrap:wrap; border-radius:16px; }
     .ui-seg .sep { display:none; }
     #story { font-size:clamp(24px, 7.4vw, 32px); }
@@ -250,7 +272,12 @@
     #dock { position:static; margin:12px var(--gut) 0; max-width:none; padding:12px; }
     .grp { flex-wrap:wrap; width:100%; }
     .grp > .ui-caption { width:auto; }
-    #more-t { display:inline; }
+    #more-t { display:inline-flex; }
+    /* tappable: 44 px targets on a phone */
+    .ui-seg > button, .linkb, #dock .ui-btn, #foot .ui-btn, #day .ui-btn, .status summary, #neurons .nx summary { min-height:44px; }
+    .ui-seg > button { padding-left:13px; padding-right:13px; }
+    #chat .ui-input { min-height:44px; }
+    #dock .grp { row-gap:6px; }
     body:not(.moreviews) #grp-anat, body:not(.moreviews) #dock .capline, body:not(.moreviews) #anatcap { display:none; }
     #foot { position:static; width:auto; padding:12px var(--gut) 14px; }
     #busy, #honest { display:none; }
@@ -260,7 +287,7 @@
     body.closeup #meters, body.closeup #st { opacity:1; }
   }
   @media (prefers-reduced-motion: reduce) {
-    #story, #sub, #day, #note, #foot, #meters .ui-big, #meters .b i { transition:none !important; }
+    #story, #sub, #day, #note, #foot, #meters .ui-big, #meters .b i, #poster { transition:none !important; }
   }
 </style>
 <meta property="og:type" content="website"><meta property="og:site_name" content="SUB-01"><meta property="og:title" content="SUB-01 · the brain"><meta property="og:description" content="The 3D brain model: real wiring from one public MRI scan, lit by simulated activity, with a rail of model indices."><meta property="og:image" content="/og.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="SUB-01 · the brain"><meta name="twitter:description" content="The 3D brain model: real wiring from one public MRI scan, lit by simulated activity, with a rail of model indices."><meta name="twitter:image" content="/og.jpg">
@@ -284,9 +311,11 @@
   </div>
 </header>
 
-<div id="scene"><div id="orient" aria-hidden="true"></div></div><div id="vignette"></div>
+<main id="main" tabindex="-1">
+<div id="scene"><img id="poster" src="/brain_poster.webp" width="1600" height="900" alt="" decoding="async" fetchpriority="high"><div id="orient" aria-hidden="true"></div></div><div id="vignette"></div>
+<script>if (document.body.classList.contains("mini")) document.getElementById("poster").remove();   // the room's mini has its own look</script>
 
-<main class="ui-hud" id="hud">
+<div class="ui-hud" id="hud">
   <!-- the state line: what he does, in one big line; the stage, Tokyo time and place in one mono line -->
   <div class="ui-title ui-in" style="--i:1" id="st">
     <span class="ui-caption">02 · the brain model, now</span>
@@ -338,7 +367,7 @@
       aria-label="a stimulus for the model" title="each message reaches the model as a stimulus · 200 characters · no links, addresses or tickers"><button class="ui-btn primary">send</button></form>
     <div id="note" role="status"></div>
   </div>
-</main>
+</div>
 
 <!-- his day: what the model did today (his screens, desk, music, sleep, diary, what he sees, teach, the spiking network) -->
 <aside id="day" aria-label="his day">
@@ -351,18 +380,18 @@
     </section>
     <a class="tile" href="/diary" id="c-diary">
       <div class="k"><span>Last night</span><span>diary →</span></div>
-      <img id="d-img" alt="" hidden>
+      <img id="d-img" alt="" width="640" height="360" hidden>
       <div class="t" id="d-title">The first diary entry is written the morning after his first night of REM sleep.</div>
       <div class="m" id="d-meta"></div>
     </a>
     <a class="tile" href="/world.html" id="c-eye" hidden>
       <div class="k"><span>What it sees</span><span id="e-t"></span></div>
-      <img id="e-img" alt="">
+      <img id="e-img" alt="" width="640" height="360">
       <div class="t q" id="e-thought"></div>
     </a>
     <section class="tile" id="music" hidden>
       <div class="k"><span>Now playing</span><span id="mu-k"></span></div>
-      <div class="mu"><img id="mu-art" alt="" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
+      <div class="mu"><img id="mu-art" alt="" width="52" height="52" hidden><div><div class="t" id="mu-t"></div><div class="m" id="mu-a"></div></div></div>
       <iframe id="mu-embed" title="Spotify player" allow="clipboard-write; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
       <div class="m" id="mu-card"></div>
@@ -372,7 +401,7 @@
     <section class="tile" id="desk" hidden>
       <div class="k"><span>At his desk</span><span id="desk-k"></span></div>
       <div id="desk-board" class="board" hidden></div>
-      <img id="desk-img" alt="" hidden>
+      <img id="desk-img" alt="" width="640" height="360" hidden>
       <div class="t" id="desk-t"></div>
       <ul id="desk-opts"></ul>
       <div class="m" id="desk-m"></div>
@@ -406,6 +435,7 @@
   </div>
 </aside>
 <div id="n3mini"></div>
+</main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -421,19 +451,31 @@ if (!MINI && window.Neurons) Neurons.init({mount: $("neurons"), open: true});
 
 // ---------- scene ----------
 const host = $("scene");
-const renderer = new THREE.WebGLRenderer({antialias:true});
+let renderer = null;
+try { renderer = new THREE.WebGLRenderer({antialias:true}); } catch (e) {}
+const GL = !!renderer;                              // no WebGL: a stand-in renderer; the page runs and the poster stays
+if (!GL) { document.body.classList.add("nogl");
+  renderer = {domElement: document.createElement("canvas"), setPixelRatio(){}, setClearColor(){}, setSize(){}, render(){}, getPixelRatio(){ return 1; }}; }
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 renderer.setClearColor(0x030305);
-host.appendChild(renderer.domElement);
+if (GL) host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, 1, 1, 3000);
 camera.up.set(0, 0, 1); camera.position.set(-300, 170, 108);
 if (MINI) camera.position.multiplyScalar(0.72);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 // the slow turn is motion: off when the viewer asks for reduced motion (and when that setting changes)
+// Under reduced motion the brain is a still: no turn, no damping glide, the shader's clock stopped (no shimmer, sweep or
+// flicker), no tweens, and a frame is drawn only when something changed (a drag, a click, a stage, a data refresh)
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)");
-controls.enableDamping = true; controls.autoRotate = !REDUCED.matches; controls.autoRotateSpeed = 0.35;
-REDUCED.addEventListener && REDUCED.addEventListener("change", () => { if (!zoom) controls.autoRotate = !REDUCED.matches; });
+controls.enableDamping = !REDUCED.matches; controls.autoRotate = false; controls.autoRotateSpeed = 0.35;   // the turn starts at the first lit frame (litFirst): the poster's angle
+let dirty = true, settleUntil = 0;                 // reduced motion: draw this frame / keep drawing until then (a click's effects)
+const RM_DATA_MS = 20000;                          // reduced motion: the activity on the fibres refreshes once in 20 s, in one step
+REDUCED.addEventListener && REDUCED.addEventListener("change", () => { if (!zoom && lit) controls.autoRotate = !REDUCED.matches;
+  controls.enableDamping = !REDUCED.matches; dirty = true; });
+controls.addEventListener("change", () => { dirty = true; });
+for (const ev of ["pointerdown", "click", "input", "wheel", "keydown"])
+  addEventListener(ev, () => { settleUntil = performance.now() + 1500; }, {passive: true, capture: true});
 let n3d = null, n3want = new URLSearchParams(location.search).get("neurons") === "1", n3meta = null, cortexPos = null, cortexIdx = null, n3wall = -1e9, n3net = null;
 let DENS = 1;                              // the fibres' density: 1 at desktop size, less when the brain is drawn small (additive lines saturate)
 function resize(){
@@ -445,7 +487,7 @@ function resize(){
   camera.updateProjectionMatrix();
   if (n3d) n3d.resize(renderer.domElement.height, camera.fov);
 }
-addEventListener("resize", resize); resize();
+addEventListener("resize", () => { resize(); dirty = true; }); resize();
 // the right column: the cards stop above the dock whatever its height (#88: the layer row overlapped the cards at 1920 px)
 if ("ResizeObserver" in window && !MINI) {
   new ResizeObserver(es => document.documentElement.style.setProperty("--dock-h",
@@ -788,7 +830,7 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
     fragmentShader: `uniform float opacity; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * opacity, 1.0); }`,
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false,
   });
-  const fibres = new THREE.LineSegments(g, fibreMat); fibres.name = "fibres"; scene.add(fibres);
+  const fibres = new THREE.LineSegments(g, fibreMat); fibres.name = "fibres"; scene.add(fibres); dirty = true;
 
   Promise.all([fetch("cortex.bin").then(r=>r.arrayBuffer()), fetch("cortex_idx.bin").then(r=>r.arrayBuffer())]).then(([vb, ib]) => {
     const cg = new THREE.BufferGeometry();
@@ -821,10 +863,9 @@ Promise.all([fetch("brain.json").then(r=>r.json()), fetch("fibres.json").then(r=
           gl_FragColor = vec4(tint * rim * strength + ${PATCH} * vPatch * 0.6 * rim, 1.0); }`,   // rim-lit like the surface itself: the folds don't stack into a blob
       transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide,
     });
-    const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m);
+    const m = new THREE.Mesh(cg, cortexMat); m.name = "cortex"; scene.add(m); dirty = true;
     if (n3want) neuronsOn(true);
   });
-  connect();
 });
 
 // ---------- story ----------
@@ -859,12 +900,14 @@ function setStage(s){
   document.documentElement.style.setProperty("--st", CHIP[s] || CHIP.AWAKE);
   if (cortexMat) cortexMat.uniforms.tint.value.set(CHIP[s] || CHIP.AWAKE);
   controls.autoRotateSpeed = s === "AWAKE" ? 0.35 : s === "REM" ? 0.22 : 0.1;
+  dirty = true;
 }
 function fire(text, networks, asleep, gain){
   tgOn.fill(0);
   const nets = (networks || []).filter(x => GROUPS.includes(x));
   for (const x of (nets.length ? nets : ["default", "attention"])) tgOn[GROUPS.indexOf(x)] = 1;
-  pulse = {t:0, start:performance.now()};
+  pulse = {t: REDUCED.matches ? 1 : 0, start:performance.now()};   // reduced motion: the whole route lit at once, still, no travelling front
+  dirty = true;
   heard = {text: String(text).slice(0, 80), at: performance.now(), asleep: !!asleep, gain: asleep ? +gain || 0 : 1};
 }
 
@@ -1003,7 +1046,8 @@ const ACT_LUT = Float32Array.from({length:256}, (_, b) => ACT_LO * Math.pow(ACT_
 const unq = s => { const bin = atob(s), a = new Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = ACT_LUT[bin.charCodeAt(i)]; return a; };
 let sock = null, act = null, base = null, actFrom = null, actTo = null, actAt = 0, actDt = 1000 / RATE;
 let full = false, retry = 0;                       // the server sends {"type":"full"} when it has no room for us
-const FULL_TXT = "the room is full; back by itself in a minute";   // (the page retries on its own: see ws.onclose)
+const FULL_TXT = "the room is full; back by itself in a minute";
+const WAIT_TXT = "reading the model…";             // the socket is open, the first tick is on its way   // (the page retries on its own: see ws.onclose)
 // ---------- #89: his screens (what the browser really shows) and the dopamine-like trace ----------
 const DA_N = 240, daTrace = [], daSpikes = [];
 let daLast = 0, daCount = 0;                       // daCount: samples pushed so far (spikes keep their sample number)
@@ -1122,7 +1166,8 @@ if (!MINI) { pollScreens(); setInterval(pollScreens, 5000); } else { const sc = 
 function connect(){
   const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=${RATE}&q=1`);
   // the pulse strip (pulse.js, feed mode) reads this page's own socket: one socket per page
-  ws.onopen = () => { if (window.SUB01Pulse) SUB01Pulse.online(true); };
+  ws.onopen = () => { if (window.SUB01Pulse) SUB01Pulse.online(true);
+    if (!MINI && $("story").textContent === "connecting…") capPut("story", WAIT_TXT); };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (!MINI && window.SUB01Pulse) SUB01Pulse.feed(m);
@@ -1288,14 +1333,15 @@ if ("IntersectionObserver" in window)            // draw only while the brain is
 if (!MINI) { loadDiary(); setInterval(loadDiary, 10 * 60 * 1000); loadTaught(); setInterval(loadTaught, 60 * 1000); loadChess(); loadMusic();
   fetch("/api/frames?n=1").then(r => r.json()).then(d => showEye(d.frames[d.frames.length - 1])).catch(() => {}); }
 // the caption twice a second, written only when it changed (R4: a rewrite every 500 ms re-laid the header for nothing)
-const capShown = {story: null, sub: null}, RM = matchMedia("(prefers-reduced-motion: reduce)");
+const capShown = {story: null, sub: null}, RM = REDUCED;
+function storyPut(html){ const e = $("story"); e.innerHTML = html; e.classList.toggle("long", e.textContent.length > 30); }
 let capSwap = 0;
 function capPut(id, html){
   if (capShown[id] === html) return;
-  const first = capShown[id] === null || capShown[id] === "" || $(id).textContent === "connecting…"; capShown[id] = html;
-  if (id !== "story" || first || RM.matches) { if (!capSwap || id !== "sub") $(id).innerHTML = html; return; }
+  const first = capShown[id] === null || capShown[id] === "" || [ "connecting…", WAIT_TXT ].includes($(id).textContent); capShown[id] = html;
+  if (id !== "story" || first || RM.matches) { if (!capSwap || id !== "sub") (id === "story" ? storyPut : h => { $(id).innerHTML = h; })(html); return; }
   const st = $("st"); st.classList.add("swap"); clearTimeout(capSwap);
-  capSwap = setTimeout(() => { $("story").innerHTML = capShown.story; $("sub").innerHTML = capShown.sub || ""; st.classList.remove("swap"); capSwap = 0; }, 200);
+  capSwap = setTimeout(() => { storyPut(capShown.story); $("sub").innerHTML = capShown.sub || ""; st.classList.remove("swap"); capSwap = 0; }, 200);
 }
 if (!MINI) setInterval(() => { if (full) capPut("story", esc(FULL_TXT));
   else if (stage) { capPut("story", story()); capPut("sub", subline()); } }, 500);
@@ -1327,21 +1373,28 @@ function frame(now){
   if (!onScreen || document.hidden) return;                                       // off screen: nothing drawn
   if (MINI && now - drawnAt < 1000 / 30 - 3) return;                              // mini: <= 30 fps
   drawnAt = now;
-  const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
-  if (!mix) mix = [1, 0, 0];
-  const k = 1 - Math.exp(-dt / 2.5);
-  for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
-  sci += (sciT - sci) * (1 - Math.exp(-dt / 0.4));
+  const still = REDUCED.matches;                                                  // reduced motion: a still brain (see REDUCED)
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; if (!still) t += dt;
+  if (!mix && stage) mix = [...target];                                           // the first stage is drawn as it is, not tweened from awake
+  const mixw = mix || target;
+  const k = still ? 1 : 1 - Math.exp(-dt / 2.5);
+  if (mix) for (let i = 0; i < 3; i++) mix[i] += (target[i] - mix[i]) * k;
+  sci = still ? sciT : sci + (sciT - sci) * (1 - Math.exp(-dt / 0.4));
   const n3live = n3want;                                                          // neurons on (live or static): the fibres step back
-  n3dim += ((n3live ? 1 : 0) - n3dim) * (1 - Math.exp(-Math.min(2, (now - (frame.n3at || now)) / 1000) / 0.6));
+  n3dim = still ? (n3live ? 1 : 0) : n3dim + ((n3live ? 1 : 0) - n3dim) * (1 - Math.exp(-Math.min(2, (now - (frame.n3at || now)) / 1000) / 0.6));
   frame.n3at = now;                                                               // wall clock: a slow device fades too
-  burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6);
-  const tween = actTo && now - actAt < actDt;            // between two ticks: blend them
-  if (actTo && (actNew || tween)) {
-    const w = Math.min(1, (now - actAt) / actDt);
-    act = w >= 1 ? actTo : actTo.map((b, i) => actFrom[i] + (b - actFrom[i]) * w);
+  if (still) burst = boost = 0; else { burst *= Math.exp(-dt / 0.5); boost *= Math.exp(-dt / 0.6); }
+  let tween = false, refresh = false;
+  if (still) {                                                                    // one step every RM_DATA_MS, no blend
+    if (actTo && base && now - (frame.rmAt || -1e9) >= RM_DATA_MS) { frame.rmAt = now; act = actTo; refresh = true; dirty = true; }
+  } else {
+    tween = actTo && now - actAt < actDt;                // between two ticks: blend them
+    if (actTo && (actNew || tween)) {
+      const w = Math.min(1, (now - actAt) / actDt);
+      act = w >= 1 ? actTo : actTo.map((b, i) => actFrom[i] + (b - actFrom[i]) * w);
+    }
   }
-  if (act && base && (actNew || tween || pulse.t >= 0)) {   // only while something changes, not every frame
+  if (act && base && (still ? refresh : actNew || tween || pulse.t >= 0)) {   // only while something changes, not every frame
     actNew = false;
     const raw = act.map((a, i) => a / Math.max(base[i], 0.02));
     const gm = Math.max(1e-3, raw.reduce((x, y) => x + y, 0) / raw.length);
@@ -1350,19 +1403,20 @@ function frame(now){
   }
   if (fibreMat) {
     const u = fibreMat.uniforms;
-    u.time.value = t; u.mixw.value.set(...mix); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
-    u.opacity.value = OPACITY * DENS * (mix[0] + 0.75 * mix[1] + 0.9 * mix[2]) * (1 + 0.4 * sci) * (1 - 0.85 * n3dim) * zoomBrain;   // neurons on: the fibres step well back (#88 B); gone inside the column (#99)
-    if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
+    u.time.value = t; u.mixw.value.set(...mixw); u.burst.value = burst; u.boost.value = boost; u.sci.value = sci;
+    u.opacity.value = OPACITY * DENS * (mixw[0] + 0.75 * mixw[1] + 0.9 * mixw[2]) * (1 + 0.4 * sci) * (1 - 0.85 * n3dim) * zoomBrain;   // neurons on: the fibres step well back (#88 B); gone inside the column (#99)
+    if (pulse.t >= 0 && still) { if (now - pulse.start > 5000) { pulse.t = -1; dirty = true; } }   // reduced motion: lit for 5 s, then off
+    else if (pulse.t >= 0) { pulse.t = (now - pulse.start) / 2600; if (pulse.t > 1.6) pulse.t = -1; }
     u.pulseT.value = pulse.t;
   }
-  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mix[0] + 0.5 * mix[1] + 0.8 * mix[2]) * (1 - 0.6 * sci) * (1 - 0.7 * n3dim) * zoomBrain;   // a faint outline behind the cells
+  if (cortexMat) cortexMat.uniforms.strength.value = 0.5 * (mixw[0] + 0.5 * mixw[1] + 0.8 * mixw[2]) * (1 - 0.6 * sci) * (1 - 0.7 * n3dim) * zoomBrain;   // a faint outline behind the cells
   if (cortexMat) {                                   // regions: the cortex's own patches (the "regions" toggle, a stimulus arriving)
     cortexMat.uniforms.uRegOn.value = showRegions ? 1 : 0;
     cortexMat.uniforms.uArrive.value = pulse.t > 0.85 && pulse.t < 1.6 ? Math.max(0, 1 - (pulse.t - 0.85) / 0.75) : 0;
   }
   if (n3d) n3d.update(now);
   if (anat) anat.update(now);                                                     // brain_anatomy hook (G9, #99)
-  if (zoomBack) { const u = ease((now - zoomBack.t0) / 1000); controls.target.lerpVectors(zoomBack.from, zoomBack.to, u); if (u >= 1) zoomBack = null; }
+  if (zoomBack) { const u = still ? 1 : ease((now - zoomBack.t0) / 1000); controls.target.lerpVectors(zoomBack.from, zoomBack.to, u); if (u >= 1) zoomBack = null; }
   if (n3want && !MINI && n3d && !n3close) {          // the zoom (#99): wheel in past ZOOM.start, or the dive button
     if (zoom) zoomFrame(now);
     else if (camera.position.distanceTo(controls.target) < ZOOM.start && now - n3lodAt > 800) zoomStart(false);
@@ -1370,8 +1424,21 @@ function frame(now){
   else if (zoom && n3close) zoomFrame(now);
   zoomOverlay(); orientMarks(now);
   if (n3close) return;                                                            // the close-up overlay draws itself (NeuronRender)
+  if (still && !zoom && !dirty && now > settleUntil) return;                      // reduced motion: nothing changed, nothing drawn
+  dirty = false;
   controls.update(); renderer.render(scene, camera);
+  if (!lit && GL && fibreMat && cortexMat && act && stage) litFirst();
 }
+// the first lit frame (fibres, cortex, a tick of data): the poster fades out (600 ms; at once under reduced motion);
+// document.body.dataset.lit = "1" and a "brain:lit" event on document are the hook
+let lit = false;
+function litFirst(){
+  lit = true; document.body.dataset.lit = "1"; document.dispatchEvent(new CustomEvent("brain:lit"));
+  if (!zoom) controls.autoRotate = !REDUCED.matches;
+  const p = $("poster"); if (!p) return;
+  p.classList.add("gone"); setTimeout(() => p.remove(), REDUCED.matches ? 0 : 700);
+}
+connect();                                       // the socket opens at once: the state line and the rail do not wait for the geometry
 requestAnimationFrame(frame);
 </script>
 <script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
