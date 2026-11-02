@@ -107,8 +107,9 @@
       if (chosen().length !== 1) continue;
       const th = document.createElement("i"); th.className = "ui-seg-thumb"; th.setAttribute("aria-hidden", "true");
       seg.insertBefore(th, seg.firstChild); seg.classList.add("has-thumb");
-      const home = now => { const c = chosen(); if (c.length !== 1) { seg.classList.remove("has-thumb"); th.style.opacity = "0"; return; }
-        seg.classList.add("has-thumb"); place(th, c[0], now); };
+      const home = now => { const c = chosen();                 // (class changes only when they change: a re-add is a mutation too)
+        if (c.length !== 1) { if (seg.classList.contains("has-thumb")) seg.classList.remove("has-thumb"); th.style.opacity = "0"; return; }
+        if (!seg.classList.contains("has-thumb")) seg.classList.add("has-thumb"); place(th, c[0], now); };
       settle(home);
       // (the thumb's own style changes are ours: ignoring them keeps this from re-firing itself forever)
       new MutationObserver(ms => { if (ms.some(m => m.target !== th)) home(); }).observe(seg, {subtree:true, attributes:true, attributeFilter:["class", "aria-pressed", "hidden", "style"]});
