@@ -34,23 +34,23 @@
   .slide { border-top:1px solid var(--ui-line); padding:clamp(28px, 6vh, 64px) 0 clamp(36px, 7vh, 80px); }
   .slide .ui-title { margin:0 0 clamp(18px, 3vh, 32px); }
   .slide .ui-title .ui-caption { display:block; margin:0 0 12px; }
-  .slide .ui-title h2 { margin:0; font-family:var(--ui-sans); font-weight:800; font-size:clamp(34px, 6.4vw, 92px); line-height:.95;
+  .slide .ui-title h2 { margin:0; font-family:var(--ui-sans); font-weight:700; font-size:clamp(34px, 6.4vw, 92px); line-height:.95;
     letter-spacing:-.05em; color:var(--ui-fg); text-wrap:balance; }
   .body { max-width:760px; }
   .slide:has(.nums) .body { max-width:1040px; }
   .slide:has(.nums) .body > p { max-width:760px; }
-  p, li { font-size:13.5px; line-height:1.7; color:var(--ui-fg2); }
+  p, li { font-size:12px; line-height:1.7; color:var(--ui-fg2); }
   p { margin:0 0 10px; }
   ul { margin:0 0 10px; padding-left:20px; }
   li { margin-bottom:8px; }
   li strong { color:var(--ui-fg); font-weight:600; }
   li ul { margin-top:8px; }
-  .src { color:var(--ui-dim); font-size:11px; line-height:1.6; }
+  .src { color:var(--ui-dim); font-size:12px; line-height:1.6; }
   .body > .src { margin:0 0 10px; }
 
   /* outlined mono tags, as on the front page */
-  .tag { display:inline-block; font-family:var(--ui-mono); font-size:9.5px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim);
-    border:1px solid var(--ui-line2); border-radius:10px; padding:1px 7px; margin:0 6px 0 0; white-space:nowrap; vertical-align:1px; }
+  .tag { display:inline-block; font-family:var(--ui-mono); font-size:12px; letter-spacing:-.01em; text-transform:none; color:var(--ui-dim);
+    border:1px solid var(--ui-line2); border-radius:8px; padding:1px 7px; margin:0 6px 0 0; white-space:nowrap; vertical-align:1px; }
   .tag.neg, .tag.red { color:var(--ui-live2); border-color:rgba(255,45,85,.45); }
 
   /* the results: one tile per claim, figure on the left, text on the right, hairlines between */
@@ -66,33 +66,33 @@
   .tile .three > span { display:flex; flex-direction:column; gap:8px; }
   .tile .three .ui-big { font-size:clamp(30px, 3.6vw, 46px); }
   .tile .txt { min-width:0; max-width:620px; }
-  .tile .txt p, .tile .txt .src { font-size:13px; }
+  .tile .txt p, .tile .txt .src { font-size:12px; }
   .tile.ph { border-bottom-style:dashed; }
 
-  table { width:100%; border-collapse:collapse; font-size:13px; margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin:0 0 12px; }
   th, td { text-align:left; padding:9px 8px 9px 0; border-bottom:1px solid var(--ui-line); vertical-align:top; color:var(--ui-fg2); }
-  th { color:var(--ui-dim); font-weight:400; font-family:var(--ui-mono); font-size:10px; letter-spacing:-.01em; text-transform:none; }
-  td.ph { color:var(--ui-dim); font-style:italic; white-space:nowrap; }
+  th { color:var(--ui-dim); font-weight:400; font-family:var(--ui-mono); font-size:12px; letter-spacing:-.01em; text-transform:none; }
+  td.ph { color:var(--ui-dim);  white-space:nowrap; }
 
   .box { border:1px solid var(--ui-line2); border-radius:var(--ui-r2); padding:14px 16px; background:var(--ui-panel); }
   .box p { margin:0; color:var(--ui-fg); }
-  .box code { font-size:13px; color:var(--ui-fg); }
+  .box code { font-size:12px; color:var(--ui-fg); }
   /* the address: a full-width block in the mono caption style (case kept: it is case-sensitive), with a copy button */
   .ca { display:flex; flex-direction:column; gap:10px; }
   .ca-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; }
   .ca-pre { flex:1 1 280px; min-width:0; margin:0; }
-  .ca-pre code { display:block; width:100%; padding:10px 12px; font-family:var(--ui-mono); font-size:12.5px; line-height:1.5; letter-spacing:.06em;
+  .ca-pre code { display:block; width:100%; padding:10px 12px; font-family:var(--ui-mono); font-size:12px; line-height:1.5; letter-spacing:.06em;
     color:var(--ui-fg); background:var(--ui-bg); border:1px solid var(--ui-line); border-radius:var(--ui-r2);
     word-break:break-all; overflow-wrap:anywhere; white-space:pre-wrap; user-select:all; -webkit-user-select:all; }
   #ca-copy { flex:none; }
 
-  #note { color:var(--ui-dim); font-size:10.5px; padding:20px var(--ui-pad) 30px; max-width:1240px; margin:0 auto; line-height:1.6;
+  #note { color:var(--ui-dim); font-size:12px; padding:20px var(--ui-pad) 30px; max-width:1240px; margin:0 auto; line-height:1.6;
     border-top:1px solid var(--ui-line); }
 
   @media (max-width: 720px) {
-    p, li { font-size:13px; }
+    p, li { font-size:12px; }
     .tile { grid-template-columns:1fr; gap:14px; padding:22px 0; }
-    .tile .txt p, .tile .txt .src { font-size:12.5px; }
+    .tile .txt p, .tile .txt .src { font-size:12px; }
     th, td { padding:7px 6px 7px 0; font-size:12px; }
   }
 </style>
@@ -146,9 +146,9 @@ code around it do.</p>
 
 <article class="tile">
   <div class="ui-num">
-    <span class="ui-caption">Wiring-only model vs recorded activity · FC</span>
+    <span class="ui-caption">Wiring only model vs recorded activity · FC</span>
     <span class="ui-big">r ≈ 0.21</span>
-    <span class="ui-caption">on held-out sessions</span>
+    <span class="ui-caption">on held out sessions</span>
   </div>
   <div class="txt">
   <p>A slow-layer model that uses only the wiring and one fitted number produces activity whose correlation pattern
@@ -179,11 +179,11 @@ code around it do.</p>
   <div class="ui-num">
     <span class="ui-caption">Perturbational complexity (PCI) <span class="tag">negative</span></span>
     <div class="three"><span><span class="ui-big">0.18</span><span class="ui-word">awake</span></span><span><span class="ui-big">0.07</span><span class="ui-word">NREM</span></span><span><span class="ui-big">0.17</span><span class="ui-word">REM</span></span></div>
-    <span class="ui-caption">below the 0.31 clinical cut-off</span>
+    <span class="ui-caption">below the 0.31 clinical cutoff</span>
   </div>
   <div class="txt">
   <p>A sudden kick to one region, repeated 60 times per state, and a measure of how complex and widespread the
-  response is (Casali et al. 2013). All three values are below the 0.31 clinical cut-off, because the pulse stays
+  response is (Casali et al. 2013). All three values are below the 0.31 clinical cutoff, because the pulse stays
   local: the struck region responds, and the rest of the brain barely does. The ordering (awake ≈ REM &gt; deep
   sleep) is the human one.</p>
   <p><em>What it does not show.</em> PCI is validated on human brains. A model scoring high would not be
@@ -288,7 +288,7 @@ code around it do.</p>
     this project with Higgsfield (image concepts turned into 3D with Meshy, then rigged and animated).
     <span class="tag">not stated</span>No licence is stated for these files; the terms they are used under are to
     be confirmed.</li>
-  <li><strong>Neuron shapes</strong> (the close-ups and the whole-brain neuron view on /brain, <code>web/neurons_morph.json</code>): real reconstructed
+  <li><strong>Neuron shapes</strong> (the close ups and the whole brain neuron view on /brain, <code>web/neurons_morph.json</code>): real reconstructed
     neurons from <a href="https://neuromorpho.org">NeuroMorpho.Org</a> (RRID:SCR_002145), licensed
     <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, simplified to at most 300 segments a cell (40 in the
     whole-brain view, drawn ~6× enlarged) and rotated. They are illustrative: the simulated network uses point neurons, and none of these cells is from the
@@ -325,7 +325,7 @@ code around it do.</p>
     <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; its neuron count (~16 000 per mm³) sets how many
     neurons the column stands for. Not from the scanned person.
     <span class="src">(<code>analysis/h01_layers.py</code>, <code>docs/spiking/h01_layers.json</code>)</span></li>
-  <li><strong>Real electron-microscopy neurons</strong> (the cortex close-up on /brain, <code>web/neuron_render/h01/</code>): cells, synapses,
+  <li><strong>Real electron microscopy neurons</strong> (the cortex close-up on /brain, <code>web/neuron_render/h01/</code>): cells, synapses,
     axon labels and an EM image from <a href="https://h01-release.storage.googleapis.com">H01</a>, a reconstruction of about one cubic
     millimetre of human temporal cortex by Google and Harvard: Shapson-Coe A, Januszewski M, Berger DR et al. (2024), A petavoxel fragment
     of human cerebral cortex reconstructed at nanoscale resolution, Science 384:eadk4858 (<a href="https://doi.org/10.1126/science.adk4858">doi</a>).

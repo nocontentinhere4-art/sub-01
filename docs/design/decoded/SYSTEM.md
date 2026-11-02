@@ -119,3 +119,18 @@ fills with a hairline and a top highlight, layered surfaces. The v4 block at the
   box with 7 px buttons and a thumb with a 1 px drop. `.ui-input` 13 px on #0b0b0e with an inset shadow.
 - Surfaces: `.ui-panel` and `.ui-dock` a #121216→#0d0d10 gradient, an 8–10 % hairline, the top highlight.
 - The v3 behaviours (the light round a pill, the sliding thumb and nav pill, the panel light, tooltips, toast) are unchanged.
+
+## v5 · the owner's design skill (2 November, late): github.com/elayadesign/ai-design-skills + redesign-skill
+Applied as the v5 block at the end of ui.css and a pass over every page (these values now win over v1–v4):
+- Motion: `--ui-ease` is cubic-bezier(.22,1,.36,1); no transition under 200 ms (colour and opacity at 300 ms); no default `ease`.
+- Surfaces: flat. The ground #000, panels, docks and the pulse strip #181818, inputs #000, tooltips #1F1F1F; no background
+  gradients anywhere (the only gradient is the hero heading text, #fff → #9B9B9B, on `.ui-title h1`, `#hero-h`, `#story`, `h1.lead`).
+- Radii on the Tailwind scale: 8 (buttons, nav, inputs), 12 (the header), 16 (panels, docks); nested shapes outer minus gap
+  (the segmented control 8 with 4 px buttons and thumb; chips 6).
+- Spacing from the scale: buttons 8 / 12, chips and seg buttons 4 / 8, nav links 4 / 8.
+- Type on the Tailwind scale: nothing under 12 px (every 9–11.5 px caption became 12), 13 → 12, 15 → 14; buttons and nav 14 px;
+  no weight above 700; headings `text-wrap:balance`, paragraphs `pretty`; no italics; no hyphens inside running copy
+  (paper titles keep theirs).
+- The header floats: 8 px off the top, sized to its content, centred, rgba(0,0,0,.6) over a 12 px blur, a 12 px radius, a hairline;
+  on phones it spans the width.
+- The skills are installed user-level in ~/.claude/skills (landing-page-design, redesign-existing-projects) for later sessions.
