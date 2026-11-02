@@ -15,8 +15,8 @@ scanned person, and the character, his room and his life are fiction.
        alt="A 3D cutaway of a small Tokyo bedroom in daylight: a young man in a black hoodie sits at a desk with a monitor, next to a bed, bookshelf, fridge and door">
 </p>
 
-The live site is private (password-gated) for now. Everything here runs locally in demo mode, see
-[Run it locally](#run-it-locally).
+The site is live at [subzerone.live](https://subzerone.live). Everything here also runs locally in demo mode, with no keys
+and no GPU, see [Run it locally](#run-it-locally). The code is open under the MIT licence; see [Contributing](#contributing).
 
 ## What you see
 
@@ -178,9 +178,17 @@ the raw MRI needs `requirements.txt` and `./fetch_data.sh` (~900 MB): see [docs/
   [web/room/CREDITS.md](web/room/CREDITS.md). The character was made for this project; the terms of its files are still
   to be confirmed.
 - **Maps:** © OpenStreetMap contributors (ODbL). **Articles:** Wikipedia (CC BY-SA). **3D engine:** three.js (MIT).
-- **Code:** no licence has been chosen yet. The full list is on [`web/about.html`](web/about.html).
+- **Code and docs:** MIT ([`LICENSE`](LICENSE)). Data and assets keep their own terms, listed in [`LICENSES.md`](LICENSES.md);
+  the character models are not covered yet. The full credits are on [`web/about.html`](web/about.html).
 
 All images in this README are our own screenshots of the pages, rendered in headless Chromium.
+
+## Contributing
+
+The model is open so that people who know more about brains, simulation or rendering can make it better. Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md): how to run it, where each part lives, the rules of the house (a model, not a mind;
+the character is fiction; honest numbers) and the open problems, scientific and engineering, with the numbers that
+would have to move.
 
 ## Disclaimer
 
