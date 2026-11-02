@@ -222,3 +222,70 @@ body[data-pulse] { padding-bottom:28px; }
   .ui-dot, .ui-in, .ui-chip .ui-dot { animation:none !important; }
   .ui-seg > button, .ui-btn, .ui-nav a { transition:none !important; }
 }
+
+/* ============================================================================================================
+   v2.1 · design-review fixes (2026-11-02): hover states that move more than colour, the skip link, a short phone
+   header, 24 px chips. Everything above stays; page styles that load after this file may still override. */
+:root { --ui-pill: rgba(255,255,255,.06); }   /* the nav pill fill, reused as the hover fill */
+
+/* buttons: the nav pill fill + a brighter hairline on hover (specificity kept low so a page can still restyle) */
+.ui-btn:hover:not(:disabled):not(.primary):not(.on) { background:var(--ui-pill); border-color:rgba(255,255,255,.4); color:var(--ui-fg);
+  box-shadow:inset 0 0 0 999px var(--ui-pill); }   /* the inset fill also shows on a page that sets its own button background */
+.ui-btn:hover:focus-visible:not(.primary):not(.on) { box-shadow:0 0 0 1px #000, inset 0 0 0 999px var(--ui-pill); }
+.ui-seg > button:hover:not(:disabled):not(.on):not([aria-pressed="true"]) { background:var(--ui-pill); color:var(--ui-fg); box-shadow:inset 0 0 0 999px var(--ui-pill); }
+.ui-seg > button:hover:focus-visible:not(.on):not([aria-pressed="true"]) { box-shadow:0 0 0 1px #000, inset 0 0 0 999px var(--ui-pill); }
+:where(.ui-dock, #tools, .ui-hud) button:where(:not(.ui-btn, .primary, .on, [aria-pressed="true"], :disabled)),
+:where(.tab) {
+  transition: background .18s var(--ui-ease), color .18s var(--ui-ease), border-color .18s var(--ui-ease); }
+:where(.ui-dock, #tools, .ui-hud) button:where(:not(.ui-btn, .primary, .on, [aria-pressed="true"], :disabled)):hover,
+:where(.tab):hover:where(:not(.on, [aria-selected="true"], :disabled)) { background:var(--ui-pill); color:var(--ui-fg); box-shadow:inset 0 0 0 999px var(--ui-pill); }
+/* the primary button: pure white and a 1 px lift, never grey */
+.ui-btn.primary { transition: background .18s var(--ui-ease), color .18s var(--ui-ease), border-color .18s var(--ui-ease), transform .18s var(--ui-ease); }
+.ui-btn.primary:hover:not(:disabled) { background:#fff; border-color:#fff; color:#000; transform:translateY(-1px); }
+.ui-btn.primary:active:not(:disabled) { transform:none; }
+
+/* inline links in running text: a hairline underline at rest, a 2 px one that draws in from the left on hover; 2 px of
+   vertical padding so the target is not a hairline */
+:is(p, li, td, .ui-honest, .ui-caption) a:not(.ui-btn):not([class*="ui-nav"]) {
+  text-decoration:none; padding:2px 0; -webkit-box-decoration-break:clone; box-decoration-break:clone;
+  background-image:linear-gradient(currentColor, currentColor), linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35));
+  background-repeat:no-repeat; background-position:0 100%, 0 100%; background-size:0 2px, 100% 1px;
+  transition: background-size .18s var(--ui-ease), color .18s var(--ui-ease); }
+:is(p, li, td, .ui-honest, .ui-caption) a:not(.ui-btn):not([class*="ui-nav"]):hover,
+:is(p, li, td, .ui-honest, .ui-caption) a:not(.ui-btn):not([class*="ui-nav"]):focus-visible { background-size:100% 2px, 100% 1px; color:var(--ui-fg); }
+
+/* the lock-up: the faint pill, and the small line brightens (the box grows by its padding and gives it back in margin) */
+.ui-lockup { padding:4px 8px; margin:-4px -8px; border-radius:8px; transition: background .18s var(--ui-ease); }
+.ui-lockup small { transition: color .18s var(--ui-ease); }
+.ui-lockup:hover { background:var(--ui-pill); }
+.ui-lockup:hover small { color:var(--ui-fg); }
+
+/* skip link (web/deck.js inserts it as the first child of body): off-screen until it takes focus */
+.ui-skip { position:fixed; left:-9999px; top:8px; z-index:2147483000; box-sizing:border-box; min-height:44px; padding:0 20px;
+  display:inline-flex; align-items:center; border-radius:999px; background:#fff; color:#000; text-decoration:none;
+  font-family:var(--ui-mono); font-size:12px; letter-spacing:.08em; text-transform:lowercase; font-weight:600; }
+.ui-skip:focus, .ui-skip:focus-visible { left:8px; }
+main[tabindex="-1"]:focus { outline:none; }
+
+/* targets: chips and segmented buttons at least 24 px tall */
+.ui-chip { box-sizing:border-box; min-height:24px; }
+.ui-seg > button { box-sizing:border-box; min-height:24px; }
+
+/* phones: lock-up and LIVE chip on one row, the clock and counter drop out, the nav is one scrolling row of 44 px targets
+   (header about 88 px instead of 220; markup untouched) */
+@media (max-width: 720px) {
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) { flex-wrap:wrap; align-items:center; row-gap:0; column-gap:12px; padding:8px var(--ui-pad) 0; }
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) > .ui-lockup { order:1; }
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) > .ui-spacer { order:2; }
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) > .ui-state { order:2; margin-left:auto; }
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) > .ui-nav { order:3; flex:1 0 100%; overflow-x:auto; scrollbar-width:none; margin:0 -12px; padding:2px 3px; }
+  :is(.ui-hdr, #hdr) .ui-state .ui-clock, :is(.ui-hdr, #hdr) .ui-state .ui-counter { display:none; }
+  :is(.ui-hdr, #hdr) .ui-state > .ui-chip:not(.live) { display:none; }          /* extra state chips (the stage) live in the pulse strip */
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) > button { order:2; }                  /* a page's own header button stays on the first row */
+  :is(.ui-hdr, #hdr):has(> .ui-lockup) > .ui-nav a { flex:none; display:inline-flex; align-items:center; box-sizing:border-box; min-height:44px; padding:0 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-btn, .ui-seg > button, .ui-nav a, .ui-lockup, .ui-lockup small, .ui-tab, .tab, :is(.ui-dock, #tools, .ui-hud) button,
+  :is(p, li, td, .ui-honest, .ui-caption) a { transition-duration:0s !important; }
+}

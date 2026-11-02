@@ -1,5 +1,5 @@
 // SUB-01 · deck.js (every page, defer). Every page is one slide of the same deck (docs/design/decoded/SYSTEM.md):
-// marks the current nav link, writes the slide counter, and moves to the previous / next slide on ← → (or [ ]).
+// inserts the skip link, marks the current nav link, writes the slide counter, and moves to the previous / next slide on ← → (or [ ]).
 // <body data-keys>: the page owns ← → (a frame viewer, say); [ ] still move between slides there.
 // The crossfade between pages is CSS (ui.css: @view-transition). Missing elements are fine: nothing here throws.
 (() => {
@@ -17,6 +17,22 @@
   const pad = n => String(n).padStart(2, "0");
   const body = document.body;
   const here = norm(location.pathname);
+
+  // skip link: first child of body, hidden off-screen by ui.css until it takes focus; a page without <main id="main"> gets a link that does nothing
+  try {
+    if (body && !document.querySelector("a.ui-skip")) {
+      const skip = document.createElement("a");
+      skip.className = "ui-skip"; skip.href = "#main"; skip.textContent = "skip to content";
+      skip.addEventListener("click", e => {
+        const m = document.getElementById("main");
+        if (!m) { e.preventDefault(); return; }
+        e.preventDefault();
+        if (!m.hasAttribute("tabindex")) m.setAttribute("tabindex", "-1");
+        m.focus({ preventScroll: true }); m.scrollIntoView();
+      });
+      body.insertBefore(skip, body.firstChild);
+    }
+  } catch (e) { /* no body yet */ }
 
   // the current nav link (by pathname; "/" only for "/")
   try {
