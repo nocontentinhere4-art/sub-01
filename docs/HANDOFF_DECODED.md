@@ -115,6 +115,7 @@ Branch `claude/compassionate-fermat-piv6wx`. The jury card is `docs/design/decod
   changing headline (brain, room); shimmer on loader captions. All of it is off under reduced motion.
 - **Bugs fixed just after:** the thumb's MutationObserver re-fired itself. It now ignores the thumb's own style changes and
   changes the control's class only when the value changes.
+- **The look (late evening, after the owner's "it still feels made with AI"):** Geist and Geist Mono self-hosted in `web/fonts` (SIL OFL; the old no-new-fonts rule is superseded), sentence-case labels everywhere, rounded rectangles instead of pills, translucent buttons with a top highlight, layered panels: the v4 block in `ui.css`, documented in `docs/design/decoded/SYSTEM.md`. Also: the left brain and the up-next block are out of the live page, the chart opens with the server's last 15 minutes, phones load `web/room/room_phone.glb` (1.85 MB).
 - **Other:** `robots.txt` lost its relative `Sitemap` line (the directive must be absolute; the public origin is still unknown).
   Jury tooling: `audit.mjs` resolves relative URLs.
 - **Tests:** green except the five pre-existing failures from main (`test_boy_mh`, `test_reading`, `test_spiking_live`,
