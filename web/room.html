@@ -7,371 +7,326 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  :root { --bg:#08080b; --fg:#ececf2; --dim:#8f8fa3; --faint:#5c5c72; --line:rgba(255,255,255,.08); --or:#ff6a00; --st:#ff9a3c;
-          --card:rgba(12,12,18,.72); --card2:rgba(12,12,18,.86); --glass:blur(14px) saturate(1.2); }
+  /* SUB-01 · room: slide 03 of the deck. The room is the slide: full bleed, a quiet instrument HUD over it (the title
+     line under the header, two pills top right, a fiction caption bottom left, the brain square bottom right) and one
+     dock pinned above the pulse (vote · chat · teach · more). Tokens and chrome come from /ui.css; the :where() rules
+     below are zero-specificity fallbacks that ui.css v2 overrides. No orange in the UI (the lamp and the window in the
+     scene are not UI); the one LIVE chip is the header's. */
+  :root { --bg:#000; --fg:#fff; --fg2:#c9c9d1; --dim:#7d7d8a; --faint:#4a4a56; --line:rgba(255,255,255,.1); --line2:rgba(255,255,255,.18);
+    --mono:var(--ui-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    --sans:var(--ui-sans, "Helvetica Neue", Helvetica, Inter, Arial, system-ui, sans-serif);
+    --ease:var(--ui-ease, cubic-bezier(.2,.7,.2,1));
+    --glass:rgba(6,6,8,.8); --blur:blur(14px) saturate(1.1);
+    --gut:16px; --hdrh:53px; --pulse:28px; --dockb:calc(var(--pulse) + 12px); --dockh:50px; --r:12px; }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; -webkit-font-smoothing:antialiased; }
+  [hidden] { display:none !important; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden; }
+  body { font-family:var(--sans); -webkit-font-smoothing:antialiased; }
   a { color:inherit; }
+  button { font:inherit; }
+  a:focus-visible, button:focus-visible { outline:1px solid var(--fg); outline-offset:2px; }
+
+  /* ui.css v2 fallbacks (zero specificity: the shared sheet wins as soon as it defines them) */
+  :where(.ui-lockup) { display:flex; flex-direction:column; color:var(--fg); text-decoration:none; line-height:1; white-space:nowrap; }
+  :where(.ui-lockup) b { font-family:var(--sans); font-weight:800; font-size:16px; letter-spacing:-.03em; }
+  :where(.ui-lockup) small { font-family:var(--mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:3px; }
+  :where(.ui-state) { display:flex; align-items:center; gap:12px; }
+  :where(.ui-clock) { color:var(--fg2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  :where(.ui-caption) { font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
+  :where(.ui-seg) { display:inline-flex; padding:2px; gap:0; border:1px solid var(--line2); border-radius:999px; }
+  :where(.ui-seg) > button { font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:lowercase; color:var(--dim); background:transparent;
+    border:0; border-radius:999px; padding:5px 13px; cursor:pointer; transition:color .15s var(--ease), background .15s var(--ease); }
+  :where(.ui-seg) > button:hover { color:var(--fg); }
+  :where(.ui-seg) > button.on { background:var(--fg); color:#000; }
+  .ui-btn:where(.primary) { background:var(--fg); color:#000; border-color:var(--fg); font-weight:600; }
+  .ui-btn:where(.primary):hover { background:#dcdce2; border-color:#dcdce2; color:#000; }
+  :where(.ui-hud) { pointer-events:none; } :where(.ui-hud) > * { pointer-events:auto; }
+
+  /* the scene and its lens */
   #scene { position:fixed; inset:0; }
   #scene canvas { display:block; }
-  /* a soft vignette and a touch of grain: a cheap, pure-CSS "lens" over the render */
   #vignette { position:fixed; inset:0; pointer-events:none; z-index:2;
-    background:radial-gradient(ellipse at 52% 45%, transparent 48%, rgba(0,0,0,.42) 100%); }
-  #top { position:fixed; left:28px; top:24px; max-width:min(620px, 56vw); pointer-events:none; z-index:5; }
-  #top a, #top nav, #top button { pointer-events:auto; }
-  #brand { display:flex; align-items:center; gap:14px; }
-  #brand h1 { margin:0; font-size:20px; letter-spacing:.16em; background:var(--or); color:#0a0a0a; padding:3px 10px 2px; border-radius:2px; }
-  #brand nav { font-size:12px; color:var(--dim); display:flex; gap:2px; }
-  #brand nav a { color:inherit; text-decoration:none; padding:4px 7px; border-radius:4px; transition:color .2s, background .2s; }
-  #brand nav a:hover { color:var(--fg); background:rgba(255,255,255,.06); }
-  #brand nav a.on { color:var(--fg); }
-  #brand nav a.on::after { content:""; display:block; height:1px; margin-top:2px; background:var(--or); }
-  #state { margin-top:22px; display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--dim); flex-wrap:wrap; text-shadow:0 1px 8px #000; }
-  #chip { color:#0a0a0a; background:var(--st); padding:3px 9px 2px; letter-spacing:.14em; font-size:11px; border-radius:2px; transition:background 1.5s; }
-  #live { width:7px; height:7px; border-radius:50%; background:#3a3a46; display:inline-block; transition:background .4s; }
-  #live.on { background:#39f5a0; box-shadow:0 0 8px #39f5a0; animation:breathe 2.6s ease-in-out infinite; }
-  @keyframes breathe { 50% { box-shadow:0 0 3px #39f5a0; } }
-  #story { margin-top:12px; font-size:21px; line-height:1.28; letter-spacing:-.01em; text-shadow:0 2px 24px #000, 0 1px 3px rgba(0,0,0,.8); min-height:1.3em; }
-  #story.in { animation:storyin .7s ease-out; }
-  @keyframes storyin { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
-  #story em { font-style:normal; color:var(--st); }
-  /* the one line that is always on the first screen, before any tick: what he is (S10). Never hidden, never moved off */
-  #fiction { margin-top:6px; font-size:11.5px; color:#d8d8e2; line-height:1.45; text-shadow:0 1px 8px #000, 0 0 3px #000, 0 0 1px #000; max-width:60ch; }   /* (readable over the white wall) */
-  #fiction a { color:#b9b9c6; text-decoration:underline dotted; } #fiction a:hover { color:var(--fg); } #fiction .short { display:none; }
-  /* the night line under the story while he sleeps: when he fell asleep, what was replayed (R3) */
-  #night { margin-top:6px; font-size:12px; color:#9fb4ff; line-height:1.5; text-shadow:0 1px 8px #000; max-width:60ch; }
-  #night[hidden] { display:none; }
-  #why { margin-top:9px; font-size:12px; color:var(--dim); text-shadow:0 1px 8px #000; max-width:52ch; line-height:1.5; }
-  #cam { margin-top:12px; background:rgba(10,10,16,.62); color:var(--dim); border:1px solid var(--line); border-radius:6px;
-    font:inherit; font-size:11px; padding:6px 10px; cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
-    transition:color .2s, border-color .2s; display:inline-flex; align-items:center; gap:7px; }
-  #cam::before { content:""; width:6px; height:6px; border-radius:50%; background:#4a4a58; }
-  #cam.on { color:var(--fg); border-color:rgba(255,255,255,.22); } #cam.on::before { background:var(--st); box-shadow:0 0 6px var(--st); }
-  /* the day plan (from /api/mind and `plan` messages) and the resting line, under the story */
-  #plan { margin-top:10px; font-size:12px; color:#c9c9d6; line-height:1.5; max-width:60ch; text-shadow:0 1px 8px #000;
-    background:rgba(10,10,16,.55); border:1px solid var(--line); border-left:2px solid var(--st); border-radius:6px; padding:6px 10px;
-    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-  #plan[hidden], #plan .r[hidden], #plan .rs[hidden] { display:none; }
-  #plan .h { color:var(--dim); } #plan s { color:var(--faint); }
-  #plan .r { display:block; font-size:11px; color:var(--dim); margin-top:2px; }
-  #plan .rs { display:block; font-size:11px; color:#9fb4ff; margin-top:2px; }
+    background:radial-gradient(ellipse at 52% 48%, transparent 50%, rgba(0,0,0,.5) 100%),
+               linear-gradient(180deg, rgba(0,0,0,.72) 0, rgba(0,0,0,.28) 260px, transparent 380px); }
+  /* the viewfinder: four corner marks and a millimetre rule down the left edge, like a plate under a microscope */
+  #reticle { position:fixed; z-index:3; pointer-events:none; left:10px; right:10px; top:calc(var(--hdrh) + 10px); bottom:calc(var(--pulse) + 10px);
+    --c:rgba(255,255,255,.42); --k:14px;
+    background:
+      linear-gradient(var(--c), var(--c)) 0 0 / var(--k) 1px, linear-gradient(var(--c), var(--c)) 0 0 / 1px var(--k),
+      linear-gradient(var(--c), var(--c)) 100% 0 / var(--k) 1px, linear-gradient(var(--c), var(--c)) 100% 0 / 1px var(--k),
+      linear-gradient(var(--c), var(--c)) 0 100% / var(--k) 1px, linear-gradient(var(--c), var(--c)) 0 100% / 1px var(--k),
+      linear-gradient(var(--c), var(--c)) 100% 100% / var(--k) 1px, linear-gradient(var(--c), var(--c)) 100% 100% / 1px var(--k);
+    background-repeat:no-repeat; }
+  #reticle::before { content:""; position:absolute; left:0; top:40px; bottom:40px; width:9px; opacity:.5;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,.55) 0 1px, transparent 1px 12px) 0 0 / 4px 100% no-repeat,
+               repeating-linear-gradient(180deg, rgba(255,255,255,.75) 0 1px, transparent 1px 60px) 0 0 / 9px 100% no-repeat; }
 
-  #side { position:fixed; right:24px; top:24px; width:350px; display:flex; flex-direction:column; gap:12px; z-index:5;
-    max-height:calc(100vh - 66px - var(--dockh, 74px)); overflow-y:auto; scrollbar-width:none; padding-bottom:4px; }
-  #side::-webkit-scrollbar { display:none; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:var(--glass);
-    -webkit-backdrop-filter:var(--glass); box-shadow:0 10px 30px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05); }
-  .card .k { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:9px; display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
-  .card .k a { text-decoration:none; color:var(--faint); transition:color .2s; } .card .k a:hover { color:var(--fg); }
-  .card .t { font-size:14.5px; line-height:1.4; }
-  .card .m { font-size:12px; color:#c9c9d6; margin-top:6px; line-height:1.55; }
-  .card .s { font-size:10.5px; color:var(--faint); margin-top:8px; line-height:1.45; }
+  /* header: the deck's, fixed over the scene */
+  #hdr { position:fixed; top:0; left:0; right:0; z-index:20; background:rgba(0,0,0,.82); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line); flex-wrap:wrap; row-gap:8px; }
+  #hdr .ui-nav { flex-wrap:wrap; }
+
+  /* the state line: what he is doing, as the slide's title, and one mono line under it */
+  #top { position:fixed; left:calc(var(--gut) + 18px); top:calc(var(--hdrh) + 26px); z-index:5; pointer-events:none;
+    max-width:min(820px, calc(100vw - 2 * var(--gut) - 360px)); }
+  #story { margin:0; font-family:var(--sans); font-weight:800; font-size:clamp(24px, 3.3vw, 48px); letter-spacing:-.045em; line-height:1.02;
+    color:var(--fg); text-wrap:balance; min-height:1em; text-shadow:0 2px 28px rgba(0,0,0,.6); overflow-wrap:anywhere; }
+  #story em { font-style:normal; color:var(--fg); }
+  #story.in { animation:storyin .6s var(--ease); }
+  @keyframes storyin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  #state { margin-top:12px; color:var(--fg2); line-height:1.6; text-shadow:0 1px 8px #000; display:flex; flex-wrap:wrap; }
+  #state > span { white-space:nowrap; }
+  #state > span:empty { display:none; }
+  #state > span:not(:empty) ~ span:not(:empty)::before { content:"·"; padding:0 .7em; color:var(--dim); }
+  #night { margin-top:6px; font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; line-height:1.5; color:var(--ui-blue2, #8fb3ff);
+    text-shadow:0 1px 8px #000; max-width:72ch; }
+  /* the fiction line: one mono caption, bottom left, always on screen */
+  #fiction { position:fixed; left:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + 14px); z-index:5; pointer-events:auto;
+    max-width:calc(100vw - 2 * var(--gut) - 200px); color:var(--fg2); line-height:1.5; text-shadow:0 1px 6px #000;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; }
+  #fiction a { color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line2); }
+  #fiction .short { display:none; }
+
+  /* top right, under the header: today ▾ and the camera */
+  #hud { position:fixed; inset:0; z-index:7; pointer-events:none; }
+  #tools { position:fixed; right:calc(var(--gut) + 18px); top:calc(var(--hdrh) + 26px); z-index:7; display:flex; gap:8px; pointer-events:auto; }
+  #tools .ui-btn { background:rgba(0,0,0,.55); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); white-space:nowrap; }
+  #tools .ui-btn.on { background:var(--fg); color:#000; border-color:var(--fg); }
+  #todaybtn[aria-expanded="true"] { background:var(--fg); color:#000; border-color:var(--fg); }
+  #today { position:absolute; right:0; top:100%; margin-top:8px; width:min(440px, calc(100vw - 2 * var(--gut))); padding:14px 16px;
+    background:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
+  #today .ui-caption { margin-bottom:8px; }
+  #why { font-size:14px; line-height:1.45; color:var(--fg); }
+  #why:empty { display:none; }
+  #plan { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-family:var(--mono); font-size:11.5px; line-height:1.6; color:var(--fg2); }
+  #plan .h { display:block; color:var(--dim); font-size:10px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:3px; }
+  #plan s { color:var(--faint); }
+  #plan .r { display:block; font-size:10.5px; color:var(--dim); margin-top:4px; }
+  #plan .rs { display:block; font-size:10.5px; color:var(--ui-blue2, #8fb3ff); margin-top:4px; }
+
+  /* the dock: one panel pinned above the pulse; the segmented row, the reactions at its right end, the open tab under it */
+  #side { position:fixed; z-index:6; left:0; right:0; margin:0 auto; bottom:var(--dockb); width:min(920px, calc(100vw - 2 * var(--gut)));
+    display:flex; flex-direction:column; background:rgba(14,14,17,.9); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+    border:1px solid var(--line2); border-radius:var(--ui-r3, 16px); overflow:hidden; }
+  #dockbar { display:flex; align-items:center; gap:10px; padding:8px; flex:none; }
+  #tabs > button { display:inline-flex; align-items:center; gap:7px; min-height:30px; }
+  #tab-left { font-size:10px; color:var(--dim); font-variant-numeric:tabular-nums; }
+  #tab-left:empty { display:none; }
+  #tabs > button.on #tab-left { color:#000; opacity:.6; }
+  #tab-dot { width:5px; height:5px; border-radius:50%; background:var(--fg); display:inline-block; }
+  #dockhint { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--faint); padding-left:4px; }
+  #rx { display:flex; align-items:center; gap:0; padding:2px; border:1px solid var(--line2); border-radius:999px; flex:none; }
+  #rx button { width:34px; height:30px; padding:0; border:0; border-radius:999px; background:none; cursor:pointer; font-size:16px; line-height:1;
+    filter:grayscale(1); opacity:.75; transition:filter .2s var(--ease), opacity .2s var(--ease), transform .12s var(--ease), background .2s var(--ease); }
+  #rx button:hover { filter:none; opacity:1; background:rgba(255,255,255,.08); }
+  #rx button:active { transform:scale(.88); }
+  #rx button.off { opacity:.25; pointer-events:none; }
+  #rx:empty { display:none; }
+  #panes { border-top:1px solid var(--line); max-height:min(46vh, 430px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+  #side:not(.open) #panes { display:none; }
+  .pane { display:none; padding:14px 16px 16px; }
+  .pane.on { display:block; animation:ui-in .4s var(--ease) both; }
+
+  /* shared text in the panes */
+  .card .k { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px;
+    font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
+  .card .k a { color:var(--fg2); text-decoration:none; } .card .k a:hover { color:var(--fg); }
+  .card .t { font-size:14px; line-height:1.4; color:var(--fg); }
+  .card .m { font-size:13px; line-height:1.5; color:var(--fg2); margin-top:6px; }
+  .card .s, .s { font-family:var(--mono); font-size:10.5px; line-height:1.55; color:var(--dim); margin-top:8px; }
+  .s.err, #note.err, #tc-note.err { color:var(--ui-live2, #ff6b8a); }
+  .empty { font-family:var(--mono); font-size:11px; color:var(--dim); }
+  #votecard:not([hidden]) + .empty { display:none; }
+
+  /* vote: hairline pills, the count at the right */
+  #v-left { color:var(--fg2); font-variant-numeric:tabular-nums; }
+  #v-opts { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap:6px; }
+  #votecard .opt { position:relative; display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; min-height:40px;
+    padding:8px 16px; border:1px solid var(--line2); border-radius:999px; background:transparent; color:var(--fg); font-family:var(--sans);
+    font-size:13.5px; text-align:left; cursor:pointer; overflow:hidden; transition:border-color .2s var(--ease), background .2s var(--ease); }
+  #votecard .opt:hover:not(:disabled) { border-color:var(--fg2); background:rgba(255,255,255,.04); }
+  #votecard .opt .bar { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.08); transition:width .4s var(--ease); pointer-events:none; }
+  #votecard .opt span { position:relative; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #votecard .opt .n { flex:none; font-family:var(--mono); font-size:11px; color:var(--fg2); font-variant-numeric:tabular-nums; }
+  #votecard .opt.mine { border-color:var(--fg); }
+  #votecard .opt.mine .n::before { content:"your vote · "; color:var(--dim); }
+  #votecard .opt:disabled { cursor:default; }
+  #votecard .opt:disabled:not(.mine) { color:var(--fg2); }
+  #v-opts .m { grid-column:1 / -1; margin:0; }
+
+  /* chat: the front page's lines */
+  #feed { display:flex; flex-direction:column; min-height:40px; max-height:min(30vh, 290px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+  #feed:empty::before { content:"no messages yet · say something: it reaches the model as a stimulus pattern"; display:block; padding:6px 0;
+    font-family:var(--mono); font-size:10.5px; line-height:1.5; color:var(--faint); }
+  .cl { display:flex; gap:9px; padding:5px 0; font-size:13px; line-height:1.4; color:var(--fg2); }
+  .cl .av { flex:0 0 20px; height:20px; border-radius:50%; background:var(--ui-panel2, #141418); border:1px solid var(--line2); color:var(--dim);
+    font-family:var(--mono); font-size:9.5px; display:flex; align-items:center; justify-content:center; text-transform:uppercase; margin-top:1px; }
+  .cl .tx { min-width:0; overflow-wrap:anywhere; }
+  .cl .nk { color:var(--fg); font-weight:600; margin-right:6px; }
+  .cl .tm { font-family:var(--mono); font-size:9.5px; color:var(--faint); white-space:nowrap; }
+  .cl .re { display:block; font-family:var(--mono); font-size:10px; color:var(--dim); margin-top:2px; }
+  .cl.me .av { background:var(--fg); color:#000; border-color:var(--fg); font-weight:700; }
+  .cl.me .tx { color:var(--fg); }
+  .tag { font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); border:1px solid var(--line2);
+    border-radius:999px; padding:1px 6px; white-space:nowrap; vertical-align:1px; }
+  #chat, #tc-form { display:flex; gap:6px; margin-top:10px; }
+  #chat .ui-input, #tc-form .ui-input { flex:1; min-width:0; }
+  #tc-form #tc-nick { flex:0 1 30%; }
+  #chat .ui-btn, #tc-form .ui-btn { flex:none; padding:5px 16px; }
+  #note { font-family:var(--mono); font-size:10px; letter-spacing:.04em; color:var(--dim); margin-top:7px; min-height:1.2em; }
+
+  /* teach */
+  #teachcard .h { margin-top:14px; margin-bottom:2px; font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); }
+  #teachcard .it { font-size:13px; padding:6px 0; border-bottom:1px solid var(--line); color:var(--fg); }
+  #teachcard .it:last-child { border-bottom:0; }
+  #teachcard .it .r { display:block; font-family:var(--mono); color:var(--dim); font-size:10.5px; }
+  #teachcard .it .w { color:var(--dim); }
+  #teachcard .y { color:var(--ui-proj, #2ee6c5); } #teachcard .n { color:var(--ui-live2, #ff6b8a); }
+
+  /* more: the extra panels as hairline panels in two columns; tap a caption to fold one */
+  .pane[data-pane="more"].on { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; align-items:start; }
+  .pane[data-pane="more"] .card { border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; background:var(--ui-panel, #0e0e11); min-width:0; }
+  .pane[data-pane="more"] #mapcard { grid-column:1 / -1; }
+  .pane[data-pane="more"] .card > .k { cursor:pointer; user-select:none; margin-bottom:0; justify-content:flex-start; }
+  .pane[data-pane="more"] .card > .k > :nth-child(2) { margin-left:auto; text-align:right; }
+  .pane[data-pane="more"] .card > .k > :only-child { margin-right:auto; }
+  .pane[data-pane="more"] .card > .k::after { content:"−"; color:var(--faint); padding-left:10px; }
+  .pane[data-pane="more"] .card.shut > .k::after { content:"+"; }
+  .pane[data-pane="more"] .card > .k + * { margin-top:10px; }
+  .pane[data-pane="more"] .card.shut > :not(.k) { display:none; }
+  #honest { grid-column:1 / -1; font-family:var(--mono); font-size:10.5px; line-height:1.55; color:var(--dim); padding:2px 2px 0; }
+  #honest a { color:var(--fg2); } #honest a:hover { color:var(--fg); }
+  #honest .ln { display:block; margin-top:4px; } #honest .cap { color:var(--fg2); }
   #musiccard .mu { display:flex; gap:10px; align-items:center; margin-bottom:9px; }
   #musiccard .mu img { width:46px; height:46px; border-radius:6px; flex:none; object-fit:cover; }
   #musiccard .mu .t { overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   #musiccard iframe { width:100%; height:80px; border:0; border-radius:12px; display:block; background:#111; }
-  #screencard .frame { position:relative; border-radius:7px; overflow:hidden; background:#000; border:1px solid rgba(255,255,255,.12);
-    box-shadow:0 0 0 3px #101014, 0 0 38px -8px rgba(140,170,255,.30); }
-  #screencard .frame::after { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
-    background:linear-gradient(165deg, rgba(255,255,255,.07), transparent 38%); }
-  .card .kw { font-size:11px; color:#c9c9d6; margin-top:10px; line-height:1.5; }
-  .card .kw b { font-weight:400; color:var(--fg); }
-  .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
-    border-top:1px solid var(--line); font-size:11px; color:#c9c9d6; }
-  .card .tn[hidden] { display:none; }
-  .card .tn b { font-weight:400; color:var(--fg); font-size:13px; white-space:nowrap; }
-  #memcard .it { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:5px 0; border-bottom:1px solid var(--line); }
-  #memcard .it:last-child { border-bottom:0; }
-  #memcard .it span:last-child { flex:none; color:var(--dim); font-size:11px; white-space:nowrap; }
-  #memcard .it .y { color:#39f5a0; } #memcard .it .n { color:#ff7a7a; }
-  #teachcard form { display:flex; flex-direction:column; gap:6px; }
-  #teachcard .row { display:flex; gap:6px; }
-  #teachcard input { flex:1; min-width:0; background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:8px 10px;
-    font:inherit; font-size:12.5px; border-radius:7px; }
-  #teachcard input:focus { outline:none; border-color:rgba(255,154,60,.6); }
-  #teachcard input#tc-nick { flex:0 0 40%; }
-  #teachcard button { background:var(--fg); color:#0a0a0a; border:0; padding:0 12px; font:inherit; font-size:12.5px; border-radius:7px; cursor:pointer; }
-  #teachcard .h { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:12px; }
-  #teachcard .it { font-size:12px; padding:5px 0; border-bottom:1px solid var(--line); }
-  #teachcard .it:last-child { border-bottom:0; }
-  #teachcard .it .r { display:block; color:var(--dim); font-size:11px; }
-  #teachcard .it .w { color:var(--dim); }
-  #teachcard .y { color:#39f5a0; } #teachcard .n { color:#ff7a7a; }
-  #tc-note.err { color:#ff8a8a; }
-  .nm { display:flex; gap:8px; margin-top:8px; font-size:10px; color:var(--dim); }
-  .nm span { flex:1; } .nm i { display:block; height:4px; border-radius:2px; background:#2a2a36; margin-top:3px; overflow:hidden; }
-  .nm i i { margin:0; background:linear-gradient(90deg, #ff9a3c, #ffc27a); transition:width .6s; }
+  #screencard .frame { position:relative; border-radius:6px; overflow:hidden; background:#000; border:1px solid var(--line2); }
   #screencard .frame img { display:block; width:100%; height:auto; transition:opacity .35s; }
-  #screencard.phone .frame { width:176px; margin:2px auto 0; border-radius:26px; border:7px solid #111116;
-    box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 14px 30px -12px #000, 0 0 36px -10px rgba(140,170,255,.28); }
-  #screencard.phone .frame::before { content:""; position:absolute; left:50%; top:7px; width:48px; height:9px; margin-left:-24px; border-radius:6px; background:#0a0a0d; z-index:1; }
+  #screencard.phone .frame { width:150px; margin:2px auto 0; border-radius:22px; border:6px solid #111116; box-shadow:0 0 0 1px var(--line2); }
+  #screencard.phone .frame::before { content:""; position:absolute; left:50%; top:6px; width:40px; height:8px; margin-left:-20px; border-radius:6px; background:#0a0a0d; z-index:1; }
   #screencard.phone .frame img { aspect-ratio:390/844; object-fit:cover; object-position:top; }
-  #screencard .url { font-size:11px; color:var(--dim); margin-top:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #map { height:230px; border-radius:8px; overflow:hidden; background:#0d0e13; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
-  .leaflet-container { background:#0d0e13 !important; font-family:inherit !important; }
-  .leaflet-control-attribution { background:rgba(8,8,11,.6) !important; color:#6a6a7e !important; font-size:9px !important; }
-  .leaflet-control-attribution a { color:#8f8fa3 !important; }
-  .mk-me { filter:drop-shadow(0 0 5px rgba(255,154,60,.9)); }
-  .mk-courier { filter:drop-shadow(0 0 5px rgba(57,245,160,.8)); }
+  #screencard .url { font-family:var(--mono); font-size:10.5px; color:var(--dim); margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #screencard .opts { margin-top:10px; padding-top:8px; border-top:1px solid var(--line); }
-  #screencard .opts .h { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
-  #screencard .op { display:grid; grid-template-columns:1fr 64px 34px; gap:8px; align-items:center; font-size:11px; color:#a9a9b8; padding:2px 0; }
+  #screencard .opts .h { font-family:var(--mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+  #screencard .op { display:grid; grid-template-columns:1fr 64px 34px; gap:8px; align-items:center; font-size:11.5px; color:var(--fg2); padding:2px 0; }
   #screencard .op span:first-child { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #screencard .op.on { color:var(--fg); }
-  #screencard .op .bar { position:relative; height:6px; background:rgba(255,255,255,.07); border-radius:3px; }
-  #screencard .op .bar i { position:absolute; top:0; bottom:0; border-radius:3px; background:#80808f; }
-  #screencard .op.on .bar i { background:#ff9a3c; } #screencard .op .bar i.neg { background:#ff7a7a; }
+  #screencard .op .bar { position:relative; height:4px; background:rgba(255,255,255,.08); border-radius:2px; }
+  #screencard .op .bar i { position:absolute; top:0; bottom:0; border-radius:2px; background:var(--dim); }
+  #screencard .op.on .bar i { background:var(--fg); } #screencard .op .bar i.neg { background:var(--ui-live2, #ff6b8a); }
   #screencard .op .bar::after { content:""; position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:rgba(255,255,255,.25); }
-  #screencard .op b { font-weight:400; text-align:right; color:var(--dim); }
-  #screencard .restarting { padding:18px 0; text-align:center; color:var(--dim); font-size:12px; }
+  #screencard .op b { font-weight:400; font-family:var(--mono); text-align:right; color:var(--dim); }
+  #screencard .restarting { padding:18px 0; text-align:center; color:var(--dim); font-family:var(--mono); font-size:11px; }
+  .card .kw { font-family:var(--mono); font-size:10.5px; color:var(--fg2); margin-top:10px; line-height:1.5; }
+  .card .kw b { font-weight:400; color:var(--fg); }
+  .card .tn { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-top:10px; padding-top:8px;
+    border-top:1px solid var(--line); font-family:var(--mono); font-size:10.5px; color:var(--fg2); }
+  .card .tn b { font-family:var(--sans); font-weight:700; color:var(--fg); font-size:15px; white-space:nowrap; }
+  #memcard .it { display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--line); }
+  #memcard .it:last-child { border-bottom:0; }
+  #memcard .it span:last-child { flex:none; font-family:var(--mono); color:var(--dim); font-size:10.5px; white-space:nowrap; }
+  #memcard .it .y { color:var(--ui-proj, #2ee6c5); } #memcard .it .n { color:var(--ui-live2, #ff6b8a); }
+  #n-text { font-family:var(--mono); font-size:11.5px; }
+  .nm { display:flex; gap:10px; margin-top:8px; font-family:var(--mono); font-size:10px; color:var(--dim); }
+  .nm span { flex:1; } .nm i { display:block; height:3px; border-radius:2px; background:rgba(255,255,255,.1); margin-top:4px; overflow:hidden; }
+  .nm i i { margin:0; background:var(--fg); transition:width .6s; }
+  /* the map: a panel with a caption */
+  #map { height:240px; border-radius:8px; overflow:hidden; background:#0b0b0e; border:1px solid var(--line); }
   #mapcard.out #map { height:340px; }
-  /* bottom-left: the brain card and the disclaimer stack in one column, so the text can never cover the card */
-  #corner { position:fixed; left:28px; bottom:18px; right:420px; display:flex; flex-direction:column; align-items:flex-start; gap:10px;
-    z-index:5; pointer-events:none; }
-  #corner > * { pointer-events:auto; }
-  #brainpip { position:relative; flex:none; width:min(300px, 26vw); aspect-ratio:4/3; border:1px solid var(--line); border-radius:12px;
-    overflow:hidden; background:#000; z-index:5; display:block; box-shadow:0 10px 30px -14px rgba(0,0,0,.9); transition:border-color .25s; }
-  #brainpip:hover { border-color:rgba(255,255,255,.22); }
-  #brainpip iframe { width:100%; height:100%; border:0; pointer-events:none; }
-  #brainpip span { position:absolute; left:10px; bottom:8px; font-size:10px; letter-spacing:.08em; color:#c6c6d4; text-shadow:0 1px 4px #000; }
-  #brainpip.still { background:radial-gradient(circle at 50% 45%, rgba(255,140,60,.28), rgba(10,10,14,.9) 70%); }
-  #brainpip span::before { content:"◉ "; color:var(--st); }
-  #honest a { color:var(--dim); white-space:nowrap; } #honest a:hover { color:var(--fg); }
-  /* one line on desktop: the text is cut with an ellipsis, the /about link stays visible; hover or focus shows it all */
-  #honest { display:flex; gap:8px; align-items:baseline; max-width:min(92ch, 100%); }
-  #honest .tx { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #honest:hover .tx, #honest:focus-within .tx, #honest:focus .tx { white-space:normal; }
-  #honest { font-size:11px; color:var(--faint); line-height:1.55; text-shadow:0 1px 6px #000; max-width:92ch;
-    background:rgba(8,8,11,.55); padding:7px 10px; border-radius:8px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
-  /* with the mind on, the /about link line carries its caption, under the disclaimer (which stays one line) */
-  #honest .ln { flex:none; } #honest.mind { flex-wrap:wrap; row-gap:2px; } #honest.mind .ln { flex-basis:100%; }
-  #honest .cap { color:var(--dim); }
-  #dock { position:fixed; right:24px; bottom:18px; width:350px; z-index:5; }
-  /* the room's chat feed: viewers' messages and his replies */
-  #feed { display:flex; flex-direction:column; gap:5px; margin-bottom:8px; max-height:168px; overflow-y:auto; scrollbar-width:none; }
-  #feed::-webkit-scrollbar { display:none; }
-  #feed[hidden] { display:none; }
-  #feed .ln { font-size:11.5px; line-height:1.45; color:#c9c9d6; background:var(--card); border:1px solid var(--line); border-radius:8px;
-    padding:5px 9px; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); overflow-wrap:anywhere; }
-  #feed .ln .w { color:var(--faint); font-size:10px; margin-right:6px; }
-  #feed .ln.his { color:var(--fg); background:rgba(40,24,10,.82); border-color:rgba(255,154,60,.35); border-left:2px solid var(--st); }
-  #feed .ln.his .tag { display:inline-block; font-size:9.5px; letter-spacing:.06em; color:#0a0a0a; background:var(--st); border-radius:2px;
-    padding:0 5px; margin-right:6px; }
-  #feed .ln.his .re { display:block; font-size:10px; color:var(--dim); margin-top:1px; }
-  #chat { display:flex; gap:6px; }
-  #chat input { flex:1; min-width:0; background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.14); padding:11px 12px;
-    font:inherit; font-size:13px; border-radius:8px; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); transition:border-color .2s; }
-  #chat input:focus { outline:none; border-color:rgba(255,154,60,.6); }
-  #chat button { background:var(--fg); color:#0a0a0a; border:0; padding:0 16px; font:inherit; font-size:13px; border-radius:8px; cursor:pointer; }
-  #chat button:hover { background:#fff; }
-  #note { font-size:10px; color:var(--faint); margin-top:5px; min-height:1.2em; }
-  /* viewers (preview/interactive): the reactions bar and the viewer count in the dock, reactions floating up over the room */
-  #rx { display:flex; align-items:center; gap:4px; margin-bottom:6px; }
-  #rx button { flex:1 1 0; min-width:0; height:34px; font-size:17px; line-height:1; background:var(--card); border:1px solid var(--line); border-radius:8px;
-    cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); transition:transform .12s, border-color .2s; padding:0; }
-  #rx button:active { transform:scale(.9); } #rx button:hover { border-color:rgba(255,255,255,.25); }
-  #rx button.off { opacity:.45; }
-  #viewers { flex:none; font-size:10.5px; color:var(--dim); padding:0 4px 0 6px; white-space:nowrap; text-shadow:0 1px 6px #000; }
-  #viewers::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:#39f5a0; margin-right:5px; vertical-align:1px; }
+  .leaflet-container { background:#0b0b0e !important; font-family:var(--mono) !important; }
+  .leaflet-control-attribution { background:rgba(0,0,0,.6) !important; color:#6a6a7e !important; font-size:9px !important; }
+  .leaflet-control-attribution a { color:var(--dim) !important; }
+  .leaflet-bar a { background:#0e0e11 !important; color:var(--fg2) !important; border-color:var(--line) !important; }
+  .mk-me { filter:drop-shadow(0 0 5px rgba(255,255,255,.7)); }
+  .mk-courier { filter:drop-shadow(0 0 5px rgba(46,230,197,.7)); }
+  #m-cap { margin-top:8px; }
+
+  /* the brain: a square panel bottom right, above the dock, one caption under it */
+  #corner { position:fixed; right:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + 14px); z-index:5; display:flex; flex-direction:column;
+    align-items:flex-end; gap:7px; }
+  #brainpip { position:relative; display:block; width:120px; height:120px; background:#000; transition:border-color .25s var(--ease); }
+  #brainpip:hover { border-color:var(--line2); }
+  #brainpip iframe { position:absolute; left:0; top:0; width:240px; height:240px; border:0; pointer-events:none; transform:scale(.5); transform-origin:0 0; }
+  #brainpip.still { background:#000 url(/intro_brain_top.webp) 50% 45% / 86% auto no-repeat; }
+  #brainpip.still::after { content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,.55) 100%); }
+  #corner .ui-caption { color:var(--fg2); text-shadow:0 1px 6px #000; }
+
+  /* the dream frame while he sleeps (R3): above the fiction caption, bottom left; a link to /world */
+  #dream { position:fixed; left:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + 44px); width:min(220px, 26vw); z-index:5; display:block;
+    text-decoration:none; padding:6px; background:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
+  #dream img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; background:#0b0b0e; }
+  #dream span { margin-top:6px; color:var(--fg2); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.5; }
+  #dream b { font-weight:400; color:var(--ui-blue2, #8fb3ff); }
+
+  /* reactions floating up over the room */
   #rxfloat { position:fixed; inset:0; pointer-events:none; z-index:4; overflow:hidden; }
-  #rxfloat span { position:absolute; bottom:18%; font-size:26px; will-change:transform, opacity; animation:rxup var(--d, 3s) ease-out forwards;
-    filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+  #rxfloat span { position:absolute; bottom:22%; font-size:26px; will-change:transform, opacity; animation:rxup var(--d, 3s) ease-out forwards; }
   @keyframes rxup { 0% { transform:translate(0, 0) scale(.6); opacity:0; } 12% { opacity:1; transform:translate(0, -6vh) scale(1); }
     100% { transform:translate(var(--dx, 0px), -52vh) scale(1.05); opacity:0; } }
-  /* the vote on what he does next */
-  #votecard .opt { position:relative; display:flex; justify-content:space-between; gap:8px; align-items:center; width:100%; margin-top:6px;
-    background:var(--card2); color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:9px 10px; font:inherit;
-    font-size:12.5px; text-align:left; cursor:pointer; overflow:hidden; }
-  #votecard .opt .bar { position:absolute; left:0; top:0; bottom:0; background:rgba(255,154,60,.16); transition:width .4s; pointer-events:none; }
-  #votecard .opt span { position:relative; } #votecard .opt .n { color:var(--dim); font-size:11.5px; white-space:nowrap; }
-  #votecard .opt.mine { border-color:rgba(255,154,60,.7); } #votecard .opt.mine .n::before { content:"your vote · "; color:var(--st); }
-  #votecard .opt:disabled { cursor:default; }
-  #votecard .s.err { color:#ff8a8a; }
-  #note.err { color:#ff8a8a; }
-  #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); font-size:13px; color:#d8d8e2; background:rgba(8,8,11,.6);
-    border:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass);
-    padding:10px 16px; border-radius:8px; display:none; z-index:4; text-align:center; }
-  #boot { position:fixed; inset:0; display:grid; place-items:center; color:var(--dim); font-size:12px; z-index:3; pointer-events:none;
-    background:radial-gradient(ellipse at 50% 60%, #121218, #08080b 70%); transition:opacity .7s ease; }
+  #away { position:fixed; left:50%; top:52%; transform:translate(-50%,-50%); z-index:4; display:none; padding:10px 16px; text-align:center;
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--fg2); border:1px solid var(--line2);
+    border-radius:999px; background:rgba(0,0,0,.6); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  #boot { position:fixed; inset:0; display:grid; place-items:center; z-index:3; pointer-events:none; background:#000; color:var(--dim);
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; transition:opacity .7s ease; }
   #boot.off { opacity:0; }
-  #boot .w { font-size:34px; letter-spacing:.22em; color:var(--fg); margin-bottom:14px; text-align:center; }
-  #boot .w b { font-weight:normal; color:var(--or); }
-  #boot .bar { width:220px; height:2px; background:rgba(255,255,255,.1); margin-top:12px; overflow:hidden; border-radius:2px; }
-  #boot .bar i { display:block; height:100%; width:0; background:var(--or); transition:width .2s; box-shadow:0 0 8px var(--or); }
-  #boot.err { pointer-events:auto; color:#ff9a9a; }
-  #boot button { margin-top:10px; font:inherit; font-size:12px; background:var(--fg); color:#0a0a0a; border:0; padding:6px 12px; border-radius:5px; cursor:pointer; }
-  @media (max-width: 900px) {
-    html,body { overflow:auto; }
-    body { position:relative; }        /* body is the scroller: the scene and the header scroll away with the cards */
-    #scene { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
-    #vignette { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
-    #top { position:absolute; left:0; right:0; top:0; max-width:none; padding:12px 16px 18px;
-      background:linear-gradient(rgba(4,4,6,.82), rgba(4,4,6,.55) 70%, rgba(4,4,6,0)); }   /* phones: the header reads over any part of the room */
-    #story { font-size:15px; line-height:1.3; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    #state { font-size:11px; gap:8px; } #why { font-size:11px; margin-top:5px; color:#b9b9c6; }
-    /* phones: one short line at the foot of the room instead of in the header's flow - the header's height is the band
-       the camera gives up (hudBand), and two more lines there put his head out of a 360 px frame */
-    #fiction { position:absolute; left:16px; right:16px; top:calc(62vh - 124px); margin:0; font-size:10.5px; max-width:none;   /* (clear of the reactions bar and the connection pill) */
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #fiction .long { display:none; } #fiction .short { display:inline; } #night { font-size:11px; margin-top:5px; }
+  #boot .w { font-family:var(--sans); font-weight:800; font-size:34px; letter-spacing:-.04em; color:var(--fg); margin-bottom:12px; text-align:center; }
+  #boot .w b { font-weight:800; }
+  #boot .bar { width:220px; height:1px; background:var(--line); margin-top:14px; overflow:hidden; }
+  #boot .bar i { display:block; height:100%; width:0; background:var(--fg); transition:width .2s; }
+  #boot.err { pointer-events:auto; color:var(--ui-live2, #ff6b8a); }
+  #boot button { margin-top:10px; font-family:var(--mono); font-size:11px; background:var(--fg); color:#000; border:0; padding:6px 14px; border-radius:999px; cursor:pointer; }
+
+  /* ≤ 1100: the dock spans the width, the corner items ride above it */
+  @media (max-width:1100px) {
+    #top { max-width:calc(100vw - 2 * var(--gut) - 300px); }
+  }
+  /* ≤ 720 (phones): the header as on the front page, the dock full width above the pulse, no brain square */
+  @media (max-width:720px) {
+    :root { --gut:12px; --dockb:var(--pulse); }
+    #hdr { padding:10px var(--gut); gap:8px 12px; }
+    #hdr .ui-nav { order:5; width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+    #hdr .ui-nav::-webkit-scrollbar { display:none; }
+    #hdr .ui-clock { display:none; }
+    #reticle { display:none; }
+    #top { left:var(--gut); right:calc(var(--gut) + 84px); top:calc(var(--hdrh) + 14px); max-width:none; }
+    #story { font-size:clamp(20px, 6vw, 26px); line-height:1.08; }
+    #state { margin-top:8px; font-size:9.5px; letter-spacing:.12em; }
+    #tools { right:var(--gut); top:calc(var(--hdrh) + 14px); }
     #cam { display:none; }
-    #note { font-size:9.5px; }
-    #brand h1 { font-size:15px; } #state { margin-top:10px; } #why { max-width:none; }
-    #side { position:static; width:auto; max-height:none; margin:62vh 16px 0; }
-    #corner { position:static; display:block; }
-    #brainpip { display:block; width:auto; margin:12px 16px 0; }
-    #honest .tx { white-space:normal; } #honest { display:block; }
-    #honest { padding:12px 16px calc(22px + var(--dockh, 74px)); max-width:none; background:none; border-radius:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
-    /* phones: the dock is a bar of its own, opaque, across the bottom: the cards scroll under it cleanly instead of their
-       text showing through between its chips, input and note (#honest's bottom padding, --dockh, lets the last card clear it) */
-    #dock { left:0; right:0; width:auto; position:fixed; bottom:0; padding:8px 12px calc(8px + env(safe-area-inset-bottom));
-      background:rgba(8,8,11,.92); border-top:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-    /* phones: the fixed dock keeps only the newest line (two lines at most, its tag first) and the plan stays short */
-    #feed { margin-bottom:6px; } #feed .ln:not(:last-child) { display:none; } #feed .ln.his .re { display:none; }
-    #feed .ln { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-      padding:0 9px; border-top:5px solid transparent; border-bottom:5px solid transparent; box-shadow:0 0 0 1px var(--line); }
-    #feed .ln.his { border-top-color:transparent; border-bottom-color:transparent; box-shadow:0 0 0 1px rgba(255,154,60,.35); }   /* clipped at two lines: no padding for a third to show in */
-    #plan { max-width:none; font-size:10.5px; padding:4px 8px; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2;
-      -webkit-box-orient:vertical; overflow:hidden; } #plan .r { display:none; }
-    #away { top:36vh; width:calc(100vw - 64px); font-size:11.5px; padding:8px 10px; }
-    #rxfloat { position:absolute; inset:auto; top:0; left:0; right:0; height:62vh; }
-    #rx button { height:32px; font-size:16px; }
-  }
-
-  /* ===== preview/interactive: the simplified room page. The room is the hero; a minimal header; one tabbed panel
-     (Vote · Chat · Teach · More); a reactions pill; a round brain thumbnail. One card style, one radius (12 px). ===== */
-  :root { --r:12px; --panel:340px; --gap:20px; }
-  #top { left:var(--gap); top:var(--gap); max-width:min(560px, calc(100vw - var(--panel) - 3 * var(--gap))); }
-  #brand h1 { font-size:16px; padding:3px 8px 2px; }
-  #brand nav { font-size:12px; }
-  #brand nav a { padding:10px 7px; }
-  #state { margin-top:12px; font-size:12px; gap:10px; }
-  #chip { font-size:10.5px; }
-  #story { margin-top:8px; font-size:18px; line-height:1.35; }
-  #tools { display:flex; gap:8px; margin-top:10px; pointer-events:auto; }
-  #tools button, #cam { margin:0; min-height:32px; font:inherit; font-size:11px; color:var(--dim); background:rgba(10,10,16,.62);
-    border:1px solid var(--line); border-radius:var(--r); padding:6px 12px; cursor:pointer; backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-  #tools button:hover { color:var(--fg); border-color:rgba(255,255,255,.22); }
-  #todaybtn[aria-expanded="true"] { color:var(--fg); border-color:rgba(255,154,60,.5); }
-  #today { position:absolute; left:0; top:100%; margin-top:8px; width:min(440px, calc(100vw - 2 * var(--gap))); pointer-events:auto;
-    background:var(--card2); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; backdrop-filter:var(--glass);
-    -webkit-backdrop-filter:var(--glass); }
-  #today[hidden] { display:none; }
-  #today #why { margin:0; max-width:none; text-shadow:none; }
-  #today #plan { margin-top:8px; background:none; border:0; border-left:2px solid var(--st); border-radius:0; padding:2px 0 2px 10px; text-shadow:none; }
-
-  /* the panel: one glass card, tabs on top, the open tab's content scrolls inside it */
-  #side { right:var(--gap); top:var(--gap); width:var(--panel); gap:0; padding:0; max-height:calc(100vh - 2 * var(--gap)); overflow:hidden;
-    background:var(--card); border:1px solid var(--line); border-radius:var(--r); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-  #tabs { display:flex; gap:4px; padding:6px; border-bottom:1px solid var(--line); flex:none; }
-  #tabs button { flex:1; min-height:44px; font:inherit; font-size:12px; color:var(--dim); background:none; border:0; border-radius:8px; cursor:pointer;
-    display:inline-flex; align-items:center; justify-content:center; gap:6px; }
-  #tabs button:hover { color:var(--fg); }
-  #tabs button.on { color:var(--fg); background:rgba(255,255,255,.07); }
-  #tab-left { font-size:10.5px; color:var(--st); }
-  #tab-dot { width:6px; height:6px; border-radius:50%; background:var(--st); display:inline-block; }
-  #tab-dot[hidden] { display:none; }
-  .pane { display:none; overflow-y:auto; scrollbar-width:thin; padding:16px; flex:1; min-height:0; }
-  .pane.on { display:block; }
-  #side .card { background:none; border:0; border-radius:0; padding:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
-  #side .card + .card { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
-  .pane[data-pane="more"] > * { margin-top:0 !important; padding-top:0 !important; border-top:0 !important; }
-  .pane[data-pane="more"] > :not([hidden]) ~ :not([hidden]) { margin-top:18px !important; padding-top:16px !important;
-    border-top:1px solid var(--line) !important; }   /* (a divider only between sections that are shown) */
-  .card .k { font-size:10.5px; letter-spacing:.14em; margin-bottom:12px; }
-  .card .m { font-size:13px; } .card .t { font-size:14px; }
-  #votecard:not([hidden]) + .empty { display:none; }
-  .empty { color:var(--dim); font-size:13px; }
-  #votecard .opt { min-height:52px; font-size:13px; margin-top:8px; border-radius:var(--r); padding:12px 14px; }
-  #votecard .opt .bar { background:rgba(255,154,60,.18); }
-  /* More: collapsible sections (tap the label) */
-  .pane[data-pane="more"] .card > .k { cursor:pointer; user-select:none; margin-bottom:0; min-height:24px; }
-  .pane[data-pane="more"] .card > .k { justify-content:flex-start; }
-  .pane[data-pane="more"] .card > .k > :nth-child(2) { margin-left:auto; text-align:right; }
-  .pane[data-pane="more"] .card > .k::after { content:"▾"; color:var(--faint); padding-left:10px; }
-  .pane[data-pane="more"] .card > .k > :only-child { margin-right:auto; }
-  .pane[data-pane="more"] .card.shut > .k::after { content:"▸"; }
-  .pane[data-pane="more"] .card > .k + * { margin-top:12px; }
-  .pane[data-pane="more"] .card.shut > :not(.k) { display:none; }
-  #honest { display:block; background:none; padding:0; backdrop-filter:none; -webkit-backdrop-filter:none; text-shadow:none; font-size:10.5px; max-width:none; }
-  #honest .tx { white-space:normal; }
-  /* chat */
-  #dock { position:static; width:auto; }
-  #feed { max-height:none; margin-bottom:12px; }
-  #feed[hidden] { display:block; } #feed[hidden]::before { content:"No messages yet."; color:var(--dim); font-size:13px; }
-  #chat input, #chat button { min-height:44px; border-radius:var(--r); }
-  #teachcard input, #teachcard button { min-height:44px; border-radius:var(--r); font-size:13px; }
-  #teachcard .row { gap:8px; } #teachcard form { gap:8px; }
-  /* reactions: one pill at the bottom centre of the room */
-  #rxpill { position:fixed; left:calc((100vw - var(--panel) - var(--gap)) / 2); bottom:var(--gap); transform:translateX(-50%); z-index:6;
-    background:rgba(10,10,16,.72); border:1px solid var(--line); border-radius:999px; padding:4px 6px 4px 4px;
-    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-  #rx { margin:0; gap:2px; }
-  #rx button { flex:none; width:44px; height:44px; border:0; background:none; border-radius:50%; font-size:20px; backdrop-filter:none; -webkit-backdrop-filter:none; }
-  #rx button:hover { background:rgba(255,255,255,.08); }
-  #viewers { padding:0 10px 0 8px; font-size:11px; }
-  /* the brain: a small round thumbnail, bottom-left */
-  #corner { left:var(--gap); bottom:var(--gap); right:auto; }
-  #brainpip { width:72px; height:72px; aspect-ratio:auto; border-radius:50%; box-shadow:none; }
-  #brainpip iframe { width:300px; height:225px; transform:translate(-114px, -76px) scale(.5); transform-origin:center; }
-  #brainpip span { display:none; }
-  /* the dream frame while he sleeps (R3): the eye's newest image over the room, above the brain thumbnail; a link to /world */
-  #dream { position:fixed; left:var(--gap); bottom:calc(var(--gap) + 84px); width:min(220px, 24vw); z-index:5; display:block; text-decoration:none;
-    color:#c6c6d4; font-size:10.5px; line-height:1.4; background:rgba(8,8,11,.6); border:1px solid var(--line); border-radius:var(--r); padding:6px;
-    backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-  #dream[hidden] { display:none; }
-  #dream img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:8px; background:#0d0e13; }
-  #dream span { display:block; margin-top:5px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  #dream b { font-weight:normal; color:#c26bff; }
-
-  @media (max-width: 900px) {
-    #scene, #vignette, #rxfloat { height:56vh; }
-    #dream { position:absolute; left:auto; right:12px; bottom:auto; top:calc(56vh - 132px); width:140px; padding:4px; font-size:9.5px; }
-    #top { padding:12px 16px 18px; max-width:none; }
-    #story { font-size:15px; margin-top:6px; }
-    #tools { margin-top:8px; } #cam { display:none; }
-    #today { width:calc(100vw - 32px); }
-    #side { position:static; width:auto; max-height:none; margin:56vh 0 0; padding-top:26px; border:0; border-radius:var(--r) var(--r) 0 0; overflow:visible;
-      background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none; }
-    #tabs { position:sticky; top:0; z-index:3; margin:0 12px; padding:10px 0; background:var(--bg); border-bottom:0; }
-    #tabs { gap:0; } #tabs button { border:1px solid var(--line); border-radius:0; background:var(--card2); }
-    #tabs button:first-child { border-radius:var(--r) 0 0 var(--r); } #tabs button:last-child { border-radius:0 var(--r) var(--r) 0; }
-    #tabs button + button { border-left:0; }
-    #tabs button.on { background:rgba(255,255,255,.1); }
-    .pane { padding:8px 16px 32px; overflow:visible; }
+    #today { width:calc(100vw - 2 * var(--gut)); }
+    #fiction { left:var(--gut); right:var(--gut); max-width:none; bottom:calc(var(--dockb) + var(--dockh) + 10px); font-size:9px; letter-spacing:.12em;
+      white-space:normal; }
+    #fiction .long { display:none; } #fiction .short { display:inline; }
+    #side { width:auto; border-radius:0; border-left:0; border-right:0; border-bottom:0; }
+    #dockbar { padding:8px var(--gut); gap:8px; flex-wrap:wrap; }
+    #tabs { flex:1 1 auto; }
+    #tabs > button { flex:1; justify-content:center; padding:5px 6px; }
+    #dockhint { display:none; }
+    #dockbar > .ui-spacer { display:none; }
+    #rxpill { flex:1 1 100%; }
+    #rx { justify-content:space-between; }
+    #rx button { flex:1; height:30px; }
+    #panes { max-height:52vh; }
+    .pane { padding:12px var(--gut) 14px; }
+    .pane[data-pane="more"].on { grid-template-columns:minmax(0, 1fr); }
+    #tc-form { flex-wrap:wrap; } #tc-form #tc-text { flex:1 1 100%; }
     #corner { display:none; }
-    #honest { padding:0; }
-    #dock { position:static; padding:0; background:none; border:0; backdrop-filter:none; -webkit-backdrop-filter:none; }
-    #feed .ln:not(:last-child) { display:block; } #feed .ln { display:block; padding:5px 9px; border:1px solid var(--line); box-shadow:none; }
-    #feed .ln.his { border-color:rgba(255,154,60,.35); border-left:2px solid var(--st); box-shadow:none; }
-    #feed .ln.his .re { display:block; }
-    #chat { position:fixed; left:0; right:0; bottom:0; z-index:7; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-      background:rgba(8,8,11,.94); border-top:1px solid var(--line); backdrop-filter:var(--glass); -webkit-backdrop-filter:var(--glass); }
-    body:not([data-tab="chat"]) #chat { display:none; }
-    body[data-tab="chat"] .pane[data-pane="chat"] { padding-bottom:96px; }
-    #rxpill { position:absolute; left:50%; top:calc(56vh - 30px); bottom:auto; max-width:calc(100vw - 24px); }
-    #rx button { width:40px; height:44px; font-size:18px; }
-    #viewers { font-size:10.5px; padding:0 8px 0 4px; }
+    #dream { left:auto; right:var(--gut); width:140px; bottom:calc(var(--dockb) + var(--dockh) + 48px); }
+    #away { width:calc(100vw - 48px); border-radius:12px; }
   }
-  @media (max-width: 380px) { #rx button { width:34px; font-size:17px; } #viewers { font-size:10px; padding:0 6px 0 2px; } #rxpill { padding:3px 4px 3px 3px; } }
-  /* ui.css header look (2026-11): black wordmark, mono pill links, current page highlighted */
-  #brand { flex-wrap:wrap; }
-  #brand h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
-  #brand nav.ui-nav { font-size:12px; color:var(--ui-dim); gap:2px; flex-wrap:wrap; }
-  #brand nav.ui-nav a { color:var(--ui-dim); padding:6px 9px; border-radius:999px; text-transform:lowercase; }
-  #brand nav.ui-nav a:hover { color:var(--ui-fg); background:rgba(255,255,255,.06); }
-  #brand nav.ui-nav a.on { color:var(--ui-fg); background:rgba(255,255,255,.1); }
-  #brand nav.ui-nav a.on::after { content:none; }
-  #brand nav.ui-nav a.ext::after { content:" \2197"; display:inline; height:auto; margin:0; background:none; color:var(--ui-faint); }
-  @media (max-width:900px) { #brand h1.ui-wordmark { font-size:16px; } #brand nav.ui-nav a { padding:8px 7px; } }
+  @media (prefers-reduced-motion: reduce) {
+    #story.in, .pane.on, #rxfloat span { animation:none !important; }
+  }
 
   /* ===== ?embed: the room as a chromeless camera on him, inside the front page's "his screen" viewport (/room?embed in
      an iframe). Only the canvas (the room, the window and its sky) and the lens stay; every UI layer is hidden (and its
      JS kept, only guarded), and one dim caption line says what he is doing for 4 s after it changes ===== */
   html.embed, html.embed body { overflow:hidden !important; height:100%; }
-  body.embed :is(#top, #brand, #state, #story, #fiction, #night, #tools, #cam, #todaybtn, #today, #why, #plan, #side, #tabs, #dock,
-    #feed, #chat, #note, #honest, #corner, #brainpip, #dream, #rxpill, #rx, #rxfloat, #away, #mapcard, #map) { display:none !important; }
+  body.embed { padding:0 !important; }
+  body.embed :is(#hdr, #ui-pulse, #reticle, #hud, #top, #state, #story, #fiction, #night, #tools, #cam, #todaybtn, #today, #why, #plan, #side, #dockbar,
+    #tabs, #panes, #dock, #feed, #chat, #note, #honest, #corner, #brainpip, #dream, #rxpill, #rx, #rxfloat, #away, #mapcard, #map) { display:none !important; }
   body.embed #boot > div { display:none; }                     /* (the boot screen stays a dark field: no wordmark, no place name) */
   body.embed #scene, body.embed #vignette { position:fixed !important; inset:0 !important; height:auto !important; }
   body.embed #vignette { background:radial-gradient(ellipse at 50% 48%, transparent 50%, rgba(0,0,0,.5) 100%);
@@ -387,35 +342,52 @@
   @media (prefers-reduced-motion: reduce) { body.embed #vignette { animation:none; } #ecap { transition-duration:.4s; } }
 </style>
 </head>
-<body>
-<script>if (new URLSearchParams(location.search).has("embed")) { document.documentElement.classList.add("embed"); document.body.classList.add("embed"); }</script>
-<div id="scene"></div><div id="vignette"></div>
-<div id="boot"><div><div class="w">SUB<b>-</b>01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
+<body data-deck="03" data-pulse>
+<script>if (new URLSearchParams(location.search).has("embed")) { document.documentElement.classList.add("embed"); document.body.classList.add("embed"); document.body.removeAttribute("data-pulse"); }</script>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a class="on" href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">03 / 06</span>
+  </div>
+</header>
+<div id="scene"></div><div id="vignette"></div><div id="reticle" aria-hidden="true"></div>
+<div id="boot"><div><div class="w">SUB-01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
 <div id="top">
-  <div id="brand"><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a class="on" href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav></div>
-  <div id="state"><span id="live"></span><span id="chip">…</span><span id="clock"></span><span id="where"></span></div>
-  <div id="story">connecting…</div>
-  <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a model of brain activity. Not a person, not conscious. <a href="/about.html">about</a></span><span class="short">A simulated character. Not a person, not conscious. <a href="/about.html">about</a></span></div>
+  <h1 id="story">connecting…</h1>
+  <div id="state" class="ui-caption"><span id="chip"></span><span id="clock"></span><span id="where"></span><span id="next"></span></div>
+  <div id="fiction"><span class="long">A fictional character in a simulated life, driven by a brain model · Not a person, not conscious · <a href="/about.html">about</a></span><span class="short">A fictional character driven by a brain model · Not a person · <a href="/about.html">about</a></span></div>
   <div id="night" hidden></div>
-  <div id="tools"><button id="todaybtn" type="button" aria-expanded="false" aria-controls="today">today ▾</button>
-<button id="cam" class="on" title="follow what he is looking at, or move the camera freely">camera: follows him</button></div>
-  <div id="today" hidden>
-  <div id="why"></div>
-  <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's reading budget is used up; back tomorrow.</span></div>
+</div>
+<div id="hud" class="ui-hud">
+  <div id="tools"><button id="todaybtn" class="ui-btn" type="button" aria-expanded="false" aria-controls="today">today ▾</button><button id="cam" class="ui-btn on" type="button" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
+    <div id="today" class="ui-panel" hidden>
+      <div class="ui-caption">today · in his words</div>
+      <div id="why"></div>
+      <div id="plan" hidden><span id="p-text"></span><span class="r" id="p-reason"></span><span class="rs" id="p-rest" hidden>Resting: today's reading budget is used up; back tomorrow.</span></div>
+    </div>
   </div>
 </div>
 
 <div id="side">
-  <nav id="tabs" role="tablist" aria-label="panels">
-    <button type="button" role="tab" data-tab="vote" class="on" aria-selected="true">Vote <span id="tab-left"></span></button>
-    <button type="button" role="tab" data-tab="chat">Chat <i id="tab-dot" hidden></i></button>
-    <button type="button" role="tab" data-tab="teach">Teach</button>
-    <button type="button" role="tab" data-tab="more">More</button>
-  </nav>
-  <section class="pane on" data-pane="vote" role="tabpanel">
+  <div id="dockbar">
+    <nav id="tabs" class="ui-seg" role="tablist" aria-label="panels">
+      <button type="button" role="tab" data-tab="vote" aria-selected="false">vote <span id="tab-left"></span></button>
+      <button type="button" role="tab" data-tab="chat" aria-selected="false">chat <i id="tab-dot" hidden></i></button>
+      <button type="button" role="tab" data-tab="teach" aria-selected="false">teach</button>
+      <button type="button" role="tab" data-tab="more" aria-selected="false">more</button>
+    </nav>
+    <div class="ui-spacer"></div>
+    <div id="rxpill"><div id="rx" role="group" aria-label="react"></div></div>
+  </div>
+  <div id="panes">
+  <section class="pane" data-pane="vote" role="tabpanel">
   <div class="card" id="votecard" hidden>
-    <div class="k"><span>What next? · viewers vote</span><span id="v-left"></span></div>
+    <div class="k"><span>What next · viewers vote</span><span id="v-left"></span></div>
     <div id="v-opts"></div>
     <div class="s" id="v-note">one vote per viewer per round</div>
     <div class="s" id="v-last" hidden></div>
@@ -425,17 +397,18 @@
   <div class="card empty">The first round opens in a moment.</div>
   </section>
   <section class="pane" data-pane="chat" role="tabpanel">
-<div id="dock">
-  <div id="feed" hidden aria-live="polite"></div>
-  <form id="chat"><input id="msg" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button>send</button></form>
-  <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+  <div id="dock">
+    <div id="feed" aria-live="polite"></div>
+    <form id="chat"><input id="msg" class="ui-input" placeholder="say something to his brain…" autocomplete="off" maxlength="200"><button class="ui-btn primary">send</button></form>
+    <div id="note">words can make him curious, hungry or restless · no links, addresses or tickers</div>
+  </div>
   </section>
   <section class="pane" data-pane="teach" role="tabpanel">
   <div class="card" id="teachcard">
     <div class="k"><span>Teach him something</span><span id="tc-left"></span></div>
     <form id="tc-form">
-      <input id="tc-text" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
-      <div class="row"><input id="tc-nick" placeholder="nickname" autocomplete="off" maxlength="16"><button>teach</button></div>
+      <input id="tc-text" class="ui-input" placeholder="a word or a short phrase (max 6 words)" autocomplete="off" maxlength="80">
+      <input id="tc-nick" class="ui-input" placeholder="nickname" autocomplete="off" maxlength="16"><button class="ui-btn primary">teach</button>
     </form>
     <div class="s" id="tc-note">nickname optional · one per viewer per day · no links, addresses or tickers</div>
     <div class="h">Taught today</div>
@@ -481,26 +454,24 @@
     <div class="k"><span>Body</span><span id="n-food"></span></div>
     <div class="m" id="n-text"></div>
   </div>
-  <div class="card" id="mapcard">
+  <div class="card ui-panel" id="mapcard">
     <div class="k"><span id="m-k">Kichijōji, Tokyo</span><span id="m-st"></span></div>
     <div id="map"></div>
+    <div class="ui-caption" id="m-cap">where he is · simulated</div>
   </div>
   <div id="honest" tabindex="0" title="A fictional character living a simulated life, driven by a model of brain activity built from public MRI data. Each page is read for him and what he could do next is listed; his brain model reacts to each option and chooses."><span class="tx">A fictional character living a simulated life, driven by a model of brain activity built from public MRI data.
     Each page is read for him and what he could do next is listed; his brain model reacts to each option and chooses.</span>
     <span class="ln"><span class="cap" id="mind-cap"></span> <a href="/about.html">More on /about.</a></span></div>
-  
   </section>
+  </div>
 </div>
 
 <div id="corner">
-<a id="brainpip" href="/brain" title="open the brain"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy"></iframe><span>his brain, live · real fibres</span></a>
+<a id="brainpip" class="ui-panel" href="/brain" title="open the brain"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy" title="his brain"></iframe></a>
+<span class="ui-caption">his brain · live</span>
 </div>
-<a id="dream" href="/world.html" hidden title="an image an AI renders from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t"></span></a>
-<div id="rxpill">
-  <div id="rx" role="group" aria-label="react"><span id="viewers" title="people with the room open now">–</span></div>
-</div>
+<a id="dream" class="ui-panel" href="/world.html" hidden title="an image rendered from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t" class="ui-caption"></span></a>
 <div id="rxfloat" aria-hidden="true"></div>
-</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="importmap">
@@ -1351,7 +1322,7 @@ function panel(st){
     $("s-opts-h").textContent = `options considered${dec.page ? " on “" + dec.page.slice(0, 40) + (dec.page.length > 40 ? "…" : "") + "”" : ""} · brain response`;
     $("s-rows").innerHTML = optRows(dec.options);
     $("s-reason").textContent = dec.reason + (dec.outcome && !["opened", "done"].includes(dec.outcome) ? ` · ${dec.outcome}` : "")
-      + (dec.eyes && dec.eyes.source !== "ai" && dec.eyes.source ? " · options from the page's own links (" + (dec.eyes.why_local || "no AI") + ")" : "");
+      + (dec.eyes && dec.eyes.source !== "ai" && dec.eyes.source ? " · options from the page's own links (" + (dec.eyes.why_local || "the page reader is off") + ")" : "");
   }
   $("s-title").textContent = (st.title || "") + (st.channel ? ` — ${st.channel}` : ""); $("s-url").textContent = st.url || "";
   const w = st.video;                 // a video (#17): muted, for a bounded time, then the brain picks again
@@ -1500,13 +1471,12 @@ function hearReply(m, live){         // a reply is only ever shown with its tag
   if (live) typing = {at:performance.now(), n:String(m.text).length};
   chatDirty = true;
 }
-function renderFeed(){
-  const rows = talk.slice(-6);
-  put("feed", "hidden", !rows.length);
+function renderFeed(){                // the front page's chat lines: "nick text · hh:mm", his replies with their tag
+  const rows = talk.slice(-12), tm = t => t ? `<span class="tm"> · ${esc(t)}</span>` : "";
   put("feed", "innerHTML", rows.map(x => x.his
-    ? `<div class="ln his"><span class="tag">${esc(x.tag)}</span><span class="w">${esc(x.t)}</span>${esc(x.text)}`
-      + (x.re ? `<span class="re">to a viewer: “${esc(x.re.length > 60 ? x.re.slice(0, 58) + "…" : x.re)}”</span>` : "") + `</div>`
-    : `<div class="ln"><span class="w">a viewer · ${esc(x.t)}</span>${esc(x.text)}</div>`).join(""));
+    ? `<div class="cl me"><span class="av">S</span><span class="tx"><span class="nk">SUB-01</span>${esc(x.text)} <span class="tag">${esc(x.tag)}</span>${tm(x.t)}`
+      + (x.re ? `<span class="re">to a viewer: “${esc(x.re.length > 60 ? x.re.slice(0, 58) + "…" : x.re)}”</span>` : "") + `</span></div>`
+    : `<div class="cl"><span class="av">${esc((x.nick || "viewer")[0])}</span><span class="tx"><span class="nk">${esc(x.nick || "viewer")}</span>${esc(x.text)}${tm(x.t)}</span></div>`).join(""));
   const f = $("feed"); f.scrollTop = f.scrollHeight;
 }
 // the monitor while he answers chat: a plain chat window, his reply typing out
@@ -1573,6 +1543,8 @@ function renderPlan(){
   put("p-reason", "textContent", steps.length && p.reason ? p.reason : "");
   put("p-reason", "hidden", !(steps.length && p.reason));
   put("p-rest", "hidden", !mindResting);
+  const nx = steps.find(s => !s.done);                 // (the state line's "next: …")
+  put("next", "textContent", nx ? `next: ${nx.label}` : "");
 }
 // a hidden tab polls nothing: a load that comes due while it is hidden (its interval, a socket message, the vote's clock)
 // is noted and runs once when the tab is seen again (the cards are up to date as it comes back, and not a byte sooner)
@@ -3367,7 +3339,7 @@ function drawArea(a){
 }
 fetch("tokyo_area.json").then(r => r.json()).then(drawArea);
 const dot = (c, r, cls) => L.circleMarker([0, 0], {radius:r, color:"#0a0a0d", weight:1.5, fillColor:c, fillOpacity:1, className:cls});
-let homeMk, meMk = dot("#ff9a3c", 7, "mk-me"), courierMk = dot("#39f5a0", 6, "mk-courier"), routes = null;
+let homeMk, meMk = dot("#ffffff", 7, "mk-me"), courierMk = dot("#39f5a0", 6, "mk-courier"), routes = null;
 fetch("tokyo_routes.json").then(r => r.json()).then(d => {
   routes = d; homeMk = L.circleMarker(d.places.home, {radius:6, color:"#ececf2", weight:1.5, fillColor:"#ececf2", fillOpacity:.15}).addTo(map).bindTooltip("home");
   meMk.setLatLng(d.places.home).addTo(map);
@@ -3435,11 +3407,12 @@ function onAudienceHello(a){
   RX = a.reactions || [];
   const bar = $("rx"); bar.querySelectorAll("button").forEach(b => b.remove());
   RX.forEach((e, k) => { const b = document.createElement("button"); b.type = "button"; b.textContent = e; b.title = "react";
-    b.addEventListener("click", () => react(k)); bar.insertBefore(b, $("viewers")); });
+    b.addEventListener("click", () => react(k)); bar.appendChild(b); });
   viewersText(a.viewers);
   if (a.vote) { voteLast = a.vote.last; setRound(a.vote.round); if (a.vote.waiting) voteNote(`viewers voted “${a.vote.waiting.label}” · waiting until he is awake`); }
 }
-function viewersText(n){ if (typeof n === "number") put("viewers", "textContent", `${n} watching`); }
+let viewers = 0;                                          // (shown by the header's live chip, written by pulse.js)
+function viewersText(n){ if (typeof n === "number") viewers = n; }
 function setRound(r){
   vote = r; voteMine = r && typeof r.mine === "number" ? r.mine : null;
   voteEnds = r ? performance.now() + r.ends_in * 1000 : 0; renderVote();
@@ -3515,17 +3488,19 @@ function floatUp(counts){                                 // the reactions since
 // ---------- the panel's tabs (Vote · Chat · Teach · More) and the header's "today" toggle (preview/interactive) ----------
 {
   const tabs = [...document.querySelectorAll("#tabs [data-tab]")], panes = [...document.querySelectorAll(".pane[data-pane]")];
-  const set = t => {
-    document.body.dataset.tab = t;
+  $("side").classList.add("ui-dock");
+  const set = t => {                                    // t = "" folds the dock to its segmented row
+    document.body.dataset.tab = t; $("side").classList.toggle("open", !!t);
     for (const b of tabs) { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }
     for (const p of panes) p.classList.toggle("on", p.dataset.pane === t);
     if (t === "chat") { $("tab-dot").hidden = true; const f = $("feed"); f.scrollTop = f.scrollHeight; }
     if (t === "more") window.dispatchEvent(new Event("resize"));     // (the map sizes itself once it can be seen)
     try { localStorage.setItem("sub01.tab", t); } catch (e) {}
   };
-  for (const b of tabs) b.addEventListener("click", () => set(b.dataset.tab));
+  for (const b of tabs) b.addEventListener("click", () => set(document.body.dataset.tab === b.dataset.tab ? "" : b.dataset.tab));
+  addEventListener("keydown", ev => { if (ev.key === "Escape" && document.body.dataset.tab && !(ev.target.closest && ev.target.closest("input, textarea"))) set(""); });
   let saved = null; try { saved = localStorage.getItem("sub01.tab"); } catch (e) {}
-  set(tabs.some(b => b.dataset.tab === saved) ? saved : "vote");
+  set(tabs.some(b => b.dataset.tab === saved) ? saved : "");
   for (const k of document.querySelectorAll('.pane[data-pane="more"] .card > .k')) k.addEventListener("click", ev => {
     if (ev.target.closest("a")) return; k.parentElement.classList.toggle("shut"); window.dispatchEvent(new Event("resize")); });
   new MutationObserver(() => { if (document.body.dataset.tab !== "chat") $("tab-dot").hidden = false; })   // a new chat line
@@ -3551,7 +3526,7 @@ function put(id, prop, v){ const k = id + "." + prop; if (shown.get(k) === v) re
 let reTimer = 0, retry = 0, full = null, gotHello = false, tickAt = 0, tickWatch = 0, drawn = 0;
 const FULL_TXT = {ip:"too many tabs open on this address · retrying in a moment", all:"the room is full · retrying in a moment"},
       LOST_TXT = "connection lost · reconnecting…", SLOW_TXT = "cannot reach his room · still trying";
-function offline(text){ $("live").classList.remove("on"); $("story").textContent = text; put("chip", "textContent", "…");
+function offline(text){ $("story").textContent = text; put("chip", "textContent", "");
   for (const k of ["story.innerHTML", "chip.textContent", "chip.background"]) shown.delete(k); }   // (the next tick rewrites them)
 function reconnect(ms){ clearTimeout(reTimer); reTimer = setTimeout(() => { reTimer = 0; connect(); }, ms); }
 function connect(){
@@ -3573,7 +3548,7 @@ function connect(){
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.type === "full") { full = m.why === "ip" ? "ip" : "all"; offline(FULL_TXT[full]); return; }
-    if (m.type === "hello") { gotHello = true; $("live").classList.add("on"); }
+    if (m.type === "hello") gotHello = true;
     if (m.type === "tick") { tickAt = drawn; retry = 0; }
     if (m.type !== "chess") deskEv(m);  // (chess: onChess, the fetch's too)
     if (m.type === "chat_ack") { $("note").textContent = m.ok ? "sent · it reaches his brain first" : `not sent: ${m.reason}`; $("note").className = m.ok ? "" : "err"; return; }
@@ -3584,14 +3559,14 @@ function connect(){
     if (m.type === "nights") { onNights(m); return; }
     if (m.type === "hello") {          // the latest chat and his replies, merged by time (hh:mm); what is playing
       if ("music" in m) { musicNow = m.music ? {...m.music, card:musicNow && m.music && musicNow.id === m.music.id ? musicNow.card : null} : null; renderMusic(); }
-      talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || "")})),
+      talk = [...(m.chat || []).map(c => ({his:false, t:c.t || "", text:String(c.text || ""), nick:c.nick || ""})),
               ...(m.replies || []).map(r => ({his:true, t:r.t || "", text:String(r.text || ""), re:r.replying_to || "", tag:r.tag || REPLY_TAG}))]
         .filter(x => x.text).map((x, i) => [x, i]).sort((a, b) => a[0].t < b[0].t ? -1 : a[0].t > b[0].t ? 1 : a[1] - b[1]).map(a => a[0]).slice(-40);
       typing = null; chatDirty = true; renderFeed();
       if (m.audience) onAudienceHello(m.audience);
       return;
     }
-    if (m.type === "chat") { if (m.text) { addTalk({his:false, t:m.t || "", text:String(m.text)}); chatDirty = true; renderFeed(); } return; }
+    if (m.type === "chat") { if (m.text) { addTalk({his:false, t:m.t || "", text:String(m.text), nick:m.nick || ""}); chatDirty = true; renderFeed(); } return; }
     if (m.type === "chat_reply") { hearReply(m, true); renderFeed(); return; }
     if (m.type === "plan") { if (m.steps) { mindPlan = m; renderPlan(); } return; }
     if (m.type === "teach_ack") {
@@ -3674,11 +3649,10 @@ function applyTick(m){
     if (stage !== stageWas) { const asleep = stage !== "AWAKE"; stageWas = stage; dreamCard();          // (a stage change: the dream frame, the vote note)
       if (asleep && vote) voteNote("he is asleep · the winning option reaches his activity model when he wakes"); }
     const hm = /(\d+):(\d+)/.exec(sl.clock || ""); if (hm && !FIXED_HOUR) hour = +hm[1] + hm[2] / 60;
-    put("chip", "textContent", sl.stage === "AWAKE" ? "AWAKE" : sl.stage === "REM" ? "REM" : "ASLEEP");
-    put("chip", "background", sl.stage === "AWAKE" ? "#ff9a3c" : sl.stage === "REM" ? "#c26bff" : "#4d7cff");
+    put("chip", "textContent", sl.stage === "AWAKE" ? "awake" : sl.stage === "REM" ? "REM · dreaming" : "NREM · asleep");
     put("clock", "textContent", `${sl.clock || ""} Tokyo`);
     const outside = outsideOf(life);
-    put("where", "textContent", outside ? "· out in Kichijōji" : "· in his room");
+    put("where", "textContent", outside ? "out in Kichijōji" : "in his room");
     const r = life.reading, sc = life.screen;
     const short = t => t && t.length > 70 ? t.slice(0, 68) + "…" : t;
     story(life, outside);
@@ -3716,8 +3690,10 @@ function applyTick(m){
       + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : ""));
 }
 if (!(DEBUG && new URLSearchParams(location.search).has("nolive"))) connect();
-// the side cards stop above the dock, whatever the chat feed's height
-new ResizeObserver(() => document.documentElement.style.setProperty("--dockh", `${Math.ceil($("dock").offsetHeight) + 18}px`)).observe($("dock"));
+// the corner captions (fiction, the brain square, the dream frame) ride above the dock, open or folded, and the HUD under
+// the header follows the header's height (two rows on phones)
+new ResizeObserver(() => document.documentElement.style.setProperty("--dockh", `${Math.ceil($("side").offsetHeight)}px`)).observe($("side"));
+new ResizeObserver(() => document.documentElement.style.setProperty("--hdrh", `${Math.ceil($("hdr").offsetHeight)}px`)).observe($("hdr"));
 $("chat").addEventListener("submit", ev => {
   ev.preventDefault(); const t = $("msg").value.trim(); if (!t) return;
   if (!sock || sock.readyState !== 1) { $("note").textContent = "still connecting"; $("note").className = "err"; return; }
@@ -3982,5 +3958,6 @@ if (DEBUG) { Object.assign(window, {THREE, scene, camera, controls, renderer, cl
 }
 // ===== end #98 G3 =====
 </script>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>
