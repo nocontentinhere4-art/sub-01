@@ -72,7 +72,7 @@
   .bcv.loading::before { content:""; position:absolute; left:18%; right:18%; top:10%; bottom:10%; border-radius:46% 46% 42% 42%;
     background:linear-gradient(100deg, rgba(63,123,255,.06) 30%, rgba(63,123,255,.18) 50%, rgba(63,123,255,.06) 70%) 0 0/250% 100%;
     animation:shim 1.4s linear infinite; }
-  .bcv.loading::after { content:"loading his wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
+  .bcv.loading::after { content:"loading the wiring…"; position:absolute; left:0; right:0; bottom:4%; text-align:center;
     font-family:var(--ui-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ui-faint); }
   @keyframes shim { from { background-position:100% 0; } to { background-position:-150% 0; } }
   .bcv .orient { position:absolute; font-family:var(--ui-mono); font-size:9px; letter-spacing:.14em; color:var(--ui-faint); text-transform:uppercase; }
@@ -229,7 +229,7 @@
 <body>
 <header class="ui-hdr" id="hdr">
   <a class="ui-wordmark" href="/">SUB-01<small>a brain, decoded live</small></a>
-  <nav class="ui-nav" aria-label="pages"><a class="on" href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="https://city.subzerone.live/" class="ext" target="_blank" rel="noopener">city</a></nav>
+  <nav class="ui-nav" aria-label="pages"><a class="on" href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a></nav>
   <div class="ui-spacer"></div>
   <div class="h-state">
     <span class="ui-chip live off" id="h-live"><i class="ui-dot"></i><span id="h-live-t">connecting</span></span>
@@ -310,7 +310,7 @@
         <div class="fmeta" id="f-why" hidden></div>
       </div>
       <div class="fsec">
-        <div class="ui-label"><span><b>Up next</b></span><span class="tag teal">voted by his brain model</span></div>
+        <div class="ui-label"><span><b>Up next</b></span><span class="tag teal">planned by the model</span></div>
         <div id="f-plan">…</div>
         <ul id="f-steps"></ul>
       </div>
@@ -318,7 +318,7 @@
         <div class="ui-label"><span><b>Chat</b> · every message is a stimulus</span><span id="f-n"></span></div>
         <div id="f-chat" aria-live="polite"></div>
         <form id="f-form" autocomplete="off"><input class="ui-input" id="f-msg" maxlength="200" placeholder="send a stimulus…" aria-label="message"><button class="ui-btn" type="submit">send</button></form>
-        <div id="f-ack">max 200 characters · no links, addresses or tickers · it reaches his model as words</div>
+        <div id="f-ack">max 200 characters · no links, addresses or tickers · it enters the model as a stimulus pattern</div>
       </div>
     </div>
   </section>
@@ -328,7 +328,7 @@
   <p class="ui-honest">Simulated activity on one real person's public MRI wiring. A model, not a mind: it does not feel, think or understand.
     The character, his room and his life are fiction. Numbers and credits: <a href="/about.html">/about.html</a>.
     <span id="f-slow"></span></p>
-  <a class="go" href="/brain">open the 3D brain →</a>
+  <a class="go" href="/brain">open the 3D model →</a>
 </footer>
 
 <script>
@@ -519,7 +519,7 @@ function handle(m){
     case "chat_reply": replyLine(m); return;
     case "chat_ack": {
       const el = $("f-ack");
-      el.textContent = m.ok ? (m.will_reply ? "sent · it travels along his fibres · his model may reply (AI-written)" : "sent · it travels along his fibres")
+      el.textContent = m.ok ? (m.will_reply ? "sent · propagating along the model's fibre tracts · a reply may follow (AI-written)" : "sent · propagating along the model's fibre tracts")
                             : `not sent: ${m.reason || "try again later"}`;
       el.className = m.ok ? "ok" : "err";
       if (m.ok) $("f-msg").value = "";
@@ -984,7 +984,7 @@ function renderFeed(){
   if (S.note && S.note.summary) { note.hidden = false; putH("f-note", `<span class="tag">notes written by an AI</span>${esc(trunc(S.note.summary, 200))}`); }
   else note.hidden = true;
   const why = $("f-why");
-  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">why his model clicked</span>${esc(trunc(S.decision.reason, 200))}`); }
+  if (S.decision && S.decision.reason) { why.hidden = false; putH("f-why", `<span class="tag teal">the model's reason for the page</span>${esc(trunc(S.decision.reason, 200))}`); }
   else why.hidden = true;
   const p = S.plan;
   if (p && (p.text || p.steps)) {
@@ -1055,11 +1055,11 @@ function pulseResp(){
 
 // ---------------------------------------------------------------- hero
 const HERO = [
-  ["A brain, decoded live.", "A model of one person's brain wiring, running all day, drives a fictional guy in a Tokyo room. These are model readouts, not measurements of anyone."],
-  ["Real wiring. One model. All day.", "214 regions from one public MRI scan, coupled along its real fibres. A simulation that runs around the clock, not a recording."],
-  ["Watch what his brain does with what he watches.", "His model picks the pages and videos; the traces below are the model's response to them. Nobody's feelings are shown here."],
-  ["Attention, arousal, load: read from the model, not from anyone.", "Each number is a formula over simulated activity against its own baseline (50). Nothing on this page is measured from a person."],
-  ["He sleeps. It replays.", "At night the model cycles through NREM and REM and replays the day's words. He is fiction; the replays are model output, not dreams."],
+  ["A brain model, decoded live.", "A whole-brain simulation built on one person's public MRI wiring, running continuously. Every number on this page is a model readout, not a measurement of anyone."],
+  ["214 regions. Real tractography. One coupled model.", "Regions coupled along fibre tracts from diffusion MRI, with conduction delays, stepped at 10 Hz. Simulated activity, not a recording."],
+  ["Stimuli in. Readouts out.", "Messages and the model's own browsing enter as stimulus patterns. Attention, arousal, cognitive load and neural activity are formulas over simulated activity against its own baseline (50)."],
+  ["A sleep circuit, modelled.", "At night a sleep model cycles the simulation through NREM and REM and replays the day's inputs. Nobody's sleep is recorded; the replays are model output."],
+  ["A model, not a mind.", "It does not feel, think or understand. The room and the character are fiction, a way to make a running simulation watchable. Method and data credit: /about.html."],
 ];
 let heroI = 0;
 function heroNext(){
