@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUB-01 · brain</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="A brain model on one person's real MRI wiring, drawn in 3D as it runs. Not measured from anyone.">
+<meta name="description" content="A brain model on one person's real MRI wiring, drawn in 3D as it runs.">
 <link rel="canonical" href="/brain">
 <link rel="stylesheet" href="/ui.css">
 <link rel="stylesheet" href="/neurons.css">
@@ -325,7 +325,7 @@
 
   <!-- the levels in the model, read from the tick (no extra request); written by metersTick() -->
   <aside class="ui-rail right ui-in" style="--i:2" id="meters" aria-label="levels in the model">
-    <div class="ui-caption rail-k">model index · 100 = awake at rest · not measured from anyone</div>
+    <div class="ui-caption rail-k">model index · 100 = awake at rest</div>
     <span class="vh">simulated levels in the model: a model's variables, not feelings</span><span class="vh" id="mt-stage"></span>
     <div class="ui-num" id="mt-da"><span class="ui-big v">—</span><span class="b ref"><i></i></span><span class="ui-caption">dopamine · wanting</span>
       <canvas id="da" width="328" height="56" aria-label="dopamine over the last two minutes"></canvas><span class="ui-caption" id="mt-dab">no burst in 10 min</span></div>
@@ -344,7 +344,7 @@
       <span class="ui-big" id="busy-v">—</span><span class="ui-word" id="busy-w"></span>
       <span class="ui-caption" id="mt-top">reading the regions…</span>
     </div>
-    <p id="honest">a model on one person's real wiring · not measured from anyone</p>
+    <p id="honest">a model on one person's real wiring</p>
     <button class="ui-btn" id="day-t" aria-controls="day" aria-expanded="false">his day · diary, screens, sleep</button>
   </div>
 

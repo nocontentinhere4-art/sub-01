@@ -3,7 +3,7 @@
 Every page is one slide of the same deck. Same chrome, same tokens, same motion, same voice. Black ground, bold
 white Helvetica headlines with tight tracking, small uppercase mono captions. Red = live, teal = projected,
 blue = the brain at baseline. No orange anywhere. No shadows; hairline borders. A model, not a mind; the character
-is fiction; no "AI" wording; plain sentences, no punch fragments. Readouts are "not measured from anyone".
+is fiction; no "AI" wording; plain sentences, no punch fragments. The line "not measured from anyone" is out (owner, 11-02): readouts are "model readouts", nothing more.
 References (Refero): Active Theory and cthdrl (void canvas, peripheral HUD, mono notation), Gt-planar (outlined
 mono tags, hairlines), Julia Krantz (contact sheet with 1 px seams), Luma Genie (full-bleed 3D with a quiet HUD),
 Dovetail (compact command-center density), plus the owner's "Humans Decoded" screenshots in ref/.

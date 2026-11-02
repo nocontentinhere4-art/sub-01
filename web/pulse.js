@@ -3,7 +3,7 @@
 // not awake. It also keeps the header's clock (#ui-clock) and live chip (#ui-live, #ui-live-t) up to date.
 // The readouts are named attention, alertness, effort, activity (phones: AT · AL · EF · AC). window.SUB01Pulse.spike()
 // sends a bright pulse along the strip (any page may call it; it also fires when the socket receives a "chat" message).
-// The readouts are formulas over the model's simulated activity (as on web/live.html), not measured from anyone.
+// The readouts are formulas over the model's simulated activity (as on web/live.html).
 // One WebSocket (/ws?rate=5&q=1) per page; <body data-pulse="feed"> opens none: the page passes its own messages to
 // window.SUB01Pulse.feed(msg) and its socket state to window.SUB01Pulse.online(bool).
 (() => {
@@ -28,7 +28,7 @@
   // ---------------------------------------------------------------- the strip
   const root = document.createElement("div");
   root.id = "ui-pulse"; root.setAttribute("role", "group"); root.setAttribute("aria-label", "live readouts");
-  root.title = "Attention · alertness · effort · activity, the last 60 s. Model readouts, not measured from anyone. 50 = his own baseline.";
+  root.title = "Attention · alertness · effort · activity, the last 60 s. Model readouts. 50 = his own baseline.";
   const cv = document.createElement("canvas"); cv.setAttribute("aria-hidden", "true");
   const vals = document.createElement("div"); vals.className = "ui-pulse-vals";
   const stageEl = document.createElement("span"); stageEl.className = "ui-chip ui-pulse-stage"; stageEl.hidden = true;
