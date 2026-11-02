@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SUB-01 · room</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>SUB-01 · room</title><meta name="description" content="A fictional guy in a Tokyo room, driven by a brain model built on one person's public MRI wiring. Watch the room live, vote on what he does next, send him a message."><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="/ui.css">
 <style>
@@ -353,7 +353,7 @@
     <span class="ui-counter" id="ui-counter">03 / 06</span>
   </div>
 </header>
-<div id="scene"></div><div id="vignette"></div><div id="reticle" aria-hidden="true"></div>
+<main id="main" aria-label="his room"><div id="scene"></div></main><div id="vignette"></div><div id="reticle" aria-hidden="true"></div>
 <div id="boot"><div><div class="w">SUB-01</div><div id="boot-t">loading his room in Kichijōji…</div><div class="bar"><i id="boot-bar"></i></div></div></div>
 <div id="away"></div>
 <div id="top">
@@ -466,10 +466,10 @@
 </div>
 
 <div id="corner">
-<a id="brainpip" class="ui-panel" href="/brain" title="open the brain"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy" title="his brain"></iframe></a>
+<a id="brainpip" class="ui-panel" href="/brain" title="open the brain" aria-label="his brain, live: open the brain page"><iframe data-src="/brain?mini" tabindex="-1" loading="lazy" title="his brain"></iframe></a>
 <span class="ui-caption">his brain · live</span>
 </div>
-<a id="dream" class="ui-panel" href="/world.html" hidden title="an image rendered from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t" class="ui-caption"></span></a>
+<a id="dream" class="ui-panel" href="/world.html" hidden aria-label="an image rendered while he sleeps: open what it sees" title="an image rendered from the brain model's state while it sleeps; a model, not a mind"><img id="dream-img" alt=""><span id="dream-t" class="ui-caption"></span></a>
 <div id="rxfloat" aria-hidden="true"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
