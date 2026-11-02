@@ -63,7 +63,7 @@ save tokens, and checks the work.
 | Intro deck on the first visit per session (decision 11) | owner (decision) | **done, committed** (dc00bd0) |
 | 3D room in the viewport: `?embed` and the postMessage contract (decision 12) | owner (decision) | **done, committed** (95b2450, 20f1c92); run in headless Chromium only; cost open |
 | Motion polish: blooms, glow, halo, flashes, grid fade-in (decision 13) | owner (decision) | **done, committed** (20f1c92); no measurable cost under software GL |
-| No AI wording on any page (decision 14) | owner (decision) | **done, committed** (8b29e26, 112a96c, 20f1c92); `docs/HANDOFF.md` still states the old rule |
+| No AI wording on any page (decision 14) | owner (decision) | **done, committed** (8b29e26, 112a96c, 20f1c92); the API tags followed (167c6f7) |
 | Writing pass by hand (decision 15) | owner (decision) | **done** (the plugins could not load in that session) |
 | Docs: this file, `SPEC.md`, `decoded/README.md`, `OPERATIONS.md`, `HANDOFF.md` | docs agent | **done** |
 
@@ -77,7 +77,7 @@ save tokens, and checks the work.
 - **Owner decision: `about.html`'s section "The coin".** Left in place with the MINT code; reduced to one contract-address line in 3430e25. Remove or keep.
 - **Owner decision: the chat-reply voice.** His replies keep the casual voice from `mind.py`. Should they take the
   scientific register too?
-- **Docs:** `docs/HANDOFF.md` still states the hard rule "AI-written text is labelled", which decision 14 supersedes. Update it in the next docs pass.
+- **Clips for X posts** (`clips.py`, see docs/HANDOFF.md): every frame still carries the corner label "AI · fictional character" and the hashtags #AI #AIgenerated. Left as is: labelling generated media on a platform is the owner's call.
 - **Server label:** `live_server.py` still sends `mind_read.tag` as "notes written by an AI" (and `tests/test_mind_live.py` checks it). The page does not show that string (it shows "his notes"). Change it with the next server edit, and then the SPEC line for `mind_read`.
 - **Rust:** answered (decision 9). Nothing to do unless performance becomes a problem.
 
