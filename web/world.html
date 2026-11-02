@@ -3,125 +3,186 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SUB-01 · world</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>SUB-01 · what it sees</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="description" content="What the brain model sees: one view at a time, rendered from its state and from chat messages.">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  :root { --bg:#040406; --fg:#ececf2; --dim:#7a7a8c; --or:#ff6a00; }
+  /* SUB-01 · 05 sees: a single-frame viewer. The frame is the page; a 56 px filmstrip under it (newest at the right);
+     ← → move one frame, Home / End jump (body[data-keys]: deck.js leaves the arrows to the page, [ ] still change pages).
+     Tokens, header, .ui-title, .ui-caption, .ui-chip come from /ui.css (v2). */
+  :root { --gut:clamp(16px, 2.4vw, 32px); --strip:56px; }
   * { box-sizing:border-box; }
-  html,body { margin:0; background:var(--bg); color:var(--fg); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  header { display:flex; align-items:center; flex-wrap:wrap; gap:14px; padding:18px 28px 14px; }
-  header h1 { margin:0; font-size:20px; letter-spacing:.16em; background:var(--or); color:#0a0a0a; padding:3px 10px 2px; border-radius:2px; }
-  header .sub { color:var(--dim); font-size:12px; }
-  header .sub a { text-decoration:none; padding:4px 6px; border-radius:4px; transition:color .2s, background .2s; }
-  header .sub a:hover { color:var(--fg); background:rgba(255,255,255,.06); }
-  #stage { color:var(--or); }
-  main { display:grid; grid-template-columns: 1fr 320px; gap:24px; padding:0 28px 18px; }
-  #view { position:relative; width:100%; aspect-ratio:16/9; background:radial-gradient(ellipse at 50% 60%, #15151d, #040406); border:1px solid #1c1c26;
-    border-radius:10px; overflow:hidden; box-shadow:0 20px 50px -24px #000; }
-  #view img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 3s ease; }
-  #view img.on { opacity:1; }
-  #thought { position:absolute; left:0; right:0; bottom:0; padding:22px 26px; font-size:22px; font-style:italic;
-    background:linear-gradient(transparent, rgba(0,0,0,.8)); text-shadow:0 1px 8px #000; }
-  #why { color:var(--dim); font-size:12px; margin-top:8px; min-height:2.4em; }
-  aside .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin:4px 0 8px; }
-  #world div { display:flex; justify-content:space-between; font-size:13px; padding:3px 0; border-bottom:1px solid #111118; }
-  #world span:last-child { color:var(--dim); }
-  #strip { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:10px; padding:0 28px 18px; }
-  #strip figure { margin:0; font-size:11px; color:var(--dim); line-height:1.4; }
-  #strip img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; border:1px solid #1c1c26; margin-bottom:4px; transition:border-color .2s; }
-  #strip figure:hover img { border-color:#3a3a4a; }
-  #strip figure, #view { cursor:zoom-in; }
-  /* the lightbox: any image full screen (a viewer could not open them: clicks did nothing); arrows, Esc, a click outside */
-  #lb { position:fixed; inset:0; z-index:20; background:rgba(2,2,4,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; cursor:zoom-out; }
-  #lb[hidden] { display:none; }
-  #lb img { max-width:100%; max-height:calc(100vh - 110px); object-fit:contain; border-radius:8px; box-shadow:0 30px 80px -30px #000; cursor:default; }
-  #lb figcaption { margin-top:12px; font-size:13px; color:#c6c6d4; text-align:center; max-width:90ch; line-height:1.5; }
-  #lb figcaption i { font-style:italic; color:var(--fg); }
-  #lb button { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:64px; border:0; background:rgba(255,255,255,.06); color:var(--fg); font:inherit; font-size:22px; border-radius:8px; cursor:pointer; }
-  #lb button:hover { background:rgba(255,255,255,.14); } #lb button[disabled] { opacity:.25; cursor:default; }
-  #lb-prev { left:10px; } #lb-next { right:10px; }
-  #lb #lb-x { top:10px; right:10px; transform:none; width:40px; height:40px; font-size:18px; }   /* (outranks the arrows' rule) */
-  #lb-n { position:absolute; top:18px; left:16px; font-size:12px; color:var(--dim); }
-  #note { color:#55556a; font-size:11px; padding:0 28px 18px; max-width:90ch; line-height:1.5; }
-  @media (max-width: 800px) { header, main, #strip, #note { padding-left:16px; padding-right:16px; }
-    main { grid-template-columns: 1fr; } #thought { font-size:16px; } }
-  header { background:#000; }
-  header h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
-  header nav.ui-nav { font-size:12px; flex-wrap:wrap; }
-  header nav.ui-nav a { padding:5px 9px; }
+  [hidden] { display:none !important; }
+  html, body { margin:0; background:#000; color:var(--ui-fg); }
+  body { font-family:var(--ui-sans); -webkit-font-smoothing:antialiased; overflow-x:hidden;
+    height:100vh; height:100dvh; display:flex; flex-direction:column; }
+  button { font:inherit; }
+  #hdr { flex:none; border-bottom:1px solid var(--ui-line); }
+
+  main { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+
+  /* the frame: as large as the screen allows, 16:9, contained on black */
+  #stage { flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; padding:14px var(--gut) 10px;
+    container-type:size; }
+  #panel { position:relative; width:min(100cqw, 100cqh * 16 / 9); aspect-ratio:16 / 9; background:#000;
+    border:1px solid var(--ui-line); border-radius:var(--ui-r2); overflow:hidden; }
+  #panel img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 1.2s var(--ui-ease); }
+  #panel img.on { opacity:1; }
+  .ov { position:absolute; left:16px; right:16px; z-index:1; pointer-events:none; font-family:var(--ui-mono); }
+  #ov-top { top:14px; display:flex; flex-direction:column; gap:7px; }
+  #cap { display:flex; align-items:center; gap:10px; }
+  #cap .ui-caption { color:var(--ui-fg); text-shadow:0 0 6px #000; }
+  #now-chip { background:#fff; color:#000; border-color:#fff; padding:1px 7px; font-size:9px; }
+  #objs { font-size:10.5px; letter-spacing:.04em; color:var(--ui-fg2); text-shadow:0 0 6px #000; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #objs:empty { display:none; }
+  #line { bottom:14px; font-size:12px; line-height:1.4; color:var(--ui-fg2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 0 6px #000; }
+  #line:empty { display:none; }
+  #panel::after { content:""; position:absolute; left:0; right:0; bottom:0; height:64px; pointer-events:none;
+    background:linear-gradient(transparent, rgba(0,0,0,.55)); }
+
+  /* the filmstrip: tiny square tiles, 1 px seams, newest at the right */
+  #film { flex:none; position:relative; padding:0 var(--gut) 8px; }
+  #strip { display:flex; gap:1px; height:var(--strip); overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
+  #strip::-webkit-scrollbar { display:none; }
+  #strip button { flex:none; position:relative; width:var(--strip); height:var(--strip); padding:0; border:0; background:#0a0a0c; cursor:pointer;
+    opacity:.55; transition:opacity .2s var(--ui-ease); }
+  #strip button:first-child { margin-left:auto; }                 /* a short strip sits at the right, by the newest */
+  #strip button:hover { opacity:.9; }
+  #strip button img { width:100%; height:100%; object-fit:cover; display:block; }
+  #strip button.on { opacity:1; outline:1px solid #fff; outline-offset:-1px; z-index:1; }
+  #strip button:focus-visible { outline:1px solid #fff; outline-offset:-1px; opacity:1; }
+  #newpill { position:absolute; right:calc(var(--gut) + 8px); top:50%; transform:translateY(calc(-50% - 4px)); z-index:2; }
+  #newpill .ui-dot { color:var(--ui-live); }
+
+  /* the empty state */
+  #empty { flex:1; padding:clamp(48px, 12vh, 140px) var(--gut); }
+  #empty h1 { font-size:clamp(56px, 9vw, 144px); }
+  #empty h1 span { font-size:inherit; }
+  #empty p { max-width:62ch; }
+
+  /* the honesty line: one mono line above the pulse */
+  #note .short { display:none; }
+  #note { flex:none; margin:0; padding:6px var(--gut) 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-top:1px solid var(--ui-line); }
+
+  @media (max-width:720px) {
+    #stage { padding:0; }
+    #panel { width:100%; height:100%; aspect-ratio:auto; border:0; border-radius:0; }
+    .ov { left:12px; right:12px; }
+    #film { padding:8px 0 6px; }
+    #newpill { right:8px; }
+    #note .long { display:none; } #note .short { display:inline; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    #panel img, #strip button { transition:none; }
+  }
 </style>
 </head>
-<body>
-<header><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a class="on" href="/world.html">sees</a></nav><div class="sub">the simulated world · <span id="stage">…</span></div></header>
-<main>
-  <div>
-    <div id="view"><img id="a" alt=""><img id="b" alt=""><div id="thought"></div></div>
-    <div id="why"></div>
+<body data-deck="05" data-pulse data-keys>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">05 / 06</span>
   </div>
-  <aside>
-    <div class="lbl">In its world now</div><div id="world"></div>
-  </aside>
+</header>
+
+<main id="main">
+  <section id="empty" class="ui-title ui-in" style="--i:1" hidden>
+    <h1>Nothing seen<span>yet.</span></h1>
+    <p>A view appears here each time the model renders one from its state and the chat; none has been rendered on this server yet.</p>
+  </section>
+
+  <div id="stage" hidden>
+    <figure id="panel" class="ui-in" style="--i:1; margin:0" aria-label="the frame on show">
+      <img id="a" alt=""><img id="b" alt="">
+      <div class="ov" id="ov-top">
+        <div id="cap"><span class="ui-caption" id="cap-t">--:--</span><span class="ui-chip" id="now-chip" hidden>now</span></div>
+        <div id="objs"></div>
+      </div>
+      <figcaption class="ov" id="line"></figcaption>
+    </figure>
+  </div>
+
+  <div id="film" class="ui-in" style="--i:2" hidden>
+    <div id="strip" role="listbox" aria-label="frames, newest at the right (← → move, Home / End jump)"></div>
+    <button class="ui-btn primary" id="newpill" type="button" hidden><i class="ui-dot"></i> new frame</button>
+  </div>
 </main>
-<div class="lbl" style="padding:0 28px;color:#7a7a8c;font-size:11px;letter-spacing:.1em">EARLIER</div>
-<div id="strip"></div>
-<div id="note">Images and lines are rendered from the brain model's state and from chat messages. Not what anyone saw or thought. A model, not a mind.</div>
-<figure id="lb" hidden role="dialog" aria-modal="true" aria-label="image, full screen"><span id="lb-n"></span><button id="lb-x" type="button" title="close (Esc)">✕</button><button id="lb-prev" type="button" title="earlier (←)">‹</button><img id="lb-img" alt=""><figcaption id="lb-cap"></figcaption><button id="lb-next" type="button" title="later (→)">›</button></figure>
+
+<p id="note" class="ui-honest"><span class="long">Images and lines are rendered from the model's state and from chat messages · not what anyone saw or thought · a model, not a mind.</span><span class="short">Rendered from the model · a model, not a mind.</span></p>
+
 <script>
-let front = "a";
-// ---- the lightbox: the frames in time order (oldest first), the one on show, arrows and keys ----
-let frames = [], lbAt = -1;
 const $ = id => document.getElementById(id);
-function lbShow(i){
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let frames = [], at = -1, front = "a", world = [], resting = null;
+
+function paint(i, smooth){
   if (!frames.length) return;
-  lbAt = Math.max(0, Math.min(frames.length - 1, i));
-  const f = frames[lbAt], cap = $("lb-cap");
-  $("lb-img").src = f.img;
-  cap.textContent = ""; const t = document.createElement("span"); t.textContent = `${f.t} ${f.stage || ""} · `; cap.append(t);
-  if (f.thought) { const q = document.createElement("i"); q.textContent = `“${f.thought}”`; cap.append(q); }
-  $("lb-n").textContent = `${lbAt + 1} / ${frames.length}`;
-  $("lb-prev").disabled = lbAt === 0; $("lb-next").disabled = lbAt === frames.length - 1;
-  $("lb").hidden = false; document.body.style.overflow = "hidden";
+  at = Math.max(0, Math.min(frames.length - 1, i));
+  const f = frames[at], latest = at === frames.length - 1;
+  const back = front === "a" ? "b" : "a", img = $(back);
+  if ($(front).getAttribute("src") !== f.img) {
+    img.onload = () => { img.classList.add("on"); $(front).classList.remove("on"); front = back; };
+    img.src = f.img;
+  }
+  $("cap-t").textContent = `${f.t || "--:--"} · ${String(f.stage || "").toUpperCase()}${latest && resting ? ` · ${resting}` : ""}`;
+  $("now-chip").hidden = !latest;
+  $("objs").textContent = latest && world.length
+    ? "in its world · " + world.slice(0, 4).map(o => `${o.name} ${o.strength}`).join(" · ") : "";
+  $("line").textContent = f.thought ? `“${f.thought}”` : "";
+  const w = f.why || {}, bits = [];                    // where the line came from: on hover, never a paragraph
+  if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${String(x).slice(0, 60)}”`).join(", "));
+  if (w.replayed && w.replayed.length) bits.push("replaying: " + w.replayed.slice(-2).map(x => `“${String(x).slice(0, 60)}”`).join(", "));
+  $("panel").title = bits.join(" · ");
+  const tiles = $("strip").children;
+  for (let k = 0; k < tiles.length; k++) { const on = k === at; tiles[k].classList.toggle("on", on); tiles[k].setAttribute("aria-selected", String(on)); }
+  if (tiles[at]) tiles[at].scrollIntoView({block:"nearest", inline:"nearest", behavior:smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto"});
+  if (latest) $("newpill").hidden = true;
 }
-function lbClose(){ $("lb").hidden = true; document.body.style.overflow = ""; }
-$("lb").addEventListener("click", e => { if (e.target === e.currentTarget || e.target.id === "lb-cap") lbClose(); });
-$("lb-x").onclick = lbClose;
-$("lb-prev").onclick = () => lbShow(lbAt - 1);
-$("lb-next").onclick = () => lbShow(lbAt + 1);
+
+async function refresh(follow){
+  let d;
+  try { d = await (await fetch("/api/frames?n=48")).json(); } catch { return; }
+  const keep = frames[at] && frames[at].img, wasLatest = at === frames.length - 1;
+  const out = [];                                       // the same image kept for a new line is one frame: its latest line
+  (d.frames || []).forEach(f => { if (out.length && out[out.length - 1].img === f.img) out[out.length - 1] = f; else out.push(f); });
+  frames = out; world = d.world || []; resting = d.resting || null;
+  const none = !frames.length;
+  $("empty").hidden = !none; $("stage").hidden = none; $("film").hidden = none;
+  if (none) return;
+  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)} · ${esc(f.stage)}" aria-label="${esc(f.t)} ${esc(f.stage)}"><img src="${esc(f.img)}" loading="lazy" decoding="async" alt=""></button>`).join("");
+  let to = frames.length - 1;
+  if (!follow && !wasLatest && keep) { const k = frames.findIndex(f => f.img === keep); if (k >= 0) to = k; }
+  if (follow === false && !wasLatest) $("newpill").hidden = false;
+  paint(to, false);
+}
+
+$("strip").addEventListener("click", e => { const b = e.target.closest("button"); if (b) paint(+b.dataset.k, true); });
+$("newpill").onclick = () => paint(frames.length - 1, true);
 document.addEventListener("keydown", e => {
-  if ($("lb").hidden) return;
-  if (e.key === "Escape") lbClose(); else if (e.key === "ArrowLeft") lbShow(lbAt - 1); else if (e.key === "ArrowRight") lbShow(lbAt + 1);
+  if (!frames.length || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return;
+  if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+  const k = e.key;
+  const to = k === "ArrowLeft" ? at - 1 : k === "ArrowRight" ? at + 1 : k === "Home" ? 0 : k === "End" ? frames.length - 1 : null;
+  if (to === null) return;
+  e.preventDefault();
+  paint(to, true);
 });
-$("view").addEventListener("click", () => lbShow(frames.length - 1));                   // the big one: the newest frame
-$("strip").addEventListener("click", e => { const fig = e.target.closest("figure"); if (fig) lbShow(+fig.dataset.i); });
-function show(f){
-  const back = front === "a" ? "b" : "a", img = document.getElementById(back);
-  img.onload = () => { img.classList.add("on"); document.getElementById(front).classList.remove("on"); front = back; };
-  img.src = f.img;
-  document.getElementById("stage").textContent = `${f.stage} ${f.t}${f.resting ? " · " + f.resting : ""}`;
-  document.getElementById("thought").textContent = f.thought ? `“${f.thought}”` : "";
-  const w = f.why || {}, bits = [];
-  if (w.messages && w.messages.length) bits.push("from chat: " + w.messages.slice(-2).map(x => `“${x.slice(0, 60)}”`).join(", "));
-  if (w.replayed && w.replayed.length) bits.push("dreaming of: " + w.replayed.slice(-2).map(x => `“${x.slice(0, 60)}”`).join(", "));
-  // (no market line: the coin's trades are a stimulus inside the model, never a word on the page)
-  document.getElementById("why").textContent = bits.join(" · ");
-}
-async function refresh(){
-  const d = await (await fetch("/api/frames?n=24")).json();
-  document.getElementById("world").innerHTML = d.world.length
-    ? d.world.map(o => `<div><span>${o.name.replace(/</g, "")}</span><span>${o.strength}</span></div>`).join("")
-    : `<div><span style="color:#55556a">empty — write something in the chat</span></div>`;
-  frames = d.frames;                                                                   // (oldest first; data-i = index)
-  document.getElementById("strip").innerHTML = d.frames.slice(0, -1).map((f, i) =>
-    `<figure data-i="${i}"><img src="${f.img}" loading="lazy" alt=""><figcaption>${f.t} ${f.stage} · ${(f.thought || "").replace(/</g, "").slice(0, 60)}</figcaption></figure>`).reverse().join("");
-  if (lbAt >= 0 && !$("lb").hidden) lbShow(Math.min(lbAt, frames.length - 1));         // (a refresh while open keeps the view)
-  if (d.frames.length) show({...d.frames[d.frames.length - 1], resting: d.resting});
-}
+
+// a new frame on the socket ("eye"): it crossfades in only if the viewer is on the latest; else a "new frame" pill
+let backoff = 1000;
 function connect(){
-  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-  ws.onmessage = e => { const m = JSON.parse(e.data); if (m.type === "eye") { show(m); refresh(); } };
-  ws.onclose = () => setTimeout(connect, 2000);
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?rate=1&lite=1`);
+  ws.onopen = () => { backoff = 1000; };
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.type === "eye") refresh(!frames.length || at === frames.length - 1 ? true : false); };
+  ws.onclose = () => { setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 30000); };
 }
-refresh(); connect();
+refresh(true); connect();
 </script>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>

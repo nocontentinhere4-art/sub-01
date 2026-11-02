@@ -3,151 +3,296 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SUB-01 · dream diary</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>SUB-01 · night log</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="description" content="The night log of a brain model: one night at a time, the images rendered from its state during REM sleep, the chat messages it replayed and the pages it read that day.">
 <link rel="stylesheet" href="/ui.css">
 <style>
-  :root { --bg:#040406; --fg:#ececf2; --dim:#7a7a8c; --line:#1c1c26; --or:#ff6a00; }
+  /* SUB-01 · 04 diary: one night at a time. A row of night pills under the header (← → move between nights,
+     ?night=YYYY-MM-DD opens one); the night's title block on the left, ONE dream image at a time on the right with a
+     56 px filmstrip (↑ ↓ or a click move frames); two short lists under both. body[data-keys]: deck.js leaves ← → to
+     the page, [ ] still change pages. Tokens, header, .ui-title, .ui-seg, .ui-caption come from /ui.css (v2). */
+  :root { --gut:clamp(16px, 2.6vw, 40px); --strip:56px; }
   * { box-sizing:border-box; }
-  html,body { margin:0; background:var(--bg); color:var(--fg); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  [hidden] { display:none !important; }
+  html, body { margin:0; background:#000; color:var(--ui-fg); }
+  body { font-family:var(--ui-sans); -webkit-font-smoothing:antialiased; overflow-x:hidden; min-height:100vh; min-height:100dvh;
+    display:flex; flex-direction:column; }
   a { color:inherit; }
-  header { display:flex; align-items:center; flex-wrap:wrap; gap:14px; padding:18px 28px 14px; }
-  header h1 { margin:0; font-size:20px; letter-spacing:.16em; background:var(--or); color:#0a0a0a; padding:3px 10px 2px; border-radius:2px; }
-  header .sub { color:var(--dim); font-size:12px; }
-  header .sub a { text-decoration:none; padding:4px 6px; border-radius:4px; transition:color .2s, background .2s; }
-  header .sub a:hover { color:var(--fg); background:rgba(255,255,255,.06); }
-  #nights { display:flex; gap:6px; overflow-x:auto; padding:0 28px 14px; scrollbar-width:none; }
-  #nights button { flex:none; background:#0c0c12; color:var(--dim); border:1px solid var(--line); padding:6px 10px;
-    font:inherit; font-size:11px; border-radius:5px; cursor:pointer; transition:color .2s, border-color .2s; }
-  #nights button:hover { color:var(--fg); border-color:#3a3a4a; }
-  #nights button.on { color:#0a0a0a; background:var(--fg); border-color:var(--fg); }
-  main { display:grid; grid-template-columns:1fr 340px; gap:24px; padding:0 28px 18px; max-width:1400px; }
-  main[hidden] { display:none; }
-  #title { font-size:27px; margin:2px 0 10px; line-height:1.25; letter-spacing:-.01em; }
-  #text { font-size:15px; line-height:1.65; color:#d6d6e0; margin:0 0 10px; max-width:70ch; }
-  #facts { color:var(--dim); font-size:12px; margin-bottom:14px; }
-  #view { position:relative; width:100%; aspect-ratio:16/9; background:radial-gradient(ellipse at 50% 60%, #15151d, #040406); border:1px solid var(--line);
-    border-radius:10px; overflow:hidden; box-shadow:0 20px 50px -24px #000; }
-  #view img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 2s ease; }
-  #view img.on { opacity:1; }
-  #cap { position:absolute; left:0; right:0; bottom:0; padding:18px 22px; font-size:16px; font-style:italic;
-    background:linear-gradient(transparent, rgba(0,0,0,.82)); text-shadow:0 1px 8px #000; }
-  #cap small { display:block; font-style:normal; color:#a4a4b6; font-size:11px; margin-bottom:4px; }
-  #strip { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px; margin-top:10px; }
-  #strip img { width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:3px; border:1px solid var(--line); cursor:pointer; opacity:.7; }
-  #strip img.on { opacity:1; border-color:var(--or); }
-  .lbl { color:var(--dim); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin:0 0 8px; }
-  aside section { margin-bottom:22px; }
-  #replays div { font-size:13px; padding:5px 0; border-bottom:1px solid #111118; }
-  #replays span { color:var(--dim); margin-left:6px; font-size:11px; }
-  #read div { font-size:13px; padding:5px 0; border-bottom:1px solid #111118; display:flex; justify-content:space-between; gap:10px; }
-  #read a { text-decoration:none; } #read a:hover { text-decoration:underline; }
-  #read span { color:var(--dim); font-size:11px; flex:none; } #read .y { color:var(--or); }
-  .hint { color:#55556a; font-size:11px; line-height:1.5; margin-top:8px; }
-  #share { width:100%; min-height:150px; background:#0c0c12; color:var(--fg); border:1px solid #2a2a36; padding:10px;
-    font:inherit; font-size:12px; line-height:1.5; resize:vertical; }
-  .row { display:flex; gap:8px; margin-top:8px; align-items:center; }
-  .row button, .row a { background:var(--fg); color:#0a0a0a; border:0; padding:7px 12px; font:inherit; font-size:12px;
-    text-decoration:none; cursor:pointer; border-radius:2px; }
-  .row a { background:#0c0c12; color:var(--fg); border:1px solid #2a2a36; }
-  #count { color:var(--dim); font-size:11px; margin-left:auto; }
-  #empty { padding:40px 28px; color:var(--dim); font-size:14px; line-height:1.6; max-width:60ch; display:none; }
-  #note { color:#55556a; font-size:11px; padding:0 28px 22px; max-width:90ch; line-height:1.5; }
-  @media (max-width: 900px) { header, #nights, main, #empty, #note { padding-left:16px; padding-right:16px; }
-    main { grid-template-columns:1fr; } #title { font-size:21px; } #cap { font-size:14px; } }
-  header { background:#000; }
-  header h1.ui-wordmark { background:none; color:var(--ui-fg); padding:0; border-radius:0; font-size:18px; letter-spacing:-.03em; }
-  header nav.ui-nav { font-size:12px; flex-wrap:wrap; }
-  header nav.ui-nav a { padding:5px 9px; }
+  button { font:inherit; }
+  #hdr { flex:none; border-bottom:1px solid var(--ui-line); }
+  main { flex:1 0 auto; }
+
+  /* the night pills */
+  #bar { display:flex; align-items:center; gap:16px; padding:10px var(--gut); border-bottom:1px solid var(--ui-line); }
+  #dates-w { flex:1 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
+  #dates-w::-webkit-scrollbar { display:none; }
+  #dates { white-space:nowrap; }
+  #dates button { white-space:nowrap; font-variant-numeric:tabular-nums; text-transform:none; }
+  #dates button i { font-style:normal; color:var(--rp, #a78bfa); margin-left:5px; }
+  #dates button.on i { color:#000; }
+  #tally { flex:none; white-space:nowrap; }
+
+  /* one night: [title block | the dream image + filmstrip], the two lists under both */
+  #night { display:grid; grid-template-columns:minmax(260px, 34%) minmax(0, 1fr); gap:24px clamp(24px, 3.4vw, 56px);
+    padding:clamp(20px, 3.4vh, 36px) var(--gut) 20px; }
+  #n-head h1 { font-size:clamp(64px, 8.4vw, 136px); }
+  #n-head h1 span { font-size:clamp(22px, 2.3vw, 36px); letter-spacing:-.035em; line-height:1.04; margin-top:.3em; text-wrap:balance; }
+  #n-head p { max-width:46ch; }
+  #n-head .stage { color:var(--rp, #a78bfa); }
+  #n-acts { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:20px; }
+  #n-acts a.ui-btn { text-decoration:none; }
+  #n-acts .ui-caption { margin-left:4px; font-variant-numeric:tabular-nums; }
+  #n-head .n-entry { text-transform:none; letter-spacing:0; margin:14px 0 0; font-family:var(--ui-mono); font-size:11.5px; line-height:1.6;
+    color:var(--ui-fg2); max-width:52ch; }
+
+  #n-view { min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+  #dream { position:relative; width:min(100%, calc((100dvh - 380px) * 4 / 3)); min-width:min(100%, 360px); aspect-ratio:4 / 3; margin:0;
+    background:#000; border:1px solid var(--ui-line); border-radius:var(--ui-r2); overflow:hidden; }
+  #dream img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .7s var(--ui-ease); }
+  #dream img.on { opacity:1; }
+  #dream .k { position:absolute; left:12px; top:12px; z-index:1; color:var(--ui-fg); text-shadow:0 0 6px #000; }
+  #dream-none { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--ui-mono); font-size:11px; color:var(--ui-faint); }
+  #d-line { width:min(100%, calc((100dvh - 380px) * 4 / 3)); min-width:min(100%, 360px); margin:0; font-family:var(--ui-mono); font-size:12px; line-height:1.45;
+    color:var(--ui-fg2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:1.45em; }
+
+  /* the filmstrip: tiny square tiles, 1 px seams */
+  #strip { display:flex; gap:1px; height:var(--strip); max-width:100%; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
+  #strip::-webkit-scrollbar { display:none; }
+  #strip button { flex:none; width:var(--strip); height:var(--strip); padding:0; border:0; background:#0a0a0c; cursor:pointer; opacity:.55;
+    transition:opacity .2s var(--ui-ease); }
+  #strip button:hover { opacity:.9; }
+  #strip button img { width:100%; height:100%; object-fit:cover; display:block; }
+  #strip button.on { opacity:1; outline:1px solid #fff; outline-offset:-1px; position:relative; z-index:1; }
+  #strip button:focus-visible { outline:1px solid #fff; outline-offset:-1px; opacity:1; }
+
+  /* two compact mono lists */
+  #lists { grid-column:1 / -1; display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:20px clamp(24px, 3.4vw, 56px); }
+  .lst .ui-caption { display:flex; justify-content:space-between; gap:10px; padding-bottom:7px; border-bottom:1px solid var(--ui-line); }
+  .lst ol { list-style:none; margin:0; padding:0; font-family:var(--ui-mono); font-size:11.5px; line-height:1.4; }
+  .lst li { display:grid; grid-template-columns:5.2ch minmax(0, 1fr); gap:12px; padding:6px 0; border-bottom:1px solid var(--ui-line); color:var(--ui-fg2); }
+  .lst li .tm { color:var(--ui-dim); font-variant-numeric:tabular-nums; }
+  .lst li .tx { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lst li.top .tx { color:var(--ui-fg); }
+  #l-read li { grid-template-columns:4ch 9ch minmax(0, 1fr); }
+  #l-read li .n { color:var(--ui-proj); font-variant-numeric:tabular-nums; }
+  #l-read li.no .n, #l-read li.no .tx { color:var(--ui-dim); }
+  #l-read li .vb { color:var(--ui-dim); }
+  #l-read li a { text-decoration:none; border-bottom:1px solid var(--ui-line2); }
+  #l-read li a:hover { border-color:var(--ui-fg); color:var(--ui-fg); }
+  #l-read li .ago { color:var(--ui-faint); }
+  .lst .none { display:block; padding:8px 0; font-family:var(--ui-mono); font-size:11px; color:var(--ui-faint); }
+  .lst .more { margin-top:8px; }
+
+  #empty { padding:clamp(48px, 12vh, 140px) var(--gut); }
+  #empty h1 { font-size:clamp(56px, 9vw, 144px); }
+  #empty h1 span { font-size:inherit; }
+  #empty p { max-width:62ch; }
+
+  /* the honesty line: one mono line above the pulse */
+  #note .short { display:none; }
+  #note { flex:none; margin:0; padding:6px var(--gut) 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-top:1px solid var(--ui-line); }
+
+  @media (max-width:1000px) {
+    #lists { grid-template-columns:minmax(0, 1fr); }
+  }
+  @media (max-width:720px) {
+    #bar { padding:8px var(--gut); }
+    #tally { display:none; }
+    #night { grid-template-columns:minmax(0, 1fr); gap:20px; }
+    #n-head h1 { font-size:clamp(64px, 21vw, 96px); }
+    #n-head h1 span { font-size:clamp(22px, 6.4vw, 30px); }
+    #dream, #d-line { width:100%; min-width:0; }
+    #note .long { display:none; } #note .short { display:inline; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    #dream img, #strip button { transition:none; }
+  }
 </style>
 </head>
-<body>
-<header><h1 class="ui-wordmark">SUB-01</h1><nav class="ui-nav"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a class="on" href="/diary">diary</a><a href="/world.html">sees</a></nav><div class="sub">dream diary</div></header>
-<div id="nights"></div>
-<div id="empty">No night written yet. During REM sleep the model replays chat messages and renders what it "dreams",
-even when nobody is watching; the entry is written the next morning, Tokyo time.</div>
-<main id="main" hidden>
-  <div>
-    <div id="title"></div>
-    <p id="text"></p>
-    <div id="facts"></div>
-    <div id="view"><img id="a" alt=""><img id="b" alt=""><div id="cap"></div></div>
-    <div id="strip"></div>
+<body data-deck="04" data-pulse data-keys>
+<header class="ui-hdr" id="hdr">
+  <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
+  <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+  <div class="ui-spacer"></div>
+  <div class="ui-state">
+    <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
+    <span class="ui-clock" id="ui-clock">--:-- Tokyo</span>
+    <span class="ui-counter" id="ui-counter">04 / 06</span>
   </div>
-  <aside>
-    <section><div class="lbl">Messages replayed in REM</div><div id="replays"></div></section>
-    <section><div class="lbl">Read that day · replayed that night</div><div id="read"></div>
-      <div class="hint">Pages it stayed on during the day: articles, threads, videos, shorts (Wikipedia only when its
-      browser was off). What it reads or watches becomes stimuli and dream material;
-      it does not understand the text. Readings count less than your messages when it picks what to replay.</div></section>
-    <section id="sharebox"><div class="lbl">Share text</div>
-      <textarea id="share" readonly></textarea>
-      <div class="row"><button id="copy">copy</button><a id="img" href="#" target="_blank" rel="noopener">image</a><span id="count"></span></div>
-    </section>
-  </aside>
+</header>
+
+<main id="log" aria-label="night log">
+  <div id="bar" hidden>
+    <div id="dates-w"><div class="ui-seg" id="dates" role="tablist" aria-label="nights (← → move)"></div></div>
+    <span class="ui-caption" id="tally"></span>
+  </div>
+
+  <section id="empty" class="ui-title ui-in" style="--i:1" hidden>
+    <h1>No night<span>written yet.</span></h1>
+    <p>During REM sleep the model replays chat messages and renders images from its state; the entry is written the next morning, Tokyo time.</p>
+  </section>
+
+  <article id="night" hidden>
+    <div id="n-head" class="ui-title ui-in" style="--i:1">
+      <h1><b id="n-day" style="font-weight:inherit"></b><span id="n-title"></span></h1>
+      <p id="n-sub"></p>
+      <div id="n-acts"></div>
+      <p class="n-entry" id="n-entry" hidden></p>
+    </div>
+    <div id="n-view" class="ui-in" style="--i:2">
+      <figure id="dream" aria-label="the dream image on show">
+        <span class="ui-caption k" id="d-k"></span><img id="a" alt=""><img id="b" alt=""><div id="dream-none" hidden>no image rendered this night</div>
+      </figure>
+      <p id="d-line"></p>
+      <div id="strip" role="listbox" aria-label="the night's frames (↑ ↓ move)"></div>
+    </div>
+    <div id="lists" class="ui-in" style="--i:3">
+      <section class="lst" id="l-rep"></section>
+      <section class="lst" id="l-read"></section>
+    </div>
+  </article>
 </main>
-<div id="note">Dream images and lines are rendered each morning from the brain model's state during REM sleep, from the chat
-messages it replays and from the titles of articles it read. They are not the real person's dreams or thoughts. A model of brain activity, not a mind.</div>
+
+<p id="note" class="ui-honest"><span class="long">Images and lines are rendered from the brain model's state during REM sleep, from the chat messages it replays and the pages it read · not anyone's dreams or thoughts · a model, not a mind.</span><span class="short">Rendered from the model in REM · a model, not a mind.</span></p>
+
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let night = null, idx = 0, front = "a", timer = null;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const tokyo = new Intl.DateTimeFormat("en-GB", {hour:"2-digit", minute:"2-digit", timeZone:"Asia/Tokyo"});
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+function dayParts(date){                       // "2026-11-01" → ["01 Nov", "Sunday"]
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date || "");
+  if (!m) return [date || "—", ""];
+  return [`${m[3]} ${MON[+m[2] - 1]}`, DAY[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()]];
+}
 
-function show(i){
-  const f = night.frames[i]; if (!f) return;
-  idx = i;
-  const back = front === "a" ? "b" : "a", img = $(back);
-  img.onload = () => { img.classList.add("on"); $(front).classList.remove("on"); front = back; };
-  img.src = f.img;
-  $("cap").innerHTML = `<small>${esc(f.t)} · REM${f.attended ? " · watched live" : ""}</small>${f.thought ? "“" + esc(f.thought) + "”" : ""}`;
-  document.querySelectorAll("#strip img").forEach((el, k) => el.classList.toggle("on", k === i));
-}
-function play(){
-  clearInterval(timer);
-  if (night.frames.length > 1) timer = setInterval(() => show((idx + 1) % night.frames.length), 5000);
-}
-async function open(date){
-  night = await (await fetch(`/api/diary/${encodeURIComponent(date)}`)).json();
-  document.querySelectorAll("#nights button").forEach(b => b.classList.toggle("on", b.dataset.date === date));
-  $("main").hidden = false;
-  $("title").textContent = night.closed ? night.title : `Night of ${night.date} · in progress`;
-  $("text").textContent = night.closed ? night.text : "SUB-01 is asleep or the night is not over yet. Frames appear here as it dreams.";
-  const x = night.facts || {};
-  $("facts").textContent = night.closed
-    ? `slept ${x.sleep_onset}–${x.woke_up} Tokyo time · ${x.wakeups ? `woke ${x.wakeups}×` : "slept through"} · ${x.replays} message replays${x.reading_replays ? ` · ${x.reading_replays} reading replays` : ""} · ${x.dream_frames} dream frames`
-    : `${night.frames.length} dream frames so far`;
-  $("strip").innerHTML = night.frames.map((f, k) => `<img src="${esc(f.img)}" loading="lazy" data-k="${k}" alt="">`).join("");
-  $("strip").onclick = e => { const k = e.target.dataset.k; if (k !== undefined) { show(+k); play(); } };
-  const reps = (x.top_replayed && x.top_replayed.length) ? x.top_replayed
-    : [...new Set(night.frames.flatMap(f => f.replayed || []))].slice(-5);
-  $("replays").innerHTML = reps.length ? reps.map(r => `<div>“${esc(r)}”</div>`).join("")
-    : `<div style="color:#55556a">none — nobody wrote that day</div>`;
-  const read = x.read || [];
-  $("read").innerHTML = !night.closed ? `<div style="color:#55556a">written in the morning</div>`
-    : read.length ? read.map(a => `<div>${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}`
-        + `<span class="${a.replayed ? "y" : ""}">${a.verb && a.verb !== "read" ? `${esc(a.verb)} · ` : ""}${a.replayed ? `replayed ${a.replayed}×` : "not replayed"}${a.today ? "" : " · read earlier"}</span></div>`).join("")
-    : `<div style="color:#55556a">nothing read that day</div>`;
-  $("sharebox").hidden = !night.closed;
-  $("share").value = night.share || "";
-  $("count").textContent = night.share ? `${night.share.length}/280` : "";
-  const cover = night.frames[Math.floor(night.frames.length / 2)];
-  $("img").href = cover ? cover.img : "#";
-  $("img").style.display = cover ? "" : "none";
-  if (night.frames.length) { show(0); play(); } else { $("cap").textContent = ""; $("a").removeAttribute("src"); }
-}
-$("copy").onclick = async () => {
-  try { await navigator.clipboard.writeText($("share").value); } catch { $("share").select(); document.execCommand("copy"); }
-  $("copy").textContent = "copied"; setTimeout(() => $("copy").textContent = "copy", 1500);
+let nights = [], ni = -1, night = null, fi = -1, front = "a";
+const cache = new Map();
+const getNight = date => {
+  if (!cache.has(date)) cache.set(date, fetch(`/api/diary/${encodeURIComponent(date)}`).then(r => r.ok ? r.json() : null).catch(() => null));
+  return cache.get(date);
 };
+
+// ---- one frame of the night ----
+function frame(i){
+  const fr = (night && night.frames) || [];
+  if (!fr.length) return;
+  fi = Math.max(0, Math.min(fr.length - 1, i));
+  const f = fr[fi], back = front === "a" ? "b" : "a", img = $(back);
+  if ($(front).getAttribute("src") !== f.img) {
+    img.onload = () => { img.classList.add("on"); $(front).classList.remove("on"); front = back; };
+    img.src = f.img;
+  }
+  $("d-k").textContent = `${f.t} · REM${f.attended ? " · watched live" : ""} · ${fi + 1} / ${fr.length}`;
+  $("d-line").textContent = f.thought ? `“${f.thought}”` : "";
+  $("d-line").title = f.thought || "";
+  const tiles = $("strip").children;
+  for (let k = 0; k < tiles.length; k++) { tiles[k].classList.toggle("on", k === fi); tiles[k].setAttribute("aria-selected", String(k === fi)); }
+  if (tiles[fi]) tiles[fi].scrollIntoView({block:"nearest", inline:"nearest", behavior:reduce() ? "auto" : "smooth"});
+}
+
+// ---- one night ----
+function list(items, fn, cap){
+  return items.length > cap
+    ? `<ol>${items.slice(0, cap).map(fn).join("")}</ol><ol hidden>${items.slice(cap).map(fn).join("")}</ol><button class="ui-btn more" type="button">all ${items.length}</button>`
+    : `<ol>${items.map(fn).join("")}</ol>`;
+}
+function fill(d){
+  night = d; fi = -1;
+  const x = d.facts || {}, closed = !!d.closed, frames = d.frames || [];
+  const [day, wd] = dayParts(d.date);
+  $("n-day").textContent = day;
+  $("n-title").textContent = !closed ? "in progress" : d.title && !/^Night of /.test(d.title) ? d.title : `${wd} night`;
+  $("n-sub").innerHTML = closed
+    ? [`${esc(x.sleep_onset || "--:--")} → ${esc(x.woke_up || "--:--")} Tokyo`, x.wakeups ? `woke ${x.wakeups}×` : "slept through",
+       plural(x.replays || 0, "message replay"), x.reading_replays ? plural(x.reading_replays, "reading replay") : "",
+       plural(x.dream_frames ?? frames.length, "frame")].filter(Boolean).join(" · ")
+    : `<span class="stage">asleep or not over yet</span> · ${plural(frames.length, "frame")} so far`;
+  const cover = frames[Math.floor(frames.length / 2)];
+  $("n-acts").innerHTML = closed ? (d.share ? `<button class="ui-btn primary" type="button" data-a="copy">copy share text</button>` : "")
+    + (cover ? `<a class="ui-btn" href="${esc(cover.img)}" target="_blank" rel="noopener">image ↗</a>` : "")
+    + (d.text ? `<button class="ui-btn" type="button" data-a="entry" aria-expanded="false">entry</button>` : "")
+    + (d.share ? `<span class="ui-caption">${d.share.length} / 280</span>` : "") : "";
+  $("n-entry").textContent = d.text || ""; $("n-entry").hidden = true;
+
+  // the image and the strip
+  $("strip").innerHTML = frames.map((f, k) => `<button type="button" role="option" data-k="${k}" title="${esc(f.t)}" aria-label="frame ${k + 1}, ${esc(f.t)}"><img src="${esc(f.img)}" loading="lazy" decoding="async" alt=""></button>`).join("");
+  $("strip").hidden = frames.length < 2;
+  $("dream-none").hidden = frames.length > 0; $("d-line").hidden = !frames.length;
+  if (!frames.length) { $("a").removeAttribute("src"); $("b").removeAttribute("src"); $("a").classList.remove("on"); $("b").classList.remove("on"); $("d-k").textContent = ""; }
+  else frame(0);
+
+  // replayed messages: in the order of the frames that carried them (hh:mm text), then the most replayed without a time
+  const seen = new Set(), reps = [], top = new Set(x.top_replayed || []);
+  for (const f of frames) for (const r of (f.replayed || [])) if (r && !seen.has(r)) { seen.add(r); reps.push({t:f.t, text:r}); }
+  for (const r of (x.top_replayed || [])) if (r && !seen.has(r)) { seen.add(r); reps.push({t:"", text:r}); }
+  const repLi = r => `<li class="${top.has(r.text) ? "top" : ""}"><span class="tm">${esc(r.t || "··:··")}</span><span class="tx" title="${esc(r.text)}">${esc(r.text)}</span></li>`;
+  $("l-rep").innerHTML = `<div class="ui-caption"><span>replayed in REM</span><span>${reps.length}</span></div>`
+    + (reps.length ? list(reps, repLi, 6) : `<span class="none">none · nobody wrote that day</span>`);
+  const read = x.read || [];
+  const readLi = a => `<li class="${a.replayed ? "" : "no"}"><span class="n">${a.replayed ? `×${a.replayed}` : "—"}</span><span class="vb">${esc(a.verb || "read")}</span>`
+    + `<span class="tx" title="${esc(a.title)}">${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}${a.today === false ? ` <span class="ago">· earlier</span>` : ""}</span></li>`;
+  $("l-read").innerHTML = `<div class="ui-caption"><span>read that day · replayed that night</span><span>${read.length}</span></div>`
+    + (!closed ? `<span class="none">written in the morning</span>` : read.length ? list(read, readLi, 6) : `<span class="none">nothing read that day</span>`);
+}
+
+async function show(i, push){
+  if (!nights.length) return;
+  ni = Math.max(0, Math.min(nights.length - 1, i));
+  const n = nights[ni];
+  const pills = $("dates").children;
+  for (let k = 0; k < pills.length; k++) { const on = k === ni; pills[k].classList.toggle("on", on); pills[k].setAttribute("aria-selected", String(on)); }
+  if (pills[ni]) pills[ni].scrollIntoView({block:"nearest", inline:"nearest"});
+  if (push) history.replaceState(null, "", `?night=${encodeURIComponent(n.date)}`);
+  const d = await getNight(n.date);
+  if (nights[ni] !== n) return;                     // another night was chosen meanwhile
+  $("night").hidden = false;
+  if (d) fill(d);
+  else { night = null; $("n-day").textContent = dayParts(n.date)[0]; $("n-title").textContent = "could not be loaded"; $("n-sub").textContent = "";
+    $("n-acts").innerHTML = ""; $("strip").innerHTML = ""; $("l-rep").innerHTML = ""; $("l-read").innerHTML = ""; }
+  getNight(nights[Math.min(ni + 1, nights.length - 1)].date); getNight(nights[Math.max(ni - 1, 0)].date);   // the neighbours, ahead
+}
+
+$("dates").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(+b.dataset.k, true); });
+$("strip").addEventListener("click", e => { const b = e.target.closest("button"); if (b) frame(+b.dataset.k); });
+$("lists").addEventListener("click", e => { const m = e.target.closest(".more"); if (m) { m.previousElementSibling.hidden = false; m.remove(); } });
+$("n-acts").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b || !night) return;
+  if (b.dataset.a === "entry") { const en = $("n-entry"); en.hidden = !en.hidden; b.classList.toggle("on", !en.hidden); b.setAttribute("aria-expanded", String(!en.hidden)); return; }
+  try { await navigator.clipboard.writeText(night.share); }
+  catch { const t = document.createElement("textarea"); t.value = night.share; t.style.cssText = "position:fixed;opacity:0";
+    document.body.append(t); t.select(); try { document.execCommand("copy"); } catch {} t.remove(); }
+  b.textContent = "copied"; setTimeout(() => b.textContent = "copy share text", 1500);
+});
+document.addEventListener("keydown", e => {
+  if (!nights.length || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return;
+  if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+  const k = e.key;
+  if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); show(ni + (k === "ArrowRight" ? 1 : -1), true); }
+  else if ((k === "ArrowUp" || k === "ArrowDown") && night && (night.frames || []).length) { e.preventDefault(); frame(fi + (k === "ArrowDown" ? 1 : -1)); }
+});
+
 (async () => {
-  const d = await (await fetch("/api/diary")).json();
-  if (!d.nights.length) { $("empty").style.display = "block"; return; }
-  $("nights").innerHTML = d.nights.map(n =>
-    `<button data-date="${esc(n.date)}">${esc(n.date)}${n.closed ? "" : " ·  tonight"} · ${n.frames}</button>`).join("");
-  $("nights").onclick = e => { const b = e.target.closest("button"); if (b) open(b.dataset.date); };
-  const want = new URLSearchParams(location.search).get("night");
-  const first = d.nights.find(n => n.date === want) || d.nights.find(n => n.closed) || d.nights[0];
-  open(first.date);
+  let d;
+  try { d = await (await fetch("/api/diary")).json(); } catch { d = {nights: []}; }
+  nights = (d.nights || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);   // oldest left, newest right
+  if (!nights.length) { $("empty").hidden = false; return; }
+  $("bar").hidden = false;
+  $("dates").innerHTML = nights.map((n, k) => `<button type="button" role="tab" data-k="${k}">${esc(dayParts(n.date)[0])}${n.closed ? "" : "<i>tonight</i>"}</button>`).join("");
+  const closedN = nights.filter(n => n.closed).length;
+  $("tally").textContent = plural(closedN, "night");
+  const lastClosed = [...nights].reverse().find(n => n.closed);
+  if (lastClosed) getNight(lastClosed.date).then(x => {
+    if (x && x.closed_at) $("tally").textContent = `${plural(closedN, "night")} · last written ${tokyo.format(new Date(x.closed_at * 1000))} Tokyo`;
+  });
+  const want = new URLSearchParams(location.search).get("night");          // ?night=YYYY-MM-DD: that night
+  const k = nights.findIndex(n => n.date === want);
+  show(k >= 0 ? k : nights.length - 1, false);
 })();
 </script>
+<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>
 </body>
 </html>
