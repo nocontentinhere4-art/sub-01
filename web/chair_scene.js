@@ -116,8 +116,51 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   const conv = prep(THREE, g);
   const boy = g.scene; scene.add(boy);
   const bones = {};
+  // The face: the model has no face rig (no morph targets, no jaw or eye bones), so expression is painted into the head
+  // material's shader from masks drawn in the head texture's own UV space (the eye and mouth islands of the atlas in
+  // room/char_mixamo.glb, located by hand): eyelids that close from the top (a blink, a squint under tension, clenched at
+  // a strong response, shut while flat, heavy with the adaptation) and the mouth opening (with the tension, the jolt;
+  // slack while flat). Driven by the same measured numbers as the body, never by the button.
+  const face = { sh: null, blink: 0, nextBlink: 2.0, force: null };
+  const faceMask = canvasTex(2048, 2048, (g, W) => {
+    const s = W / 4096;
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, W);
+    const eye = (cx, cy, rx, ry, rot) => { g.save(); g.translate(cx * s, cy * s); g.rotate(rot); g.scale(rx * s, ry * s);
+      const gr = g.createLinearGradient(0, -1, 0, 1); gr.addColorStop(0, "rgb(255,0,0)"); gr.addColorStop(1, "rgb(14,0,0)");   // red: 1 at the upper lid, ~0 at the lower
+      g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); g.restore(); };
+    eye(1762, 655, 150, 68, -0.1); eye(2575, 648, 160, 62, -0.1);
+    g.save(); g.translate(2385 * s, 2290 * s); g.rotate(Math.atan2(160, 130)); g.scale(110 * s, 42 * s);                     // green: the mouth, 1 at the centre
+    const gm = g.createRadialGradient(0, 0, 0, 0, 0, 1); gm.addColorStop(0, "rgb(0,255,0)"); gm.addColorStop(0.7, "rgb(0,210,0)"); gm.addColorStop(1, "rgb(0,0,0)");
+    g.fillStyle = gm; g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); g.restore();
+  });
+  faceMask.flipY = false; faceMask.colorSpace = THREE.NoColorSpace; faceMask.needsUpdate = true;
+  const faceShader = m => {
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uFaceMask = { value: faceMask }; sh.uniforms.uLid = { value: 0 }; sh.uniforms.uMouth = { value: 0 };
+      sh.uniforms.uSkin = { value: new THREE.Color("#e6b89c") };
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform sampler2D uFaceMask; uniform float uLid; uniform float uMouth; uniform vec3 uSkin;")
+        .replace("#include <map_fragment>", `#include <map_fragment>
+          vec4 fm = texture2D(uFaceMask, vMapUv);
+          if (fm.r > 0.02) {
+            float edge = 1.02 - uLid;
+            float covered = smoothstep(edge - 0.04, edge + 0.04, fm.r);
+            vec3 lidSkin = texture2D(map, vMapUv + vec2(0.0, 0.016 * (2.0 * fm.r - 2.35))).rgb;   // the skin just above the upper lid, with its own shading
+            diffuseColor.rgb = mix(diffuseColor.rgb, lidSkin * (0.9 + 0.1 * fm.r), covered);
+            float lash = (1.0 - smoothstep(0.0, 0.05, abs(fm.r - edge))) * smoothstep(0.03, 0.12, uLid);
+            diffuseColor.rgb = mix(diffuseColor.rgb, uSkin * 0.22, lash * 0.75);
+          }
+          if (fm.g > 0.02) {
+            float open = smoothstep(1.0 - uMouth, 1.0 - uMouth + 0.2, fm.g) * step(0.01, uMouth);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.015, 0.012), open);
+          }`);
+      face.sh = sh;
+    };
+    m.needsUpdate = true;
+  };
   boy.traverse(o => {
-    if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true; const m = o.material; if (m) { m.emissive && m.emissive.setRGB(0, 0, 0); m.roughness = 0.8; m.envMapIntensity = 0.3; } }
+    if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
+      for (const m of (Array.isArray(o.material) ? o.material : [o.material])) { if (!m) continue; m.emissive && m.emissive.setRGB(0, 0, 0); m.roughness = 0.8; m.envMapIntensity = 0.3; if (m.name === "owner_head") faceShader(m); } }
     if (o.isBone) bones[o.name] = o;
   });
   const mixer = new THREE.AnimationMixer(boy);
@@ -232,11 +275,11 @@ export async function createScene({ canvas, lite = false, small = false, reduced
     for (const s of ["Left", "Right"]) { const k = s === "Left" ? 1 : -1;
       bend(s + "Shoulder", 0, 0, k * (7 * te - 2 * sl - 5 * li));
       bend(s + "Arm", -4 * te + 2 * hv + 5 * li - 5 * jo, 0, k * (3 * te - 4 * li));
-      bend(s + "ForeArm", 6 * te + tr * 0.5 - 6 * li, 0, 0);
-      bend(s + "Hand", -8 * te + 3 * sl + tr + 12 * li, 0, k * (tr2 * 0.5 + 6 * li));
+      bend(s + "ForeArm", 6 * te + tr * 0.5 + 1 * li, 0, 0);                              // flat: the forearm stays on the armrest
+      bend(s + "Hand", -8 * te + 3 * sl + tr - 3 * li, 0, k * tr2 * 0.5);                  // flat: the wrist droops, no cocked hand
       bend(s + "UpLeg", -2 * te + 2 * li, 0, k * (1.5 * te + 3 * li));
       bend(s + "Foot", 8 * te - 2 * sl - 6 * li, 0, 0); }
-    for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) bend(`finger${f}-${j}.${s}`, 0, 0, (s === "L" ? 1 : -1) * ((f === 1 ? 10 : 28) * te - 6 * sl - 10 * li));
+    for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) bend(`finger${f}-${j}.${s}`, 0, 0, (s === "L" ? 1 : -1) * ((f === 1 ? 10 : 28) * te - 6 * sl + 4 * li));   // flat: a resting curl
     // the chair takes it: the straps pull, the frame rattles under tension (not under reduced motion)
     chest.scale.set(1 + 0.03 * te, 1 + 0.03 * te, 0.78); lap.scale.set(1 + 0.02 * te, 1 + 0.02 * te, 0.9);
     const ra = reduced ? 0 : 0.004 * te * te;
@@ -249,6 +292,17 @@ export async function createScene({ canvas, lite = false, small = false, reduced
     glowT = Math.max(glowT - dt / 0.6, 0); const gl = Math.max(glowT, te * 0.6);
     glow.intensity = 4 * gl; stud.material.emissiveIntensity = 2.5 * gl;
     doorLight.intensity = 1.6 + 1.4 * li;                                                   // the cold light from the door takes over when flat
+    // the face: a blink every few seconds, a squint with tension, clenched shut at a strong response, shut while flat,
+    // heavy with the adaptation; the mouth opens with the tension and the jolt, hangs a little while flat
+    if (face.sh) {
+      if (!reduced && li < 0.5) { face.nextBlink -= dt; if (face.nextBlink <= 0) { face.blink = 0.16; face.nextBlink = 2.5 + Math.random() * 4.5; } }
+      const bl = face.blink > 0 ? Math.sin(Math.min(1, (0.16 - face.blink) / 0.16) * Math.PI) : 0; face.blink = Math.max(0, face.blink - dt);
+      const clench = te > 0.45 ? Math.min(1, (te - 0.45) / 0.35) : 0;
+      const lid = face.force ? face.force.lid : Math.max(li, bl, 0.95 * clench, 0.35 * te * (1 - clench), 0.3 * hv + 0.2 * sl);
+      const mouth = face.force ? face.force.mouth : Math.max(0.9 * te * te, 0.3 * li, 0.7 * jo);   // face.force: a check handle
+      face.sh.uniforms.uLid.value += (lid - face.sh.uniforms.uLid.value) * Math.min(1, dt * 18);
+      face.sh.uniforms.uMouth.value += (mouth - face.sh.uniforms.uMouth.value) * Math.min(1, dt * 14);
+    }
     sparkStep(dt);
     if (!reduced && jo > 0.05) { camera.position.x += (Math.random() - 0.5) * 0.006 * jo; camera.position.y += (Math.random() - 0.5) * 0.004 * jo; }
   }
@@ -274,6 +328,6 @@ export async function createScene({ canvas, lite = false, small = false, reduced
     shock() { if (!reduced) lampDip = 1; glowT = 1; sparkBurst(); },
     revive() { jolt = 1; glowT = 1; sparkBurst(); S.limp.t = 0; S.limp.x = Math.min(S.limp.x, 0.6); },
     setAvailable(ok) { renderer.toneMappingExposure = ok ? base.exposure : base.exposure * 0.55; },
-    frame, resize, scene, camera, renderer, bones, mixer, springs: S,
+    frame, resize, scene, camera, renderer, bones, mixer, springs: S, face,
   };
 }
