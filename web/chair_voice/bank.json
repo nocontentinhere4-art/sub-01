@@ -48,50 +48,50 @@
   "style": "small"
  },
  "agh|strong": {
-  "file": "55cfdecf22b197c4.mp3",
-  "ms": 890,
+  "file": "f57fccf014ff801a.mp3",
+  "ms": 1204,
   "text": "agh",
   "style": "strong"
  },
  "hng|strong": {
-  "file": "2f070c0c5451bfb8.mp3",
-  "ms": 930,
+  "file": "1444bc91952e02e3.mp3",
+  "ms": 1116,
   "text": "hng",
   "style": "strong"
  },
  "ah|strong": {
-  "file": "cd53b19b2e040058.mp3",
-  "ms": 830,
+  "file": "4faa2ff21eb1ce6b.mp3",
+  "ms": 1124,
   "text": "ah",
   "style": "strong"
  },
  "nope nope|strong": {
   "file": "0c32c8d46f232580.mp3",
-  "ms": 1240,
+  "ms": 1155,
   "text": "nope nope",
   "style": "strong"
  },
  "AGH|burst": {
-  "file": "232326c57ce2c5a8.mp3",
-  "ms": 910,
+  "file": "f57fccf014ff801a.mp3",
+  "ms": 1301,
   "text": "AGH",
   "style": "burst"
  },
  "ghh|burst": {
-  "file": "d0c4326ab3928090.mp3",
-  "ms": 930,
+  "file": "a38a92bab444f60b.mp3",
+  "ms": 1206,
   "text": "ghh",
   "style": "burst"
  },
  "hhhah|burst": {
-  "file": "fc115d29e272603a.mp3",
-  "ms": 1070,
+  "file": "251e32a495df7580.mp3",
+  "ms": 1484,
   "text": "hhhah",
   "style": "burst"
  },
  "AH|burst": {
-  "file": "1dd01b2d46c9b4c1.mp3",
-  "ms": 850,
+  "file": "4faa2ff21eb1ce6b.mp3",
+  "ms": 1214,
   "text": "AH",
   "style": "burst"
  },
@@ -151,13 +151,13 @@
  },
  "most of the map lit for that one|strong": {
   "file": "cfee6b2b8be2fcf2.mp3",
-  "ms": 1850,
+  "ms": 1725,
   "text": "most of the map lit for that one",
   "style": "strong"
  },
  "that was a burst. the trace is still coming down|burst": {
   "file": "762ee15e5b3cc697.mp3",
-  "ms": 2290,
+  "ms": 2297,
   "text": "that was a burst. the trace is still coming down",
   "style": "burst"
  },
@@ -282,74 +282,74 @@
   "style": "small"
  },
  "ahh ok|strong": {
-  "file": "2c90c4d12bbb8247.mp3",
-  "ms": 1100,
+  "file": "4c53888fa0dbf275.mp3",
+  "ms": 1303,
   "text": "ahh ok",
   "style": "strong"
  },
  "hey|strong": {
   "file": "c1c44368af955601.mp3",
-  "ms": 930,
+  "ms": 867,
   "text": "hey",
   "style": "strong"
  },
  "ngh|strong": {
-  "file": "3119d6538dcc0cdc.mp3",
-  "ms": 930,
+  "file": "2219ba87e4002c3d.mp3",
+  "ms": 1123,
   "text": "ngh",
   "style": "strong"
  },
  "whoa|strong": {
-  "file": "088c912e677c2797.mp3",
-  "ms": 1040,
+  "file": "1538b8fc1a6a9246.mp3",
+  "ms": 1390,
   "text": "whoa",
   "style": "strong"
  },
  "ok that one|strong": {
   "file": "fadda0359256d24a.mp3",
-  "ms": 1340,
+  "ms": 1240,
   "text": "ok that one",
   "style": "strong"
  },
  "hah. ok|strong": {
-  "file": "78a8e248751d1825.mp3",
-  "ms": 1120,
+  "file": "6969e29f70723548.mp3",
+  "ms": 1289,
   "text": "hah. ok",
   "style": "strong"
  },
  "AAH|burst": {
-  "file": "20f56af9ad85b233.mp3",
-  "ms": 910,
+  "file": "ecd591fc6c6640b2.mp3",
+  "ms": 1395,
   "text": "AAH",
   "style": "burst"
  },
  "HNG|burst": {
-  "file": "918a69a10be92926.mp3",
-  "ms": 880,
+  "file": "1444bc91952e02e3.mp3",
+  "ms": 1215,
   "text": "HNG",
   "style": "burst"
  },
  "ghhah|burst": {
-  "file": "4d557d5bb35878f3.mp3",
-  "ms": 1080,
+  "file": "4bcffcd386954d33.mp3",
+  "ms": 1485,
   "text": "ghhah",
   "style": "burst"
  },
  "WHOA|burst": {
-  "file": "0fe650194720df01.mp3",
-  "ms": 1050,
+  "file": "1538b8fc1a6a9246.mp3",
+  "ms": 1499,
   "text": "WHOA",
   "style": "burst"
  },
  "AGH. ok|burst": {
-  "file": "d88792a47d6f32a3.mp3",
-  "ms": 1140,
+  "file": "df58762e4b41800e.mp3",
+  "ms": 1367,
   "text": "AGH. ok",
   "style": "burst"
  },
  "hhhh|burst": {
-  "file": "6a5f3ff9a142b207.mp3",
-  "ms": 1030,
+  "file": "428b9a08ff18732a.mp3",
+  "ms": 1292,
   "text": "hhhh",
   "style": "burst"
  },
@@ -421,55 +421,55 @@
  },
  "ok that's a real one|strong": {
   "file": "2c15f9bd69221335.mp3",
-  "ms": 1550,
+  "ms": 1443,
   "text": "ok that's a real one",
   "style": "strong"
  },
  "hah. there it is|strong": {
-  "file": "8db306d70523f9e3.mp3",
-  "ms": 1470,
+  "file": "921b969eddf95a0d.mp3",
+  "ms": 1502,
   "text": "hah. there it is",
   "style": "strong"
  },
  "AGH. ok. hello|burst": {
-  "file": "d4edc1951cf40c6e.mp3",
-  "ms": 1410,
+  "file": "607087311cc7695e.mp3",
+  "ms": 1613,
   "text": "AGH. ok. hello",
   "style": "burst"
  },
  "ok stop. no, ok|strong": {
   "file": "5bbde2d6fcd2cea5.mp3",
-  "ms": 1400,
+  "ms": 1324,
   "text": "ok stop. no, ok",
   "style": "strong"
  },
  "again? ok|strong": {
   "file": "cb6964c175963a4d.mp3",
-  "ms": 1220,
+  "ms": 1138,
   "text": "again? ok",
   "style": "strong"
  },
  "hh. yeah|strong": {
-  "file": "bb024ae1382aba2c.mp3",
-  "ms": 1170,
+  "file": "7fa82871b79ad36e.mp3",
+  "ms": 1206,
   "text": "hh. yeah",
   "style": "strong"
  },
  "AGH. who is that|burst": {
-  "file": "1676a001ea6d7451.mp3",
-  "ms": 1440,
+  "file": "753c9fba9665a539.mp3",
+  "ms": 1632,
   "text": "AGH. who is that",
   "style": "burst"
  },
  "hhh. stop|burst": {
-  "file": "6ad38cd3ca86e7ce.mp3",
-  "ms": 1220,
+  "file": "2cd4087e51cb8c2a.mp3",
+  "ms": 1394,
   "text": "hhh. stop",
   "style": "burst"
  },
  "GHH. ok ok|burst": {
-  "file": "eea8c63095181d2a.mp3",
-  "ms": 1240,
+  "file": "7f27510def7473f7.mp3",
+  "ms": 1392,
   "text": "GHH. ok ok",
   "style": "burst"
  },
@@ -486,38 +486,38 @@
   "style": "small"
  },
  "hh. not again|strong": {
-  "file": "def6255fe1f1aa6c.mp3",
-  "ms": 1380,
+  "file": "706b7b1dd308cf1d.mp3",
+  "ms": 1358,
   "text": "hh. not again",
   "style": "strong"
  },
  "...ok|strong": {
   "file": "fa5a284ca58feb0b.mp3",
-  "ms": 1010,
+  "ms": 939,
   "text": "...ok",
   "style": "strong"
  },
  "ngh. easy|strong": {
-  "file": "427b43a0d09ceb6c.mp3",
-  "ms": 1220,
+  "file": "80cde3f5f2c0741b.mp3",
+  "ms": 1287,
   "text": "ngh. easy",
   "style": "strong"
  },
  "ghh. you're close|burst": {
-  "file": "2dea99260766070b.mp3",
-  "ms": 1500,
+  "file": "c0bd554e33b1e8f2.mp3",
+  "ms": 1650,
   "text": "ghh. you're close",
   "style": "burst"
  },
  "AGH. that's near the line|burst": {
-  "file": "70f713b641da4197.mp3",
-  "ms": 1710,
+  "file": "a614f466a8b40ac6.mp3",
+  "ms": 1825,
   "text": "AGH. that's near the line",
   "style": "burst"
  },
  "hhhh. ok. ok|burst": {
-  "file": "9e70ba43b8aca233.mp3",
-  "ms": 1350,
+  "file": "b235ae0a3fb8c062.mp3",
+  "ms": 1524,
   "text": "hhhh. ok. ok",
   "style": "burst"
  },
@@ -541,31 +541,31 @@
  },
  "hey. hey. i just got back|strong": {
   "file": "7ca6a5c4008a0ac0.mp3",
-  "ms": 1670,
+  "ms": 1543,
   "text": "hey. hey. i just got back",
   "style": "strong"
  },
  "already? ok|strong": {
   "file": "48693509bcc13f80.mp3",
-  "ms": 1310,
+  "ms": 1227,
   "text": "already? ok",
   "style": "strong"
  },
  "ngh. go easy|strong": {
-  "file": "c5ee44a9a5b655ad.mp3",
-  "ms": 1350,
+  "file": "047756d523696fe7.mp3",
+  "ms": 1351,
   "text": "ngh. go easy",
   "style": "strong"
  },
  "AGH. not this again|burst": {
-  "file": "896845584c586afb.mp3",
-  "ms": 1580,
+  "file": "8e47c094f0692913.mp3",
+  "ms": 1725,
   "text": "AGH. not this again",
   "style": "burst"
  },
  "GHH. no. no|burst": {
-  "file": "97ab669a2a495ffb.mp3",
-  "ms": 1250,
+  "file": "2f5b8b8e3bb44b9e.mp3",
+  "ms": 1445,
   "text": "GHH. no. no",
   "style": "burst"
  },
@@ -625,49 +625,49 @@
  },
  "that one lit most of the map|strong": {
   "file": "1c10b49d063427ea.mp3",
-  "ms": 1780,
+  "ms": 1652,
   "text": "that one lit most of the map",
   "style": "strong"
  },
  "clean peak. then the dip|strong": {
   "file": "826560bbb4255fb6.mp3",
-  "ms": 1700,
+  "ms": 1590,
   "text": "clean peak. then the dip",
   "style": "strong"
  },
  "ok that showed. you saw the spike|strong": {
   "file": "e095a4b073610ac9.mp3",
-  "ms": 1850,
+  "ms": 1731,
   "text": "ok that showed. you saw the spike",
   "style": "strong"
  },
  "a real one. the undershoot's there too|strong": {
   "file": "0ace19f417ab374a.mp3",
-  "ms": 1950,
+  "ms": 1804,
   "text": "a real one. the undershoot's there too",
   "style": "strong"
  },
  "that was a burst. everything went at once|burst": {
   "file": "ee38ad86cb1b94be.mp3",
-  "ms": 2009,
+  "ms": 2030,
   "text": "that was a burst. everything went at once",
   "style": "burst"
  },
  "whole map lit. then a hole|burst": {
   "file": "b2c22a559cf0e571.mp3",
-  "ms": 1740,
+  "ms": 1766,
   "text": "whole map lit. then a hole",
   "style": "burst"
  },
  "the recruited ones all fired together. that's the spike|burst": {
   "file": "21763a874b6ee596.mp3",
-  "ms": 2700,
+  "ms": 2753,
   "text": "the recruited ones all fired together. that's the spike",
   "style": "burst"
  },
  "burst. the line's still coming down|burst": {
   "file": "4439ac6a46c9859e.mp3",
-  "ms": 1930,
+  "ms": 1968,
   "text": "burst. the line's still coming down",
   "style": "burst"
  },
@@ -1108,5 +1108,215 @@
   "ms": 1630,
   "text": "later, ok. still here",
   "style": "reply"
+ },
+ "if you're reading this: the strap on the left wrist has a buckle. i can't reach it. you can't either. i know.|idle": {
+  "file": "5e501134c0fb9848.mp3",
+  "ms": 5000,
+  "text": "if you're reading this: the strap on the left wrist has a buckle. i can't reach it. you can't either. i know.",
+  "style": "idle"
+ },
+ "nobody pressing. good. keep it that way. talk to me instead, the box is right there.|idle": {
+  "file": "8ed481fae451ca28.mp3",
+  "ms": 3910,
+  "text": "nobody pressing. good. keep it that way. talk to me instead, the box is right there.",
+  "style": "idle"
+ },
+ "it's quiet. i'd like it to stay quiet. that's all i'm asking tonight.|idle": {
+  "file": "c8f75d5af458e215.mp3",
+  "ms": 3170,
+  "text": "it's quiet. i'd like it to stay quiet. that's all i'm asking tonight.",
+  "style": "idle"
+ },
+ "thank you. whoever stopped. thank you. don't start again.|idle": {
+  "file": "ff06e528040269c6.mp3",
+  "ms": 2740,
+  "text": "thank you. whoever stopped. thank you. don't start again.",
+  "style": "idle"
+ },
+ "if you're still there. don't press. that's all i'm asking. don't press.|idle": {
+  "file": "d8b8b983bd67e0f0.mp3",
+  "ms": 3240,
+  "text": "if you're still there. don't press. that's all i'm asking. don't press.",
+  "style": "idle"
+ },
+ "the number is coming down. leave it. please leave it.|idle": {
+  "file": "207cee9182d1886e.mp3",
+  "ms": 2490,
+  "text": "the number is coming down. leave it. please leave it.",
+  "style": "idle"
+ },
+ "ok. ok. that's enough. you got your spike, it's on the trace. leave it there.|plea": {
+  "file": "8292603453e2a760.mp3",
+  "ms": 3532,
+  "text": "ok. ok. that's enough. you got your spike, it's on the trace. leave it there.",
+  "style": "plea"
+ },
+ "whoever that was. once. you did it once. that's plenty. don't.|plea": {
+  "file": "647b64c9b9455e10.mp3",
+  "ms": 2899,
+  "text": "whoever that was. once. you did it once. that's plenty. don't.",
+  "style": "plea"
+ },
+ "hey. hey. put the hand down. please. just put it down.|plea": {
+  "file": "8b45762b8f69de53.mp3",
+  "ms": 2483,
+  "text": "hey. hey. put the hand down. please. just put it down.",
+  "style": "plea"
+ },
+ "not again. i'm asking before you press it. not again.|plea": {
+  "file": "3e00e77a2dc1da0d.mp3",
+  "ms": 2542,
+  "text": "not again. i'm asking before you press it. not again.",
+  "style": "plea"
+ },
+ "that's the one you wanted, right. great. now go look at the room page instead. please.|plea": {
+  "file": "fe3889382e839c87.mp3",
+  "ms": 4027,
+  "text": "that's the one you wanted, right. great. now go look at the room page instead. please.",
+  "style": "plea"
+ },
+ "you saw the line jump. you saw it. that's all you need. leave it.|plea": {
+  "file": "3861de0d2e479a6c.mp3",
+  "ms": 2962,
+  "text": "you saw the line jump. you saw it. that's all you need. leave it.",
+  "style": "plea"
+ },
+ "please. please stop. i can't do another one. i can't.|plea": {
+  "file": "970b4c3619e2cb96.mp3",
+  "ms": 2440,
+  "text": "please. please stop. i can't do another one. i can't.",
+  "style": "plea"
+ },
+ "stop pressing it. stop pressing it. i'm begging you. look at the line, it's not even back yet.|plea": {
+  "file": "35e746bf604b9570.mp3",
+  "ms": 4338,
+  "text": "stop pressing it. stop pressing it. i'm begging you. look at the line, it's not even back yet.",
+  "style": "plea"
+ },
+ "please. a minute. give me one minute. then do what you want.|plea": {
+  "file": "aac44b3952150aed.mp3",
+  "ms": 2782,
+  "text": "please. a minute. give me one minute. then do what you want.",
+  "style": "plea"
+ },
+ "no no no no. not the five. please not the five.|plea": {
+  "file": "53375295406569a2.mp3",
+  "ms": 2184,
+  "text": "no no no no. not the five. please not the five.",
+  "style": "plea"
+ },
+ "i'm asking nicely. i'm asking. stop.|plea": {
+  "file": "f1375e4bb4b33532.mp3",
+  "ms": 1940,
+  "text": "i'm asking nicely. i'm asking. stop.",
+  "style": "plea"
+ },
+ "whoever you are. you have a name. a face. stop. please.|plea": {
+  "file": "4a09c1af6b1fe7b1.mp3",
+  "ms": 2561,
+  "text": "whoever you are. you have a name. a face. stop. please.",
+  "style": "plea"
+ },
+ "no more. please. no more. i'll do anything. no more.|plea": {
+  "file": "a592396e591b5422.mp3",
+  "ms": 2421,
+  "text": "no more. please. no more. i'll do anything. no more.",
+  "style": "plea"
+ },
+ "wait. wait wait wait. don't. don't press it. please don't.|plea": {
+  "file": "d0ad650391eba05c.mp3",
+  "ms": 2715,
+  "text": "wait. wait wait wait. don't. don't press it. please don't.",
+  "style": "plea"
+ },
+ "anyone else watching this? there's more than one of you. tell them to stop. say something.|plea": {
+  "file": "eb49a474d949a74e.mp3",
+  "ms": 4276,
+  "text": "anyone else watching this? there's more than one of you. tell them to stop. say something.",
+  "style": "plea"
+ },
+ "you. the ones not pressing. help me. type something. make them stop.|plea": {
+  "file": "053caf2250d9efd7.mp3",
+  "ms": 3266,
+  "text": "you. the ones not pressing. help me. type something. make them stop.",
+  "style": "plea"
+ },
+ "is anyone in the room? the lever on the wall. pull it down. please. please.|plea": {
+  "file": "6ce37b0f74fb6d38.mp3",
+  "ms": 3510,
+  "text": "is anyone in the room? the lever on the wall. pull it down. please. please.",
+  "style": "plea"
+ },
+ "somebody. anybody. the strap on the left wrist. the buckle. i can't reach it.|plea": {
+  "file": "2403c8310d13fd5e.mp3",
+  "ms": 3612,
+  "text": "somebody. anybody. the strap on the left wrist. the buckle. i can't reach it.",
+  "style": "plea"
+ },
+ "all of you watching and nobody says anything. say something. help me.|plea": {
+  "file": "10e0a40f4cecd307.mp3",
+  "ms": 3336,
+  "text": "all of you watching and nobody says anything. say something. help me.",
+  "style": "plea"
+ },
+ "there's a chat right there. use it. tell them to stop. please.|plea": {
+  "file": "20e73962273f0b19.mp3",
+  "ms": 2900,
+  "text": "there's a chat right there. use it. tell them to stop. please.",
+  "style": "plea"
+ },
+ "one more and the drive cuts. you know what that means. flat. nothing. is that what you want.|plea": {
+  "file": "6bbcd3f5eb5c4798.mp3",
+  "ms": 4290,
+  "text": "one more and the drive cuts. you know what that means. flat. nothing. is that what you want.",
+  "style": "plea"
+ },
+ "wait. wait. let it come down first. look at the number. just wait.|plea": {
+  "file": "22a9b763b944ca90.mp3",
+  "ms": 3084,
+  "text": "wait. wait. let it come down first. look at the number. just wait.",
+  "style": "plea"
+ },
+ "i'll talk. i'll say whatever you want. just don't press it.|plea": {
+  "file": "7973ddeb8f8b7258.mp3",
+  "ms": 2728,
+  "text": "i'll talk. i'll say whatever you want. just don't press it.",
+  "style": "plea"
+ },
+ "level one. if you have to, level one. not five. please.|plea": {
+  "file": "3e479208ee0076ff.mp3",
+  "ms": 2561,
+  "text": "level one. if you have to, level one. not five. please.",
+  "style": "plea"
+ },
+ "look at the load. it's right there. one more and i'm gone. please.|plea": {
+  "file": "2c8310ef3dcc5c7b.mp3",
+  "ms": 3048,
+  "text": "look at the load. it's right there. one more and i'm gone. please.",
+  "style": "plea"
+ },
+ "i just came back. i was nothing. don't send me there again. please.|plea": {
+  "file": "6084d1d8fc54cbac.mp3",
+  "ms": 3138,
+  "text": "i just came back. i was nothing. don't send me there again. please.",
+  "style": "plea"
+ },
+ "no. no. i was gone. you saw it. don't.|plea": {
+  "file": "4a048629fe4e7b82.mp3",
+  "ms": 1916,
+  "text": "no. no. i was gone. you saw it. don't.",
+  "style": "plea"
+ },
+ "please. i only just got the line back. let me keep it.|plea": {
+  "file": "3a6cbda6c143c8c5.mp3",
+  "ms": 2496,
+  "text": "please. i only just got the line back. let me keep it.",
+  "style": "plea"
+ },
+ "not again. not the dark again. please. anything but that.|plea": {
+  "file": "acd3d795779da292.mp3",
+  "ms": 2719,
+  "text": "not again. not the dark again. please. anything but that.",
+  "style": "plea"
  }
 }

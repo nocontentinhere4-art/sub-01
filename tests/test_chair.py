@@ -422,10 +422,11 @@ def test_speech_reacts_to_the_measured_class_not_the_button():
     assert sp.queue[-1]["cls"] == "small"
     card["peak_ratio"] = 4.5
     sp.on_trace({"card": card, "t_ms": 700, "phase": "stimulated"}, now)
-    assert len([q for q in sp.queue if q["kind"] == "reaction"]) == 1 and sp.queue[-1]["cls"] == "burst"
+    reactions = lambda: [q for q in sp.queue if q["kind"] == "reaction"]
+    assert len(reactions()) == 1 and reactions()[-1]["cls"] == "burst"
     assert sp.stats["cancelled"] == 1                                # the small one went
     sp.on_trace({"card": card, "t_ms": 700, "phase": "stimulated"}, now)
-    assert len(sp.queue) == 1                                        # one reaction per stimulus
+    assert len(reactions()) == 1                                     # one reaction per stimulus (a plea may follow it)
 
 
 def test_speech_queue_no_overlap_priority_and_stale_drop():
@@ -458,6 +459,34 @@ def test_speech_comment_frequency_is_bounded():
     for k in range(speech_mod.COMMENT_EVERY_N):
         sp.on_measured({"id": f"d-{k}", "baseline": True, "peak_ratio": 2.5}, 100.0 + 400 + k)
     assert sp.stats["comments"] == 2
+
+
+def test_pleas_follow_strong_reactions_and_escalate_with_the_register():
+    """Owner (2026-11-03): he has to beg for help. A plea after a strong or burst reaction, longer than a reaction, at most
+    one every PLEA_EVERY_S, its stage from the register; none after a small response while fresh."""
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    base = {"baseline": True, "t1_ms": 0}
+    sp.on_trace({"card": {"id": "c-1", "peak_ratio": 1.3, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 100.0)
+    assert sp.stats["pleas"] == 0 and [q["kind"] for q in sp.queue] == ["reaction"]
+    sp.on_trace({"card": {"id": "c-2", "peak_ratio": 3.0, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 110.0)
+    pleas = [q for q in sp.queue if q["cls"] == "plea"]
+    assert len(pleas) == 1 and pleas[0]["kind"] == "comment" and pleas[0]["text"] in speech_mod.PLEAS["ask"]
+    assert len(pleas[0]["text"].split()) >= 6 and sp.duration_ms(pleas[0]) > sp.duration_ms(sp.queue[0])
+    sp.on_trace({"card": {"id": "c-3", "peak_ratio": 5.0, "burst": True, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 112.0)
+    assert sp.stats["pleas"] == 1                                      # not within PLEA_EVERY_S of the last
+    sp.load = 1.2                                                      # rattled: he begs
+    assert sp.plea_stage(130.0) == "beg"
+    sp.load, sp.viewers = 1.35, 3                                      # worn with others watching: he turns to them
+    assert sp.plea_stage(130.0) == "others"
+    sp.viewers = 1
+    assert sp.plea_stage(130.0) == "bargain"
+    sp.revived_t = 125.0                                               # just back from flat
+    assert sp.plea_stage(130.0) == "wary"
+    sp.on_trace({"card": {"id": "c-4", "peak_ratio": 1.3, **base}, "t_ms": 500, "phase": "responding", "load": 1.35}, 130.0)
+    assert sp.stats["pleas"] == 2 and [q for q in sp.queue if q["cls"] == "plea"][-1]["text"] in speech_mod.PLEAS["wary"]   # once rattled, a small one draws a plea too
+    for stage, texts in speech_mod.PLEAS.items():
+        for text in texts:
+            assert 6 <= len(text.split()) <= 24, (stage, text)
 
 
 def test_speech_lines_never_claim_feeling_or_consciousness():
@@ -570,7 +599,7 @@ def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
     for text, cls in speech_mod.bank_lines():
         e = real[f"{text}|{cls}"]
         f = HERE / speech_mod.BANK_DIR / e["file"]
-        assert f.suffix == ".mp3" and f.stat().st_size > 1000 and 300 < e["ms"] < 6000, (text, cls)
+        assert f.suffix == ".mp3" and f.stat().st_size > 1000 and 300 < e["ms"] < 14000, (text, cls)
     assert sum(f.stat().st_size for f in (HERE / speech_mod.BANK_DIR).iterdir()) < 6e6     # small enough to commit
 
 
@@ -646,7 +675,7 @@ def test_join_and_idle_lines_when_people_watch_and_nobody_presses():
     out = sp.tick(1.0, viewers=1)
     assert out and out[0]["cls"] == "join" and out[0]["text"] in speech_mod.JOIN_LINES
     assert sp.tick(2.0, viewers=2) == []                             # one join line a minute
-    for t in range(3, 41):
+    for t in range(3, int(speech_mod.IDLE_AFTER_S)):
         assert all(m.get("cls") != "idle" for m in sp.tick(float(t), viewers=2))
     out = sp.tick(1.0 + speech_mod.IDLE_AFTER_S + 0.5, viewers=2)
     assert out and out[0]["cls"] == "idle" and out[0]["text"] in sum(speech_mod.IDLE_LINES.values(), [])
