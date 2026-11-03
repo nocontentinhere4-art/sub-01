@@ -547,17 +547,13 @@ def test_no_trading_content_on_any_page():
     assert "Contract address" in about and "trade feed" not in about and "read-only: it never connects" not in about   # the coin section is one address line (owner, 2026-11-02)
 
 
-def test_room_first_screen_says_he_is_a_fictional_character():
-    """S10: one always-visible line under the story, in the header (before any tick, at phone width too), with /about."""
+def test_room_has_no_fiction_caption_row():
+    """The room is the slide: no disclaimer row over it (removed on request). The sentence stays on /about and in
+    the #honest line of the room's dock, so the fiction is still stated where it is read."""
     room = (WEB / "room.html").read_text()
-    head = room[room.index('<div id="top">'):room.index('<div id="side">')]
-    m = re.search(r'<div id="fiction">(.*?)</div>', head, re.S)
-    assert m and "hidden" not in m.group(0), "the disclaimer line is missing from the header or hidden"
-    line = m.group(1)
-    assert "fictional character" in line and "simulated life" in line and "Not a person, not conscious" in line
-    assert 'href="/about.html"' in line
-    assert "#fiction[hidden]" not in room and not re.search(r"#fiction\s*\{[^}]*display\s*:\s*none", room)
-    assert room.index('id="fiction"') < room.index('id="tools"')   # directly under the story, above the tools
+    assert 'id="fiction"' not in room and "#fiction" not in room
+    assert "Not a person, not conscious" not in room
+    assert 'id="honest"' in room and "fictional character" in room
 
 
 def test_room_caption_is_an_activity_verb_and_never_leaks_the_browser():

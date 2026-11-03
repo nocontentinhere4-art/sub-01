@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/ui.css">
 <style>
   /* SUB-01 · room: slide 03 of the deck. The room is the slide: full bleed, a quiet instrument HUD over it (the title
-     line under the header, two pills top right, a fiction caption bottom left, the brain square bottom right) and one
+     line under the header, two pills top right, the brain square bottom right) and one
      dock pinned above the pulse (vote · chat · teach · more). Tokens and chrome come from /ui.css; the :where() rules
      below are zero-specificity fallbacks that ui.css v2 overrides. No orange in the UI (the lamp and the window in the
      scene are not UI); the one LIVE chip is the header's. */
@@ -84,15 +84,9 @@
   #state > span:not(:empty) ~ span:not(:empty)::before { content:"·"; padding:0 .7em; color:var(--dim); }
   #night { margin-top:6px; font-family:var(--mono); font-size:12px; letter-spacing:.06em; line-height:1.5; color:var(--ui-blue2, #8fb3ff);
     text-shadow:0 1px 8px #000; max-width:72ch; }
-  /* the fiction line: its own thin row directly above the dock, full width, left aligned (the dock's height is tracked in
-     --dockh, so it rides on top of an open dock); nothing else is drawn in its row: the brain square and the dream
-     frame sit above it (--fich) */
-  :root { --fich:26px; }
-  #fiction { position:fixed; left:0; right:0; bottom:calc(var(--dockb) + var(--dockh)); z-index:6; height:var(--fich); display:block;
-    padding:0 calc(var(--gut) + 18px); background:rgba(0,0,0,.88); border-top:1px solid var(--line); color:var(--fg2);
-    font-family:var(--mono); font-size:12px; line-height:var(--fich); letter-spacing:.02em; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #fiction a { color:var(--fg); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line2); margin-left:.4em; }
-  #fiction .short { display:none; }
+  /* --fich: the row the fiction caption used to take above the dock (removed); the brain square, the dream frame
+     and the loader still offset by it, now zero */
+  :root { --fich:0px; }
 
   /* top right, under the header: today ▾ and the camera */
   #hud { position:fixed; inset:0; z-index:7; pointer-events:none; }
@@ -259,7 +253,7 @@
   #brainpip.still::after { content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,.55) 100%); }
   #corner .ui-caption { color:var(--fg2); text-shadow:0 1px 6px #000; }
 
-  /* the dream frame while he sleeps (R3): above the fiction row, bottom left; a link to /world */
+  /* the dream frame while he sleeps (R3): above the dock, bottom left; a link to /world */
   #dream { position:fixed; left:calc(var(--gut) + 18px); bottom:calc(var(--dockb) + var(--dockh) + var(--fich) + 14px); width:min(220px, 26vw); z-index:5; display:block;
     text-decoration:none; padding:6px; background:var(--glass); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); }
   #dream img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; background:#0b0b0e; }
@@ -282,7 +276,7 @@
   #poster.off { opacity:0; }
   @media (max-aspect-ratio:1/1) { #poster { object-fit:contain; object-position:50% 42%; background:#000; } }   /* (portrait: the whole room, fitted, never a crop that cuts him) */
   #main:focus { outline:none; }                                 /* (the skip link's target: focus lands here, no ring round the whole room) */
-  /* the loader: one small line over the poster, above the fiction caption (not a black screen) */
+  /* the loader: one small line over the poster, above the dock (not a black screen) */
   #boot { position:fixed; inset:0; display:grid; place-items:end center; z-index:3; pointer-events:none; color:var(--fg2);
     padding:0 var(--gut) calc(var(--dockb) + var(--dockh) + var(--fich) + 22px);
     font-family:var(--mono); font-size:12px; letter-spacing:-.01em; transition:opacity .7s var(--ui-ease); }
@@ -316,8 +310,6 @@
     #tools { right:var(--gut); top:calc(var(--hdrh) + 14px); }
     #cam { display:none; }
     #today { width:calc(100vw - 2 * var(--gut)); }
-    #fiction { padding:0 var(--gut); letter-spacing:0; }
-    #fiction .long { display:none; } #fiction .short { display:inline; }
     #side { width:auto; border-radius:0; border-left:0; border-right:0; border-bottom:0; }
     #dockbar { padding:8px var(--gut); gap:8px; flex-wrap:wrap; }
     #tabs { flex:1 1 auto; }
@@ -346,7 +338,7 @@
      JS kept, only guarded), and one dim caption line says what he is doing for 4 s after it changes ===== */
   html.embed, html.embed body { overflow:hidden !important; height:100%; }
   body.embed { padding:0 !important; }
-  body.embed :is(#hdr, #ui-pulse, #reticle, #hud, #top, #state, #story, #fiction, #night, #tools, #cam, #todaybtn, #today, #why, #plan, #side, #dockbar,
+  body.embed :is(#hdr, #ui-pulse, #reticle, #hud, #top, #state, #story, #night, #tools, #cam, #todaybtn, #today, #why, #plan, #side, #dockbar,
     #tabs, #panes, #dock, #feed, #chat, #note, #honest, #corner, #brainpip, #dream, #rxpill, #rx, #rxfloat, #away, #mapcard, #map) { display:none !important; }
   body.embed #boot > div { display:none; }                     /* (the boot screen stays a dark field: no wordmark, no place name) */
   body.embed #scene, body.embed #vignette { position:fixed !important; inset:0 !important; height:auto !important; }
@@ -391,7 +383,6 @@
   <div id="state" class="ui-caption"><span id="chip"></span><span id="clock"></span><span id="where"></span><span id="next"></span></div>
   <div id="night" hidden></div>
 </div>
-<div id="fiction"><span class="long">A fictional character in a simulated life, driven by a brain model · Not a person, not conscious · <a href="/about.html">about</a></span><span class="short">fiction · a brain model, not a person · <a href="/about.html">about</a></span></div>
 <div id="hud" class="ui-hud">
   <div id="tools"><button id="todaybtn" class="ui-btn" type="button" aria-expanded="false" aria-controls="today">today ▾</button><button id="cam" class="ui-btn on" type="button" title="follow what he is looking at, or move the camera freely">camera: follows him</button>
     <div id="today" class="ui-panel" hidden>
@@ -3724,7 +3715,7 @@ function applyTick(m){
       + (life.courier ? `<br>food ordered · ${esc(life.courier.status)}` : ""));
 }
 if (!(DEBUG && new URLSearchParams(location.search).has("nolive"))) connect();
-// the corner captions (fiction, the brain square, the dream frame) ride above the dock, open or folded, and the HUD under
+// the corner captions (the brain square, the dream frame) ride above the dock, open or folded, and the HUD under
 // the header follows the header's height (two rows on phones)
 new ResizeObserver(() => document.documentElement.style.setProperty("--dockh", `${Math.ceil($("side").offsetHeight)}px`)).observe($("side"));
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdrh", `${Math.ceil($("hdr").offsetHeight)}px`)).observe($("hdr"));
