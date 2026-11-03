@@ -42,7 +42,7 @@ LEVEL_MIN, LEVEL_MAX = 1, 5
 QUEUE_MAX = 6
 COOLDOWN_S = 2.0
 PER_MINUTE = 20
-CLIENT_EVERY_S, CLIENT_BURST = 4.0, 2
+CLIENT_EVERY_S, CLIENT_BURST = 3.0, 2
 IDLE_PAUSE_S = 45.0
 TRACE_KEEP = 500                  # bins kept for a late joiner (10 s at 20 ms)
 EVENTS_KEEP = 60
@@ -147,7 +147,7 @@ class SimSource(Source):
                 elif kind == "state":
                     self.running = bool(msg.get("running"))
                     await self._state()
-                elif kind in ("delivered", "measured", "refused", "reset_done"):
+                elif kind in ("delivered", "measured", "refused", "reset_done", "flatline", "revived"):
                     if self.on_event:
                         await self.on_event(msg)
         finally:
@@ -238,6 +238,7 @@ class Hub:
         self.bins = deque(maxlen=TRACE_KEEP)
         self.last_trace = None
         self.stopped = False
+        self.flat = False                         # the network flatlined (a rule of the piece: spiking/alif.py)
         self.last_viewer = clock()
         self.stats = {"submitted": 0, "delivered": 0, "throttled": 0, "full": 0, "refused": 0}
         source.on_trace, source.on_event, source.on_state = self._trace, self._event, self._state
@@ -247,7 +248,7 @@ class Hub:
         s = self.source.status()
         s.update(stopped=self.stopped, queue=len(self.queue), viewers=len(self.clients),
                  cooldown_s=COOLDOWN_S, per_minute=PER_MINUTE, inflight=self.inflight["id"] if self.inflight else None,
-                 open=self.open_card["id"] if self.open_card else None, label=LABEL)
+                 open=self.open_card["id"] if self.open_card else None, label=LABEL, flat=self.flat)
         if self.stopped:
             s["available"] = False
             s["why"] = "stopped by the operator"
@@ -375,7 +376,8 @@ class Hub:
         """The measured state the chat's model call gets: the last cards and the phase, never a feeling."""
         cards = [{k: c.get(k) for k in ("level", "peak_ratio", "burst", "recruit", "recovered_ms", "distinguishable")} for c in list(self.cards)[-3:]]
         return {"phase": (self.last_trace or {}).get("phase"), "last_shocks": cards, "open": bool(self.open_card),
-                "source": self.source.status().get("kind")}
+                "source": self.source.status().get("kind"), "flat": self.flat,
+                "flatlines": (self.last_trace or {}).get("flatlines"), "revivals": (self.last_trace or {}).get("revivals")}
 
     async def run_comments(self):
         """The comment or the chat answer the speech module asked for, written off the loop (the mind's metered model
@@ -443,7 +445,18 @@ class Hub:
                 self.queue.appendleft(req)
             else:
                 self._note({"type": "event", "id": msg.get("id"), "state": "refused", "why": why, "t_wall": int(now * 1000)})
+        elif kind == "flatline":
+            self.flat = True
+            self._note({"type": "event", "state": "flatline", "t_wall": int(now * 1000), **{k: v for k, v in msg.items() if k != "type"}})
+            if self.speech:
+                self.speech.on_flatline(msg, now)
+        elif kind == "revived":
+            self.flat = False
+            self._note({"type": "event", "state": "revived", "t_wall": int(now * 1000), **{k: v for k, v in msg.items() if k != "type"}})
+            if self.speech:
+                self.speech.on_revived(msg, now)
         elif kind == "reset_done":
+            self.flat = False
             self.bins.clear()
             self.cards.clear()
             self.open_card, self.inflight = None, None

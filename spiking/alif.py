@@ -64,6 +64,15 @@ LEVELS = {   # intensity 1-5: pulse amplitude (mV per 1 ms step while on), recru
     5: {"amp": 16.0, "frac": 0.60, "dur_ms": 1000},
 }
 PULSE_HZ, PULSE_WIDTH_MS = 50.0, 2       # the train: 50 pulses a second, each 2 ms (a common clinical range: 20-120 Hz)
+# The arrest, a rule of the piece (owner, 2026-11-03), not a mechanism of any neuron: the mean adaptation current is
+# averaged over the last LOAD_TAU_S (a measured "load"); when it stays above FLAT_LOAD_RATIO times its quiet level,
+# which takes about ten level-5 shocks in a row from one visitor and no amount of level 3 (measured), the background
+# drive is cut to zero, so the network's spontaneous activity stops: a flatline that the trace shows as it is. A shock
+# of level REVIVE_LEVEL or more restores the drive before its pulse train, and the activity returns. While flat,
+# nothing is measured against the baseline and the body hangs.
+LOAD_TAU_S = 15.0
+FLAT_LOAD_RATIO = 1.45
+REVIVE_LEVEL = 3
 MAX_DUR_MS = 1000                        # hard bounds the hub also enforces
 MAX_AMP = 16.0
 
@@ -119,6 +128,7 @@ class ALIFNet(LiveNet):
         self.exc_ids = np.flatnonzero(self.is_exc_np)
         self.inh_ids = np.flatnonzero(~self.is_exc_np)
         self.pulse = None
+        self.flat = False
         self.stim_rng = np.random.default_rng(seed + 5000)
         self._state(seed=seed)
 
@@ -131,6 +141,17 @@ class ALIFNet(LiveNet):
         self.s_i = np.zeros(n, dtype=np.float32)
         self.w_ad = np.zeros(n, dtype=np.float32)
         self.pulse = None
+        self.flat = False
+
+    def arrest(self):
+        """The rule of the piece: the background drive goes to zero; spontaneous activity stops."""
+        self.mu.fill(0.0)
+        self.flat = True
+
+    def restart(self):
+        """The drive is back (a strong shock while flat); the pulse train that follows restarts the activity."""
+        self.mu.fill(self.cfg.mu_ext)
+        self.flat = False
 
     def reset(self):
         """Operator reset: a fresh state on the same wiring (new seed each time so the restart is not a replay)."""
@@ -146,9 +167,14 @@ class ALIFNet(LiveNet):
             np.add.at(buf, tgt, w[syn])
 
     def stimulate(self, level):
-        """Start a pulse train now (one at a time: a new one replaces a running one). -> its card."""
+        """Start a pulse train now (one at a time: a new one replaces a running one). -> its card. While flat, a train
+        of REVIVE_LEVEL or more restores the drive first (the card says "revived")."""
+        revived = False
+        if self.flat and int(level) >= REVIVE_LEVEL:
+            self.restart()
+            revived = True
         self.pulse = Pulse(self, level, self.t, self.stim_rng)
-        return self.pulse.card()
+        return {**self.pulse.card(), "revived": revived, "flat": self.flat}
 
     def stim_on(self):
         return self.pulse is not None and self.pulse.t0 <= self.t < self.pulse.t1
@@ -265,6 +291,9 @@ class Measure:
         self.cards = []                                              # closed cards (newest last, at most 50)
         self.bins = []                                               # recent bins for the trace (dicts), at most 1500
         self.phase = "warming"
+        self.flat_since, self.flatlines, self.revivals = None, 0, 0
+        self.load = 0.0                                              # EWMA of the mean adaptation current (the rule)
+        self.events = []                                             # flatline / revived, drained by the child
 
     # --- one bin -------------------------------------------------------------------------------------------------
     def bin(self):
@@ -280,16 +309,23 @@ class Measure:
         groups = {g: float((per_region[ids] * self.region_n[ids]).sum() / self.group_n[g]) if ids.size else 0.0
                   for g, ids in self.group_ids.items()}
         stim = net.stim_on() or (net.pulse is not None and net.pulse.t0 <= net.t)
+        t_ms = net.t * net.cfg.dt
+        # the arrest rule (module docstring): the load is the adaptation current averaged over LOAD_TAU_S
+        self.load += (self.bin_ms / 1000.0 / LOAD_TAU_S) * (w_mean - self.load)
+        if not net.flat and self.base_main.ready and self.load > FLAT_LOAD_RATIO * max(self.base_main.mean[3], 1e-6):
+            net.arrest()
+            self.flat_since = t_ms
+            self.flatlines += 1
+            self.events.append({"type": "flatline", "t_ms": t_ms, "w": float(w_mean), "base_w": float(self.base_main.mean[3])})
         if net.pulse is not None and net.t >= net.pulse.t1 - 1:
             self.last_stim_end = max(self.last_stim_end, net.pulse.t1)
-        t_ms = net.t * net.cfg.dt
-        quiet = (not stim) and (net.t - self.last_stim_end) * net.cfg.dt >= QUIET_AFTER_MS and t_ms >= WARMUP_MS
+        quiet = (not stim) and (net.t - self.last_stim_end) * net.cfg.dt >= QUIET_AFTER_MS and t_ms >= WARMUP_MS and not net.flat
         main = np.array([rate, rate_e, rate_i, w_mean] + [groups[g] for g in GROUP_KEYS])
         if quiet and self.response is None:
             self.base_main.add(main)
             self.base_region.add(per_region)
         b = {"t_ms": float(t_ms), "rate": float(rate), "rate_e": float(rate_e), "rate_i": float(rate_i), "w": w_mean,
-             "stim": bool(stim), "groups": groups}
+             "stim": bool(stim), "groups": groups, "flat": bool(net.flat)}
         if self.base_main.ready:
             m, s = self.base_main.mean, self.base_main.sd()
             b["ratio"] = float(rate / max(m[0], 1e-6))
@@ -304,6 +340,8 @@ class Measure:
         return b
 
     def _phase(self, b):
+        if self.net.flat:
+            return "flat"
         if not self.base_main.ready:
             return "warming"
         if b["stim"]:
@@ -317,6 +355,11 @@ class Measure:
         """A stimulus starts now: open its card (closed by _update_response)."""
         net = self.net
         m = self.base_main
+        if card.get("revived"):
+            dead_s = (net.t * net.cfg.dt - self.flat_since) / 1000.0 if self.flat_since is not None else None
+            self.revivals += 1
+            self.events.append({"type": "revived", "t_ms": net.t * net.cfg.dt, "dead_s": dead_s, "level": card.get("level")})
+            self.flat_since = None
         self.response = {"id": rid, **card, "t0_ms": net.t * net.cfg.dt, "t1_ms": (net.t * net.cfg.dt) + card["dur_ms"],
                          "baseline": bool(m.ready), "base_rate": float(m.mean[0]) if m.ready else None,
                          "base_w": float(m.mean[3]) if m.ready else None, "w_before": float(net.w_ad.mean()),
@@ -400,14 +443,16 @@ def drive_from(b, base):
     """Measured bin -> the three numbers the body animates from, all 0..1. tension: how far the rate is above baseline
     (log scale, 1 at 8x). slack: how far below (the undershoot after a shock). heavy: the adaptation current above its
     baseline (1 at twice the baseline w). An artistic mapping, not a physiological claim."""
+    if b.get("flat"):
+        return {"tension": 0.0, "slack": 1.0, "heavy": 1.0, "measured": True, "flat": True}
     if not base.get("ready") or "ratio" not in b:
-        return {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "measured": False}
+        return {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "measured": False, "flat": False}
     ratio = max(b["ratio"], 1e-6)
     tension = min(1.0, max(0.0, math.log(ratio) / math.log(8.0)))
     slack = min(1.0, max(0.0, 1.0 - ratio)) if ratio < 1 else 0.0
     heavy = min(1.0, max(0.0, b.get("w_rel", 0.0)))
     return {"tension": round(float(tension), 3), "slack": round(float(slack), 3), "heavy": round(float(heavy), 3),
-            "measured": True}
+            "measured": True, "flat": False}
 
 
 def bench(n=N_NEURONS, seconds=2.0):
@@ -439,8 +484,10 @@ def _trace(M, bins, running, lag_ms):
     last = bins[-1] if bins else None
     return {"type": "trace", "t_ms": float(M.net.t * M.net.cfg.dt), "running": running, "lag_ms": round(lag_ms, 1),
             "bins": [[round(b["t_ms"]), round(b["rate"], 2), round(b["groups"]["somatomotor"], 2), round(b["w"], 2),
-                      int(b["stim"]), round(b.get("ratio", 0.0), 3)] for b in bins],
-            "phase": M.phase, "drive": drive_from(last, base) if last else None, "baseline": base, "card": M.card()}
+                      int(b["stim"]), round(b.get("ratio", 0.0), 3), int(b.get("flat", False))] for b in bins],
+            "phase": M.phase, "flat": bool(M.net.flat), "flatlines": M.flatlines, "revivals": M.revivals,
+            "load": round(M.load / max(M.base_main.mean[3], 1e-6), 3) if M.base_main.ready else None,
+            "drive": drive_from(last, base) if last else None, "baseline": base, "card": M.card()}
 
 
 def serve(net, M, fd_in, out, pace=True):
@@ -478,6 +525,8 @@ def serve(net, M, fd_in, out, pace=True):
                 card = net.stimulate(level)
                 M.open(rid, card)
                 send({"type": "delivered", "id": rid, "t_ms": float(net.t * net.cfg.dt), **card})
+                while M.events:                                   # "revived" goes out right after its delivery
+                    send(M.events.pop(0))
         elif kind == "resume":
             if not state["running"]:
                 state["running"] = True
@@ -533,6 +582,8 @@ def serve(net, M, fd_in, out, pace=True):
         pending.append(M.bin())
         if len(M.cards) > n_cards:
             send({"type": "measured", **M.cards[-1]})
+        while M.events:
+            send(M.events.pop(0))
         if len(pending) >= TRACE_EVERY:
             send(_trace(M, pending, True, anchor["lag"]))
             pending = []

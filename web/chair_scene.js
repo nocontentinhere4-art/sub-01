@@ -1,9 +1,10 @@
-// SUB-01 · the chair scene (web/chair.html): the character seated in a tall wooden chair, head clamp, straps and
-// cables, under one warm lamp against a block wall, after the reference image. His body moves from three measured
-// numbers (chair.py Drive: tension, slack, heavy), never from the button: the only thing that follows the button is
-// the lamp dip at delivery. The procedural layer is additive on the seated clip and bounded by the restraints (the
-// head stays in the clamp, the wrists on the armrests, the torso against the strap), with springs for the body's own
-// inertia. Artistic mappings of simulated signals, not physiology.
+// SUB-01 · the chair scene (web/chair.html): the character seated in a tall wooden chair, head cap, straps and cables,
+// under one hanging lamp in a block-walled cell, after the reference image. His body moves from the measured numbers
+// (chair.py Drive: tension, slack, heavy, flat), never from the button: the only things that follow the button are the
+// lamp dip and the sparks at delivery. The procedural layer is additive on the seated clip and bounded by the restraints
+// (the head stays in the cap, the wrists under the straps, the torso against the belt), with springs for the body's own
+// inertia. Flat (the rule of the piece): the body hangs, the lamp sinks; revival: a jolt from the measured burst.
+// Artistic mappings of simulated signals, not physiology. Everything here is procedural geometry: no bought model.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -12,7 +13,6 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { prep, fixClip } from "./room/char_mixamo.js";
 
 const D2R = Math.PI / 180;
-const WOOD = 0x4a2e1a, WOOD2 = 0x5c3a22, LEATHER = 0x1b1512, METAL = 0x8c8c8c, DARK = 0x2a2a2a;
 
 // a spring that follows its target faster up than down: the body tenses at once and lets go slowly
 class Spring {
@@ -20,55 +20,95 @@ class Spring {
   step(dt) { const k = this.t > this.x ? this.up : this.down, a = k * k * (this.t - this.x) - 2 * k * this.v; this.v += a * dt; this.x += this.v * dt; return this.x; }
 }
 
-function blockWall(w = 6, h = 3.2) {
-  const c = document.createElement("canvas"); c.width = 1024; c.height = 512; const g = c.getContext("2d");
-  g.fillStyle = "#8a7a52"; g.fillRect(0, 0, c.width, c.height);
-  const bw = 1024 / 12, bh = 512 / 12;
-  for (let r = 0; r < 12; r++) for (let i = -1; i < 13; i++) {
-    const x = i * bw + (r % 2 ? bw / 2 : 0), y = r * bh, n = Math.random();
-    g.fillStyle = `rgb(${150 + n * 40 | 0},${132 + n * 36 | 0},${88 + n * 30 | 0})`;
-    g.fillRect(x + 3, y + 3, bw - 6, bh - 6);
-    g.fillStyle = "rgba(0,0,0,.12)"; for (let k = 0; k < 14; k++) g.fillRect(x + 4 + Math.random() * (bw - 10), y + 4 + Math.random() * (bh - 10), 2 + Math.random() * 5, 1 + Math.random() * 2);
-  }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / 4.8, h / 2.4); t.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.95, metalness: 0 });
+// --- procedural materials -----------------------------------------------------------------------------------------------
+function canvasTex(w, h, draw, repeat = [1, 1]) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
-
+const rnd = (a, b) => a + Math.random() * (b - a);
+function blockWall(wm = 6, hm = 3.2) {
+  const map = canvasTex(1024, 512, (g, W, H) => {
+    g.fillStyle = "#6f6248"; g.fillRect(0, 0, W, H);                           // mortar
+    const bw = W / 10, bh = H / 10;
+    for (let r = 0; r < 10; r++) for (let i = -1; i < 11; i++) {
+      const x = i * bw + (r % 2 ? bw / 2 : 0), y = r * bh, n = Math.random();
+      g.fillStyle = `rgb(${136 + n * 46 | 0},${118 + n * 40 | 0},${78 + n * 30 | 0})`; g.fillRect(x + 3, y + 3, bw - 6, bh - 6);
+      g.fillStyle = "rgba(0,0,0,.14)"; for (let k = 0; k < 16; k++) g.fillRect(x + 5 + Math.random() * (bw - 12), y + 5 + Math.random() * (bh - 12), rnd(2, 7), rnd(1, 3));
+      g.fillStyle = "rgba(255,255,255,.07)"; g.fillRect(x + 3, y + 3, bw - 6, 2);                 // a lit top edge per block
+    }
+    // damp and soot: dark stains low
+    const grd = g.createLinearGradient(0, H * 0.55, 0, H); grd.addColorStop(0, "rgba(0,0,0,0)"); grd.addColorStop(1, "rgba(10,8,4,.45)"); g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    for (let k = 0; k < 14; k++) { g.fillStyle = `rgba(20,14,8,${rnd(.05, .18)})`; g.beginPath(); g.ellipse(rnd(0, W), rnd(H * .4, H), rnd(30, 120), rnd(20, 80), 0, 0, Math.PI * 2); g.fill(); }
+  }, [wm / 4.8, hm / 2.4]);
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0 });
+}
+function concrete() {
+  const map = canvasTex(512, 512, (g, W, H) => {
+    g.fillStyle = "#4a4640"; g.fillRect(0, 0, W, H);
+    for (let k = 0; k < 4000; k++) { g.fillStyle = `rgba(${rnd(20, 90) | 0},${rnd(18, 85) | 0},${rnd(16, 78) | 0},${rnd(.08, .3)})`; g.fillRect(rnd(0, W), rnd(0, H), rnd(1, 4), rnd(1, 4)); }
+    for (let k = 0; k < 9; k++) { g.fillStyle = `rgba(15,12,8,${rnd(.1, .3)})`; g.beginPath(); g.ellipse(rnd(0, W), rnd(0, H), rnd(30, 110), rnd(20, 70), rnd(0, 3), 0, Math.PI * 2); g.fill(); }
+    g.strokeStyle = "rgba(0,0,0,.35)"; g.lineWidth = 2; for (let k = 0; k < 5; k++) { g.beginPath(); let x = rnd(0, W), y = rnd(0, H); g.moveTo(x, y); for (let j = 0; j < 8; j++) { x += rnd(-40, 40); y += rnd(-40, 40); g.lineTo(x, y); } g.stroke(); }
+  }, [4, 3]);
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.92, metalness: 0.02 });
+}
 function woodGrain(base = "#4a2e1a") {
-  const c = document.createElement("canvas"); c.width = 256; c.height = 256; const g = c.getContext("2d");
-  g.fillStyle = base; g.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${i % 2 ? 20 : 120},${i % 2 ? 10 : 70},${i % 2 ? 5 : 35},${0.08 + Math.random() * 0.12})`; g.lineWidth = 1 + Math.random() * 2;
-    g.beginPath(); const y = Math.random() * 256; g.moveTo(0, y); g.bezierCurveTo(80, y + (Math.random() - 0.5) * 20, 170, y + (Math.random() - 0.5) * 20, 256, y); g.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.7, metalness: 0.05 });
+  const map = canvasTex(256, 256, (g, W, H) => {
+    g.fillStyle = base; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${i % 2 ? 20 : 120},${i % 2 ? 10 : 70},${i % 2 ? 5 : 35},${rnd(.08, .2)})`; g.lineWidth = rnd(1, 3);
+      g.beginPath(); const y = rnd(0, H); g.moveTo(0, y); g.bezierCurveTo(80, y + rnd(-10, 10), 170, y + rnd(-10, 10), W, y); g.stroke(); }
+  });
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.65, metalness: 0.05 });
+}
+function leatherMat() {
+  const map = canvasTex(128, 128, (g, W, H) => { g.fillStyle = "#1c1511"; g.fillRect(0, 0, W, H); for (let k = 0; k < 1500; k++) { g.fillStyle = `rgba(${rnd(30, 70) | 0},${rnd(22, 50) | 0},${rnd(16, 36) | 0},${rnd(.2, .5)})`; g.fillRect(rnd(0, W), rnd(0, H), 1, 1); } }, [3, 3]);
+  return new THREE.MeshStandardMaterial({ map, roughness: 0.5, metalness: 0.05 });
 }
 
 export async function createScene({ canvas, lite = false, small = false, reduced = false, onProgress = () => {} }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lite ? 1 : 1.5));
-  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = !lite && !small; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setClearColor(0x050505);
-  const scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x050505, 6, 12);
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 40); camera.position.set(0, 1.25, 3.6);
+  renderer.setClearColor(0x030303);
+  const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x050403, 0.085);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 40); camera.position.set(0.15, 1.3, 3.5);
   const controls = new OrbitControls(camera, canvas); controls.target.set(0, 1.12, 0); controls.enablePan = false; controls.enableDamping = true;
-  controls.minDistance = 2.2; controls.maxDistance = 4.6; controls.minPolarAngle = 1.15; controls.maxPolarAngle = 1.72; controls.minAzimuthAngle = -0.7; controls.maxAzimuthAngle = 0.7;
+  controls.minDistance = 2.0; controls.maxDistance = 4.8; controls.minPolarAngle = 1.1; controls.maxPolarAngle = 1.72; controls.minAzimuthAngle = -0.8; controls.maxAzimuthAngle = 0.8;
   controls.rotateSpeed = 0.5; controls.update();
 
-  // --- the room: a block wall, a concrete floor, one warm lamp ------------------------------------------------------
-  const wallMat = blockWall();
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.4), wallMat); wall.position.set(0, 1.7, -1.1); wall.receiveShadow = true; scene.add(wall);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 8), new THREE.MeshStandardMaterial({ color: 0x3a3630, roughness: 0.9 }));
-  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-  scene.add(new THREE.HemisphereLight(0x6a5a3a, 0x0a0806, 0.22));
-  const lamp = new THREE.SpotLight(0xffd79a, 38, 9, 0.62, 0.55, 1.6); lamp.position.set(0.35, 3.1, 1.9); lamp.target.position.set(0, 0.9, 0);
-  lamp.castShadow = renderer.shadowMap.enabled; lamp.shadow.mapSize.set(1024, 1024); lamp.shadow.bias = -0.0004; lamp.shadow.radius = 3; scene.add(lamp, lamp.target);
-  const rim = new THREE.DirectionalLight(0x6f86b0, 0.5); rim.position.set(-1.5, 2.2, -1.5); scene.add(rim);
-  const fill = new THREE.PointLight(0xffe2b0, 2.4, 5, 2); fill.position.set(-1.2, 1.2, 1.4); scene.add(fill);
-  const glow = new THREE.PointLight(0xbfe0ff, 0, 1.2, 2); scene.add(glow);                   // the electrode glow at delivery
-  const base = { lamp: lamp.intensity, exposure: renderer.toneMappingExposure };
+  // --- the cell: block walls on three sides, a concrete floor with a drain, a ceiling, a door ----------------------------
+  const wallMat = blockWall(), floorMat = concrete();
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.4), wallMat); back.position.set(0, 1.7, -1.3); back.receiveShadow = true; scene.add(back);
+  for (const sx of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(6, 3.4), blockWall(6, 3.4)); w.position.set(sx * 3.2, 1.7, 1.7); w.rotation.y = -sx * Math.PI / 2; w.receiveShadow = true; scene.add(w); }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), floorMat); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshStandardMaterial({ color: 0x1a1612, roughness: 1 })); ceiling.rotation.x = Math.PI / 2; ceiling.position.y = 3.4; scene.add(ceiling);
+  const metal = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 0.38, metalness: 0.85 }), dark = new THREE.MeshStandardMaterial({ color: 0x24242a, roughness: 0.55, metalness: 0.5 });
+  const drain = new THREE.Mesh(new THREE.CircleGeometry(0.16, 24), new THREE.MeshStandardMaterial({ color: 0x0b0b0b, roughness: 0.6, metalness: 0.6 })); drain.rotation.x = -Math.PI / 2; drain.position.set(0.55, 0.003, 0.65); scene.add(drain);
+  for (let k = -2; k <= 2; k++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.006, 0.02), metal); bar.position.set(0.55, 0.006, 0.65 + k * 0.05); scene.add(bar); }
+  const door = new THREE.Group(); scene.add(door); door.position.set(-3.19, 0, 0.3); door.rotation.y = Math.PI / 2;
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.6, metalness: 0.6 });
+  const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.1, 0.06), doorMat); leaf.position.set(0, 1.05, 0); door.add(leaf);
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.08, 2.2, 0.1), new THREE.MeshStandardMaterial({ color: 0x1a1c1f, roughness: 0.7, metalness: 0.5 })); doorFrame.position.set(0, 1.1, -0.03); door.add(doorFrame);
+  const slit = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.2), new THREE.MeshStandardMaterial({ color: 0x8fb4d0, emissive: 0x5f88a8, emissiveIntensity: 0.9, roughness: 0.2 })); slit.position.set(0, 1.6, 0.035); door.add(slit);
+  const doorLight = new THREE.PointLight(0x7fa6c8, 1.6, 4, 2); doorLight.position.set(-2.9, 1.6, 0.3); scene.add(doorLight);
 
-  // --- the character and his seated clip ----------------------------------------------------------------------------
+  // --- the lamp: a cord from the ceiling, a cone shade, a bulb, the spot inside, a haze cone -----------------------------
+  scene.add(new THREE.HemisphereLight(0x6a5838, 0x080604, 0.32));
+  const lampPos = new THREE.Vector3(0.2, 2.75, 0.9);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 3.4 - lampPos.y, 6), dark); cord.position.set(lampPos.x, (3.4 + lampPos.y) / 2, lampPos.z); scene.add(cord);
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.2, 28, 1, true), new THREE.MeshStandardMaterial({ color: 0x1f1f22, roughness: 0.5, metalness: 0.7, side: THREE.DoubleSide }));
+  shade.position.copy(lampPos).add(new THREE.Vector3(0, -0.1, 0)); scene.add(shade);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffe9b0, emissive: 0xffd080, emissiveIntensity: 6, roughness: 0.3 })); bulb.position.copy(lampPos).add(new THREE.Vector3(0, -0.16, 0)); scene.add(bulb);
+  const lamp = new THREE.SpotLight(0xffd79a, 64, 10, 0.66, 0.55, 1.4); lamp.position.copy(bulb.position); lamp.target.position.set(0, 0.9, 0.1);
+  lamp.castShadow = renderer.shadowMap.enabled; lamp.shadow.mapSize.set(1024, 1024); lamp.shadow.bias = -0.0004; lamp.shadow.radius = 3; scene.add(lamp, lamp.target);
+  const hazeTex = canvasTex(64, 256, (g, W, H) => { const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "rgba(255,220,160,.55)"); gr.addColorStop(1, "rgba(255,220,160,0)"); g.fillStyle = gr; g.fillRect(0, 0, W, H); });
+  const haze = new THREE.Mesh(new THREE.ConeGeometry(1.9, 2.6, 32, 1, true), new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  haze.position.copy(bulb.position).add(new THREE.Vector3(0, -1.3, 0)); haze.rotation.x = Math.PI; haze.renderOrder = 5; scene.add(haze);
+  const fill = new THREE.PointLight(0xffe2b0, 3.2, 6, 2); fill.position.set(-1.0, 1.3, 1.8); scene.add(fill);
+  const glow = new THREE.PointLight(0xbfe0ff, 0, 1.4, 2); scene.add(glow);                   // the electrode glow at delivery
+  const base = { lamp: lamp.intensity, exposure: renderer.toneMappingExposure, bulb: 6, haze: 0.16 };
+
+  // --- the character and his seated clip ----------------------------------------------------------------------------------
   const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
   const load = url => new Promise((ok, no) => loader.load(url, ok, e => onProgress(url, e), no));
   onProgress("character", null);
@@ -86,88 +126,131 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   const action = mixer.clipAction(clip); action.play();
   mixer.update(0.01); boy.updateMatrixWorld(true);
   const wp = b => bones[b] ? bones[b].getWorldPosition(new THREE.Vector3()) : null;
-
-  // --- the chair, built round the pose: seat under the hips, armrests under the hands, clamp round the head -----------
-  const chair = new THREE.Group(); scene.add(chair);
-  const hips = wp("Hips"), knL = wp("LeftLeg"), knR = wp("RightLeg"), hL = wp("LeftHand"), hR = wp("RightHand"), head = wp("Head"), top = wp("head_end") || head.clone().add(new THREE.Vector3(0, 0.12, 0));
-  const spine = wp("Spine"), fL = wp("LeftFoot"), fR = wp("RightFoot");
-  // he faces +z (the camera); the hips bone sits ~0.23 m above the seat on this rig (the room's seat is 0.505 m under
-  // hips at 0.739); the seat runs from behind the hips to just short of the knees, the back posts stand behind it
-  const seatY = hips.y - 0.23, seatZ0 = hips.z - 0.16, seatZ1 = Math.max(knL.z, knR.z) - 0.03, seatD = Math.max(0.42, seatZ1 - seatZ0), seatW = 0.62;
-  const wood = woodGrain(), wood2 = woodGrain("#5c3a22"), leather = new THREE.MeshStandardMaterial({ color: LEATHER, roughness: 0.55, metalness: 0.05 });
-  const metal = new THREE.MeshStandardMaterial({ color: METAL, roughness: 0.35, metalness: 0.85 }), dark = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.6, metalness: 0.4 });
-  const box = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, 0.008), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = m.receiveShadow = true; chair.add(m); return m; };
-  const cz = (seatZ0 + seatZ1) / 2;
-  box(seatW, 0.05, seatD, wood, 0, seatY, cz);                                                   // the seat
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.06, seatY, 0.06, wood2, sx * (seatW / 2 - 0.04), seatY / 2, cz + sz * (seatD / 2 - 0.04));   // legs
-  const backZ = seatZ0 - 0.02, backH = 2.05;
-  for (const sx of [-1, 1]) box(0.07, backH, 0.07, wood2, sx * (seatW / 2 - 0.035), backH / 2, backZ);     // the tall back posts
-  for (const y of [seatY + 0.35, seatY + 0.75, backH - 0.08]) box(seatW, 0.08, 0.05, wood, 0, y, backZ);  // crossbars
-  box(seatW - 0.14, 0.6, 0.03, wood, 0, seatY + 0.42, backZ + 0.015);                                       // the back board
-  for (const [h, sx] of [[hL, -1], [hR, 1]]) {                                                              // armrests under the hands
-    const ay = h.y - 0.035, az = h.z;
-    box(0.11, 0.045, 0.5, wood, sx * (seatW / 2 - 0.02), ay, az + 0.05);
-    box(0.05, ay - seatY, 0.05, wood2, sx * (seatW / 2 - 0.02), (ay + seatY) / 2, az + 0.22);
-    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.012, 8, 20, Math.PI), leather); strap.position.set(h.x, ay + 0.03, az); strap.rotation.set(0, Math.PI / 2, 0); strap.castShadow = true; chair.add(strap);
-    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.02), metal); buckle.position.set(h.x + sx * 0.05, ay + 0.03, az); chair.add(buckle);
-  }
-  const chest = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.016, 8, 36, Math.PI), leather);             // the chest strap, over the front of the torso
-  chest.position.set(spine.x, spine.y + 0.02, spine.z - 0.02); chest.rotation.set(Math.PI / 2, 0, 0); chest.scale.set(1, 1, 0.75); chest.castShadow = true; chair.add(chest);
-  const cb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.012), metal); cb.position.set(spine.x, spine.y + 0.02, spine.z + 0.16); chair.add(cb);
-  for (const f of [fL, fR]) { const s = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 8, 20), leather); s.position.set(f.x, f.y + 0.08, f.z - 0.04); s.rotation.y = Math.PI / 2; s.scale.set(1, 1.2, 1); chair.add(s); }   // ankle straps
-  // the head clamp: a band round the forehead, two brackets up to the top crossbar, a cap with the electrode, cables
-  const clamp = new THREE.Group(); chair.add(clamp);
-  const band = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.012, 8, 40), dark); band.position.set(head.x, head.y + 0.08, head.z + 0.01); band.rotation.x = Math.PI / 2; band.scale.set(1, 1, 1.15); band.castShadow = true; clamp.add(band);
-  for (const sx of [-1, 1]) { const br = new THREE.Mesh(new THREE.BoxGeometry(0.025, backH - 0.08 - (head.y + 0.08), 0.03), dark); br.position.set(head.x + sx * 0.125, (head.y + 0.08 + backH - 0.08) / 2, head.z + 0.01); br.castShadow = true; clamp.add(br);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.03), dark); arm.position.set(head.x + sx * 0.19, head.y + 0.1, head.z + 0.01); arm.rotation.z = sx * 0.6; clamp.add(arm); }
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.05, 20), metal); cap.position.set(top.x, top.y + 0.015, top.z); cap.castShadow = true; clamp.add(cap);
-  const stud = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 10), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, emissive: 0x3a7fc0, emissiveIntensity: 0.0, roughness: 0.3, metalness: 0.6 }));
-  stud.position.set(top.x, top.y + 0.045, top.z); clamp.add(stud); glow.position.copy(stud.position).add(new THREE.Vector3(0, 0.05, 0.05));
-  const tube = (pts, r, mat) => { const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, r, 7, false), mat); m.castShadow = true; chair.add(m); return m; };
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const junction = box(0.16, 0.22, 0.06, dark, -1.35, 1.75, -1.07);
-  tube([V(top.x, top.y + 0.045, top.z), V(top.x - 0.1, top.y + 0.25, top.z - 0.1), V(-0.6, 2.25, -0.5), V(-1.3, 2.1, -1.0), V(-1.35, 1.87, -1.04)], 0.012, dark);
-  tube([V(top.x + 0.03, top.y + 0.04, top.z + 0.02), V(top.x + 0.22, top.y + 0.1, top.z - 0.08), V(0.4, 1.3, -0.65), V(0.55, 0.25, -0.75), V(-1.3, 0.05, -1.0), V(-1.35, 1.6, -1.04)], 0.011, dark);
-  tube([V(hL.x - 0.05, hL.y - 0.02, hL.z), V(hL.x - 0.3, hL.y - 0.3, hL.z + 0.1), V(-0.9, 0.08, -0.4), V(-1.35, 1.62, -1.05)], 0.008, dark);
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.22, 0.02), new THREE.MeshStandardMaterial({ color: 0x1e1e22, roughness: 0.5 })); plate.position.set(0, 2.75, -1.08); scene.add(plate);
 
-  // --- the body layer -------------------------------------------------------------------------------------------------
-  const S = { tension: new Spring(14, 2.2), slack: new Spring(3, 1.2), heavy: new Spring(2.5, 0.8) };
-  const target = { tension: 0, slack: 0, heavy: 0, measured: false };
+  // --- the chair, built round the pose: a heavy oak frame, a slatted back, padded arms, straps with buckles --------------
+  const chair = new THREE.Group(); scene.add(chair);
+  const hips = wp("Hips"), knL = wp("LeftLeg"), knR = wp("RightLeg"), hL = wp("LeftHand"), hR = wp("RightHand"), head = wp("Head"), top = wp("head_end") || head.clone().add(V(0, 0.12, 0));
+  const spine = wp("Spine"), fL = wp("LeftFoot"), fR = wp("RightFoot"), elL = wp("LeftForeArm"), elR = wp("RightForeArm");
+  // he faces +z (the camera); the hips bone sits ~0.23 m above the seat on this rig; the seat runs from behind the hips to
+  // just short of the knees, the back posts stand behind it
+  const seatY = hips.y - 0.23, seatZ0 = hips.z - 0.17, seatZ1 = Math.max(knL.z, knR.z) - 0.03, seatD = Math.max(0.44, seatZ1 - seatZ0), seatW = 0.66;
+  const wood = woodGrain("#4a2e1a"), wood2 = woodGrain("#3b2414"), leather = leatherMat(), pad = new THREE.MeshStandardMaterial({ color: 0x241a14, roughness: 0.7 });
+  const sponge = new THREE.MeshStandardMaterial({ color: 0xb79c62, roughness: 0.95 });
+  const box = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0, r = 0.006) => { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, r), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = m.receiveShadow = true; chair.add(m); return m; };
+  const screw = (x, y, z, rx = 0, ry = 0) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.006, 10), metal); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); chair.add(m); return m; };
+  const cz = (seatZ0 + seatZ1) / 2, P = 0.09;                                              // post thickness
+  box(seatW, 0.07, seatD, wood, 0, seatY, cz, 0, 0, 0, 0.01);                                // the seat
+  box(seatW - 0.02, 0.09, 0.05, wood2, 0, seatY - 0.08, seatZ1 - 0.02);                     // the apron
+  for (const sx of [-1, 1]) box(P, seatY, P, wood2, sx * (seatW / 2 - P / 2), seatY / 2, seatZ1 - P / 2);             // front legs
+  for (const sx of [-1, 1]) box(0.05, 0.05, seatD - 0.1, wood2, sx * (seatW / 2 - P / 2), 0.16, cz);                 // stretchers
+  box(seatW - 0.1, 0.05, 0.05, wood2, 0, 0.16, seatZ1 - P / 2);
+  const backZ = seatZ0 - 0.03, backH = 2.1;
+  for (const sx of [-1, 1]) box(P, backH, P, wood2, sx * (seatW / 2 - P / 2), backH / 2, backZ);                      // the tall posts
+  box(seatW, 0.12, 0.07, wood, 0, backH - 0.06, backZ, 0, 0, 0, 0.01);                                                // the top rail
+  box(seatW, 0.09, 0.06, wood, 0, seatY + 0.3, backZ);                                                                // the low rail
+  for (let k = -2; k <= 2; k++) box(0.06, backH - 0.5 - (seatY + 0.35), 0.03, wood, k * 0.11, (backH - 0.12 + seatY + 0.35) / 2, backZ + 0.005);   // slats
+  box(seatW - 0.2, 0.3, 0.035, wood, 0, head.y - 0.05, backZ + 0.02, 0, 0, 0, 0.008);                                 // the headboard
+  for (const [h, sx, el] of [[hL, -1, elL], [hR, 1, elR]]) {                                                          // the arms
+    const ay = h.y - 0.045, az = h.z, ax = sx * (seatW / 2 - 0.01);
+    box(0.15, 0.05, 0.62, wood, ax, ay, az + 0.02, 0, 0, 0, 0.008);
+    box(0.12, 0.02, 0.4, pad, ax, ay + 0.035, az + 0.04, 0, 0, 0, 0.006);                                           // the leather pad
+    box(0.06, ay - seatY - 0.03, 0.06, wood2, ax, (ay + seatY) / 2, az + 0.26);                                      // the arm posts
+    box(0.06, ay - seatY - 0.03, 0.06, wood2, ax, (ay + seatY) / 2, az - 0.2);
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.056, 0.014, 8, 20, Math.PI), leather); strap.position.set(h.x, ay + 0.035, az); strap.rotation.set(0, Math.PI / 2, 0); strap.scale.set(1, 1, 1.4); strap.castShadow = true; chair.add(strap);
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.016, 0.03), metal); buckle.position.set(h.x + sx * 0.052, ay + 0.045, az); chair.add(buckle);
+    screw(h.x + sx * 0.062, ay + 0.058, az, Math.PI / 2, 0);
+  }
+  const belt = (y, z, r, sy = 1, w = 0.02) => { const m = new THREE.Mesh(new THREE.TorusGeometry(r, w, 8, 40, Math.PI), leather); m.position.set(spine.x, y, z); m.rotation.set(Math.PI / 2, 0, 0); m.scale.set(1, 1, sy); m.castShadow = true; chair.add(m); return m; };
+  const chest = belt(spine.y + 0.02, spine.z - 0.03, 0.22, 0.78, 0.022);                                              // the chest strap
+  const chestBuckle = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.045, 0.014), metal); chestBuckle.position.set(spine.x, spine.y + 0.02, spine.z + 0.145); chair.add(chestBuckle);
+  const lap = belt(hips.y + 0.02, hips.z - 0.02, 0.2, 0.9, 0.02);                                                     // the lap belt
+  const lapBuckle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.014), metal); lapBuckle.position.set(hips.x, hips.y + 0.02, hips.z + 0.17); chair.add(lapBuckle);
+  for (const f of [fL, fR]) { const s = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.014, 8, 20), leather); s.position.set(f.x, f.y + 0.09, f.z - 0.05); s.rotation.y = Math.PI / 2; s.scale.set(1, 1.2, 1); s.castShadow = true; chair.add(s);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.012), metal); b.position.set(f.x, f.y + 0.09, f.z + 0.015); chair.add(b); }   // ankle straps
+  // the headgear: a sponge-rimmed metal cap on a bracket from the top rail, a chin strap, two cables
+  const clamp = new THREE.Group(); chair.add(clamp);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 0.06, 24), metal); cap.position.set(top.x, top.y + 0.02, top.z); cap.castShadow = true; clamp.add(cap);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 10, 32), sponge); rim.position.set(top.x, top.y - 0.005, top.z); rim.rotation.x = Math.PI / 2; clamp.add(rim);
+  const stud = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, emissive: 0x3a7fc0, emissiveIntensity: 0.0, roughness: 0.3, metalness: 0.6 }));
+  stud.position.set(top.x, top.y + 0.055, top.z); clamp.add(stud); glow.position.copy(stud.position).add(V(0, 0.05, 0.05));
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.03, backH - 0.12 - (top.y + 0.04), 0.03), dark); bracket.position.set(top.x, (top.y + 0.04 + backH - 0.12) / 2, backZ + 0.05); clamp.add(bracket);
+  const bArm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, top.z - backZ - 0.03), dark); bArm.position.set(top.x, top.y + 0.045, (top.z + backZ + 0.05) / 2); clamp.add(bArm);
+  const chin = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 30, Math.PI), leather); chin.position.set(head.x, head.y - 0.03, head.z + 0.0); chin.rotation.set(0, 0, Math.PI); chin.scale.set(1, 0.9, 1); clamp.add(chin);
+  const tube = (pts, r, mat) => { const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, r, 7, false), mat); m.castShadow = true; chair.add(m); return m; };
+  const junction = box(0.2, 0.28, 0.07, dark, -1.55, 1.7, -1.26);
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.03), metal); lever.position.set(-1.55, 1.78, -1.2); lever.rotation.x = -0.5; scene.add(lever);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 10), new THREE.MeshStandardMaterial({ color: 0x7a1a1a, roughness: 0.4 })); knob.position.set(-1.55, 1.87, -1.15); scene.add(knob);
+  tube([V(top.x, top.y + 0.05, top.z), V(top.x - 0.1, top.y + 0.28, top.z - 0.12), V(-0.7, 2.3, -0.7), V(-1.45, 2.1, -1.2), V(-1.55, 1.85, -1.23)], 0.013, dark);
+  tube([V(top.x + 0.03, top.y + 0.045, top.z + 0.02), V(top.x + 0.25, top.y + 0.12, top.z - 0.1), V(0.45, 1.3, -0.8), V(0.6, 0.2, -0.9), V(-1.4, 0.06, -1.15), V(-1.55, 1.55, -1.23)], 0.011, dark);
+  tube([V(hL.x - 0.05, hL.y - 0.03, hL.z), V(hL.x - 0.35, hL.y - 0.35, hL.z + 0.1), V(-1.0, 0.06, -0.5), V(-1.55, 1.57, -1.23)], 0.008, dark);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.24, 0.02), new THREE.MeshStandardMaterial({ color: 0x1b1b1f, roughness: 0.5 })); plate.position.set(0, 2.8, -1.28); scene.add(plate);
+
+  // --- the sparks at delivery: a short burst of additive points from the cap -------------------------------------------
+  const N_SPARK = 90, spPos = new Float32Array(N_SPARK * 3), spVel = [];
+  const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute("position", new THREE.BufferAttribute(spPos, 3));
+  const sparks = new THREE.Points(spGeo, new THREE.PointsMaterial({ color: 0xcfe8ff, size: 0.018, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sparks.visible = false; scene.add(sparks);
+  let sparkT = 0;
+  function sparkBurst() {
+    for (let i = 0; i < N_SPARK; i++) { spPos.set([stud.position.x, stud.position.y, stud.position.z], 3 * i);
+      const a = rnd(0, Math.PI * 2), u = rnd(0.2, 1); spVel[i] = [Math.cos(a) * u * 0.9, rnd(0.3, 1.6), Math.sin(a) * u * 0.9]; }
+    spGeo.attributes.position.needsUpdate = true; sparks.visible = true; sparks.material.opacity = 1; sparkT = 0.55;
+  }
+  function sparkStep(dt) {
+    if (!sparks.visible) return;
+    for (let i = 0; i < N_SPARK; i++) { const v = spVel[i]; v[1] -= 4.5 * dt; spPos[3 * i] += v[0] * dt; spPos[3 * i + 1] += v[1] * dt; spPos[3 * i + 2] += v[2] * dt; }
+    spGeo.attributes.position.needsUpdate = true; sparkT -= dt; sparks.material.opacity = Math.max(0, sparkT / 0.55);
+    if (sparkT <= 0) sparks.visible = false;
+  }
+
+  // --- the body layer -------------------------------------------------------------------------------------------------------
+  const S = { tension: new Spring(14, 2.2), slack: new Spring(3, 1.2), heavy: new Spring(2.5, 0.8), limp: new Spring(1.6, 1.4) };
+  const target = { tension: 0, slack: 0, heavy: 0, measured: false, flat: false };
   const rest = {}; const keep = ["Head", "neck", "Spine", "Spine01", "Spine02", "LeftShoulder", "RightShoulder", "LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand", "RightHand", "LeftFoot", "RightFoot", "LeftUpLeg", "RightUpLeg"];
   for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) keep.push(`finger${f}-${j}.${s}`);
   const q = new THREE.Quaternion(), e = new THREE.Euler();
   const bend = (name, x, y = 0, z = 0) => { const b = bones[name]; if (!b) return; q.setFromEuler(e.set(x * D2R, y * D2R, z * D2R)); b.quaternion.multiply(q); };
-  let t = 0, lampDip = 0, glowT = 0, breath = 0;
+  let t = 0, lampDip = 0, glowT = 0, breath = 0, jolt = 0, flicker = 0;
+  const chairRest = chair.position.clone();
   function body(dt) {
     t += dt;
-    const te = S.tension.step(dt), sl = S.slack.step(dt), hv = S.heavy.step(dt);
+    const te = S.tension.step(dt), sl = S.slack.step(dt), hv = S.heavy.step(dt), li = S.limp.step(dt);
     const tr = reduced ? 0 : te * te * Math.sin(t * 2 * Math.PI * 9.0) * 0.9;              // physiological-tremor band, 9 Hz
     const tr2 = reduced ? 0 : te * te * Math.sin(t * 2 * Math.PI * 7.3 + 1.1) * 0.7;
-    breath += dt * (0.22 + 0.55 * te) * 2 * Math.PI;                                       // 13 to 46 breaths a minute
-    const br = Math.sin(breath) * (0.6 + 0.6 * te);
-    // head: pressed back into the clamp with tension, dropped forward when slack or heavy; a tremor under tension
-    bend("Head", -9 * te + 7 * sl + 5 * hv + tr, tr2 * 0.6, tr * 0.4);
-    bend("neck", -4 * te + 3 * sl + 2 * hv, 0, 0);
-    // torso: arched back against the strap with tension, slumped forward after
-    bend("Spine01", -5 * te + 4 * sl + 3 * hv + br * 0.4, 0, tr2 * 0.3);
-    bend("Spine02", -3 * te + 3 * sl + 2 * hv + br * 0.6, 0, 0);
-    bend("Spine", br * 0.5, 0, 0);
-    // shoulders up and in, forearms pressing into the armrests, fingers gripping
+    breath += dt * (li > 0.5 ? 0.0 : (0.22 + 0.55 * te)) * 2 * Math.PI;                   // 13 to 46 breaths a minute; none when flat
+    const br = Math.sin(breath) * (0.6 + 0.6 * te) * (1 - li);
+    jolt = Math.max(0, jolt - dt / 0.9); const jo = reduced ? 0 : jolt * jolt;
+    // head: pressed back into the cap with tension, dropped forward when slack or heavy, hanging when flat
+    bend("Head", -9 * te + 7 * sl + 5 * hv + 26 * li + tr - 14 * jo, tr2 * 0.6 + 8 * li, tr * 0.4 + 9 * li);
+    bend("neck", -4 * te + 3 * sl + 2 * hv + 10 * li, 0, 3 * li);
+    // torso: arched back against the strap with tension, slumped forward after, folded when flat
+    bend("Spine01", -5 * te + 4 * sl + 3 * hv + 9 * li + br * 0.4 - 6 * jo, 0, tr2 * 0.3 + 2 * li);
+    bend("Spine02", -3 * te + 3 * sl + 2 * hv + 6 * li + br * 0.6, 0, 0);
+    bend("Spine", br * 0.5 + 3 * li, 0, 0);
+    // shoulders up and in, forearms pressing into the armrests, fingers gripping; everything open and heavy when flat
     for (const s of ["Left", "Right"]) { const k = s === "Left" ? 1 : -1;
-      bend(s + "Shoulder", 0, 0, k * (7 * te - 2 * sl));
-      bend(s + "Arm", -4 * te + 2 * hv, 0, k * 3 * te);
-      bend(s + "ForeArm", 6 * te + tr * 0.5, 0, 0);
-      bend(s + "Hand", -8 * te + 3 * sl + tr, 0, k * tr2 * 0.5);
-      bend(s + "UpLeg", -2 * te, 0, k * 1.5 * te);
-      bend(s + "Foot", 8 * te - 2 * sl, 0, 0); }
-    for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) bend(`finger${f}-${j}.${s}`, 0, 0, (s === "L" ? 1 : -1) * (f === 1 ? 10 : 28) * te - (s === "L" ? 1 : -1) * 6 * sl);
-    // the chair takes it: the straps pull, the clamp band tightens a touch
-    chest.scale.set(1 + 0.03 * te, 1 + 0.03 * te, 0.75); band.scale.set(1 - 0.03 * te, 1, 1.15 - 0.03 * te);
-    // light: a single soft dip at delivery (none under reduced motion); the electrode glow rides the measured tension
-    if (lampDip > 0) { lampDip = Math.max(0, lampDip - dt / 0.35); lamp.intensity = base.lamp * (1 - 0.35 * Math.sin(lampDip * Math.PI)); } else lamp.intensity = base.lamp;
+      bend(s + "Shoulder", 0, 0, k * (7 * te - 2 * sl - 5 * li));
+      bend(s + "Arm", -4 * te + 2 * hv + 5 * li - 5 * jo, 0, k * (3 * te - 4 * li));
+      bend(s + "ForeArm", 6 * te + tr * 0.5 - 6 * li, 0, 0);
+      bend(s + "Hand", -8 * te + 3 * sl + tr + 12 * li, 0, k * (tr2 * 0.5 + 6 * li));
+      bend(s + "UpLeg", -2 * te + 2 * li, 0, k * (1.5 * te + 3 * li));
+      bend(s + "Foot", 8 * te - 2 * sl - 6 * li, 0, 0); }
+    for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) bend(`finger${f}-${j}.${s}`, 0, 0, (s === "L" ? 1 : -1) * ((f === 1 ? 10 : 28) * te - 6 * sl - 10 * li));
+    // the chair takes it: the straps pull, the frame rattles under tension (not under reduced motion)
+    chest.scale.set(1 + 0.03 * te, 1 + 0.03 * te, 0.78); lap.scale.set(1 + 0.02 * te, 1 + 0.02 * te, 0.9);
+    const ra = reduced ? 0 : 0.004 * te * te;
+    chair.position.set(chairRest.x + ra * Math.sin(t * 61), chairRest.y + ra * 0.4 * Math.abs(Math.sin(t * 37)), chairRest.z + ra * Math.sin(t * 53 + 1));
+    // light: a single soft dip at delivery; the lamp sinks and flickers while flat; the electrode glow rides the tension
+    flicker = reduced ? 0 : li * (0.5 + 0.5 * Math.sin(t * 2.1)) * (Math.random() < 0.02 ? 0.5 : 0);
+    const lampK = (1 - 0.55 * li) * (1 - flicker * 0.3);
+    if (lampDip > 0) { lampDip = Math.max(0, lampDip - dt / 0.35); lamp.intensity = base.lamp * lampK * (1 - 0.35 * Math.sin(lampDip * Math.PI)); } else lamp.intensity = base.lamp * lampK;
+    bulb.material.emissiveIntensity = base.bulb * lampK; haze.material.opacity = base.haze * lampK;
     glowT = Math.max(glowT - dt / 0.6, 0); const gl = Math.max(glowT, te * 0.6);
     glow.intensity = 4 * gl; stud.material.emissiveIntensity = 2.5 * gl;
+    doorLight.intensity = 1.6 + 1.4 * li;                                                   // the cold light from the door takes over when flat
+    sparkStep(dt);
+    if (!reduced && jo > 0.05) { camera.position.x += (Math.random() - 0.5) * 0.006 * jo; camera.position.y += (Math.random() - 0.5) * 0.004 * jo; }
   }
   function frame(dt) {
     for (const n of keep) { const b = bones[n]; if (b && rest[n]) b.quaternion.copy(rest[n]); }   // the clip only rewrites a bone when its value changes
@@ -185,8 +268,11 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   }
   resize();
   return {
-    setDrive(d) { target.measured = !!(d && d.measured); for (const k of ["tension", "slack", "heavy"]) { S[k].t = target.measured ? Math.min(1, Math.max(0, d[k] || 0)) : 0; } },
-    shock() { if (!reduced) lampDip = 1; glowT = 1; },
+    setDrive(d) { target.measured = !!(d && d.measured); target.flat = !!(d && d.flat);
+      for (const k of ["tension", "slack", "heavy"]) S[k].t = target.measured && !target.flat ? Math.min(1, Math.max(0, d[k] || 0)) : 0;
+      S.limp.t = target.flat ? 1 : 0; },
+    shock() { if (!reduced) lampDip = 1; glowT = 1; sparkBurst(); },
+    revive() { jolt = 1; glowT = 1; sparkBurst(); S.limp.t = 0; S.limp.x = Math.min(S.limp.x, 0.6); },
     setAvailable(ok) { renderer.toneMappingExposure = ok ? base.exposure : base.exposure * 0.55; },
     frame, resize, scene, camera, renderer, bones, mixer, springs: S,
   };

@@ -172,5 +172,41 @@
   "ms": 1780,
   "text": "the baseline is a way off yet",
   "style": "settle"
+ },
+ "...where was i|back": {
+  "file": "b2d27c807e1bf1ba.wav",
+  "ms": 1380,
+  "text": "...where was i",
+  "style": "back"
+ },
+ "hh. ok. i'm back|back": {
+  "file": "a97f19f72faba1be.wav",
+  "ms": 1430,
+  "text": "hh. ok. i'm back",
+  "style": "back"
+ },
+ "that was nothing. then you|back": {
+  "file": "808b7db76c8419b1.wav",
+  "ms": 1730,
+  "text": "that was nothing. then you",
+  "style": "back"
+ },
+ "ok. ok. don't do that again|back": {
+  "file": "1d28829528ccb2ac.wav",
+  "ms": 1720,
+  "text": "ok. ok. don't do that again",
+  "style": "back"
+ },
+ "it went flat. no trace, no noise, nothing. then a kick and the line again. you did that|back": {
+  "file": "25234069fc3f52d2.wav",
+  "ms": 3950,
+  "text": "it went flat. no trace, no noise, nothing. then a kick and the line again. you did that",
+  "style": "back"
+ },
+ "i was gone for a bit. dark isn't the word, there was no word. don't do that again. or do, whatever|back": {
+  "file": "cff7634351ea2e58.wav",
+  "ms": 4410,
+  "text": "i was gone for a bit. dark isn't the word, there was no word. don't do that again. or do, whatever",
+  "style": "back"
  }
 }

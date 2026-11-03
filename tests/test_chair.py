@@ -158,14 +158,14 @@ def test_no_fabricated_response_without_a_baseline():
     run_bins(n, M, 7000)
     c = M.cards[-1]
     assert c["baseline"] is False and c["peak_ratio"] is None and c["distinguishable"] is False
-    assert drive_from({"rate": 40.0}, {"ready": False}) == {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "measured": False}
+    assert drive_from({"rate": 40.0}, {"ready": False}) == {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "measured": False, "flat": False}
 
 
 def test_drive_mapping_is_bounded_and_monotonic():
     base = {"ready": True}
     d = [drive_from({"ratio": r, "w_rel": 0.0}, base)["tension"] for r in (1.0, 2.0, 4.0, 8.0, 50.0)]
     assert d == sorted(d) and d[0] == 0.0 and d[-1] == 1.0
-    assert drive_from({"ratio": 0.5, "w_rel": 0.5}, base) == {"tension": 0.0, "slack": 0.5, "heavy": 0.5, "measured": True}
+    assert drive_from({"ratio": 0.5, "w_rel": 0.5}, base) == {"tension": 0.0, "slack": 0.5, "heavy": 0.5, "measured": True, "flat": False}
 
 
 def test_runtime_is_well_inside_real_time():
@@ -591,3 +591,52 @@ def test_chair_chat_no_filter_limits_and_spoken_answer():
     cc.take_job(130.0)
     assert cc.finish("m-2", None, 130.0)["text"] in speech_mod.NO_MODEL_LINES                # no model: a plain line, never silence
     assert cc.stats == {"messages": 2, "throttled": 1, "replies": 2, "model": 1}
+
+
+# --- the flatline and the revival ------------------------------------------------------------------------------------------------
+def test_flatline_rule_and_revival_in_the_simulation():
+    n = ALIFNet(Config(n_neurons=SMALL, mu_ext=MU_EXT), seed=9)
+    M = Measure(n)
+    run_bins(n, M, 4000)
+    bw = M.base_main.mean[3]
+    for k in range(6):                                              # moderate use never gets there
+        M.open(f"a{k}", n.stimulate(3))
+        run_bins(n, M, 3000)
+    assert not n.flat and M.load < alif.FLAT_LOAD_RATIO * bw and not M.events
+    M.load = alif.FLAT_LOAD_RATIO * bw * 1.01                        # the load the rule reads, pushed over the line
+    run_bins(n, M, 40)
+    assert n.flat and M.events and M.events[0]["type"] == "flatline" and M.phase == "flat"
+    assert float(n.mu.max()) == 0.0
+    b = run_bins(n, M, 1500)
+    assert all(x["flat"] for x in b) and b[-1]["rate"] < 0.05       # no spontaneous activity without the drive
+    assert drive_from(b[-1], M.baseline_view()) == {"tension": 0.0, "slack": 1.0, "heavy": 1.0, "measured": True, "flat": True}
+    c = n.stimulate(2)
+    M.open("weak", c)
+    run_bins(n, M, 1500)
+    assert not c["revived"] and n.flat                               # too weak to bring the drive back
+    c = n.stimulate(alif.REVIVE_LEVEL)
+    M.open("rev", c)
+    assert c["revived"] and not n.flat and M.events[-1]["type"] == "revived" and M.events[-1]["dead_s"] > 2
+    b = run_bins(n, M, 4000)
+    assert b[-1]["rate"] > 1.0 and not b[-1]["flat"]
+
+
+def test_speech_and_chat_go_silent_when_flat_and_speak_on_revival():
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    cc = speech_mod.ChairChat(sp, clock=lambda: 0.0)
+    sp.on_delivered({"id": "c-1", "level": 5}, 1.0)
+    sp._line("reaction", "agh", "c-1", 3.0, 1.0, "strong")
+    sp.on_flatline({"type": "flatline"}, 2.0)
+    assert sp.flat and not sp.queue
+    sp.on_trace({"card": {"id": "c-1", "baseline": True, "peak_ratio": 4.0, "t1_ms": 0}, "t_ms": 100, "phase": "flat"}, 2.5)
+    assert not sp.queue                                             # no reactions while flat
+    assert cc.submit("v", "are you there?", "text", 3.0, {})[0]["state"] == "flat"
+    sp.on_revived({"type": "revived", "dead_s": 7.0, "level": 4}, 10.0)
+    assert not sp.flat and sp.queue and sp.queue[0]["cls"] == "back"
+    job = sp.take_comment_job()
+    assert job and job[0] == "revive" and "flatlined" in job[1] and '"flat_for_s": 7.0' in job[2]
+    sp.finish_comment("revive", None, "back", 10.5)
+    kinds = [(q["kind"], q["cls"]) for q in sp.queue]
+    assert ("reaction", "back") in kinds and ("comment", "back") in kinds
+    out = sp.tick(10.6)
+    assert out[0]["type"] == "say" and out[0]["cls"] == "back"

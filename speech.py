@@ -35,6 +35,7 @@ REACTIONS = {
     "strong": ["agh", "hng", "ah", "nope nope"],
     "burst": ["AGH", "ghh", "hhhah", "AH"],
     "settle": ["...hh", "give me a sec", "whew", "ok. ok."],
+    "back": ["...where was i", "hh. ok. i'm back", "that was nothing. then you", "ok. ok. don't do that again"],
 }
 RULE_COMMENTS = {
     "none": ["that barely showed on the trace", "the line didn't even move", "you can see it: nothing"],
@@ -42,7 +43,17 @@ RULE_COMMENTS = {
     "strong": ["that one went {ratio}x over baseline", "most of the map lit for that one"],
     "burst": ["{recruit} of the regions fired for that. you can see it", "that was a burst. the trace is still coming down"],
     "settle": ["still coming back down from the last one", "the baseline is a way off yet"],
+    "back": ["it went flat. no trace, no noise, nothing. then a kick and the line again. you did that",
+             "i was gone for a bit. dark isn't the word, there was no word. don't do that again. or do, whatever"],
 }
+SYSTEM_BACK = (
+    "You write one or two short lines SUB-01 says, a fictional character of about 20 in a brain-simulation art piece, "
+    "strapped in a chair while visitors send simulated shocks to his simulated brain. His network just flatlined after "
+    "too many shocks (the drive collapsed, the trace went flat) and a strong shock brought it back. You get the measured "
+    "numbers: how long it was flat, how many shocks led there, the level that brought him back. He says how it was, in "
+    "his own words, however he wants to: what the dark was like, what he noticed coming back, what he thinks of whoever "
+    "did it. Lowercase is fine, light slang is fine. At most 45 words. No emojis, no links, no quotes."
+)
 SYSTEM_COMMENT = (
     "You write one short line SUB-01 says, a fictional character of about 20 in a brain-simulation art project, "
     "strapped in a chair while visitors send simulated shocks to his simulated brain. You get the measured numbers "
@@ -277,7 +288,9 @@ class Speech:
         self.since_comment = 0
         self.last_delivered = None           # the newest stimulus id (a comment for an older one is stale)
         self.history = []                    # closed cards (last 6), for the comment's context
-        self.pending_comment = None          # (stimulus id, future) while the model writes
+        self.pending_comment = None          # (stimulus id, state, cls) while the model writes
+        self.flat = False
+        self.shocks_since_revive = 0
         self.stats = {"reactions": 0, "comments": 0, "cancelled": 0, "dropped": 0, "model_calls": 0}
 
     def status(self):
@@ -308,11 +321,30 @@ class Speech:
 
     def on_delivered(self, ev, now):
         self.last_delivered = ev.get("id")
+        self.shocks_since_revive += 1
+
+    def on_flatline(self, ev, now):
+        """The network flatlined: no reactions until it is back; the pending lines go."""
+        self.flat = True
+        self.queue.clear()
+        self.pending_comment = None
+
+    def on_revived(self, ev, now):
+        """Back: a first line at once, then a longer one from the model about how it was (a rule line without one)."""
+        self.flat = False
+        dead_s = ev.get("dead_s")
+        self._line("reaction", self.rng.choice(REACTIONS["back"]), "revive", REACTION_LIFE_S + 2, now, "back")
+        state = {"revived": True, "flat_for_s": round(dead_s, 1) if dead_s is not None else None,
+                 "shocks_before": self.shocks_since_revive, "revived_by_level": ev.get("level"),
+                 "note": "all numbers are measured on a simulated network; the flatline is a rule of the piece"}
+        self.shocks_since_revive = 0
+        self.last_comment_t, self.since_comment = now, 0
+        self.pending_comment = ("revive", state, "back")
 
     def on_trace(self, trace, now):
-        """The open card as the bins come in: the reaction, upgraded while the response grows."""
+        """The open card as the bins come in: the reaction, upgraded while the response grows. Nothing while flat."""
         card = trace.get("card")
-        if not card or not card.get("id"):
+        if self.flat or not card or not card.get("id"):
             return
         rid, cls = card["id"], classify(card)
         if card.get("baseline") and (card.get("peak_ratio") or 0) < CLASS_RATIO["small"]:
@@ -355,16 +387,18 @@ class Speech:
         if job is None:
             return None
         rid, state, cls = job
-        return rid, SYSTEM_COMMENT, json.dumps(state), cls
+        return rid, (SYSTEM_BACK if cls == "back" else SYSTEM_COMMENT), json.dumps(state), cls
 
     def finish_comment(self, rid, text, cls, now):
         """The model's answer (or None: a rule line). Dropped when another shock landed since."""
-        if rid != self.last_delivered:
+        if rid != self.last_delivered and cls != "back":
             self.stats["dropped"] += 1
             return
         if text:
-            text = " ".join(str(text).strip().strip('"').split()[:COMMENT_WORDS])
+            text = " ".join(str(text).strip().strip('"').split()[:COMMENT_WORDS if cls != "back" else 45])
             self.stats["model_calls"] += 1
+        elif cls == "back":
+            text = self.rng.choice(RULE_COMMENTS["back"])
         else:
             card = self.history[-1] if self.history else {}
             tpl = self.rng.choice(RULE_COMMENTS[cls])
@@ -460,6 +494,8 @@ class ChairChat:
         if now - last < CHAT_EVERY_S:
             self.stats["throttled"] += 1
             return {"type": "chat_ack", "state": "throttled", "retry_s": round(CHAT_EVERY_S - (now - last), 1)}, None
+        if self.speech.flat:
+            return {"type": "chat_ack", "state": "flat", "why": "the trace is flat; a strong shock brings him back"}, None
         if self.busy or self.pending is not None:
             return {"type": "chat_ack", "state": "busy", "why": "he is answering someone"}, None
         self.last_by_key[key] = now

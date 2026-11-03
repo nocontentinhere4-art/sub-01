@@ -17,6 +17,7 @@
   #hud .ui-caption { display:block; line-height:1.6; text-shadow:0 1px 6px #000; }
   #src { color:var(--ui-fg); }
   #src.off { color:#ff5b5b; }
+  #phase.flat { color:#ff5b5b; }
   #boot { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:6; padding:8px 14px; border-radius:8px; background:#181818; border:1px solid var(--ui-hair,rgba(255,255,255,.1)); font:12px var(--ui-mono); color:var(--ui-dim); pointer-events:none; }
   #boot[hidden] { display:none; }
   #say { position:fixed; left:50%; bottom:214px; transform:translateX(-50%); z-index:6; max-width:min(560px,calc(100% - 32px)); padding:8px 14px; border-radius:8px;
@@ -42,6 +43,13 @@
   #more td, #more th { padding:2px 10px 2px 0; text-align:left; font-weight:500; }
   #card { font:12px var(--ui-mono); color:var(--ui-dim); margin-top:6px; min-height:16px; }
   #chat { margin-top:10px; border-top:1px solid rgba(255,255,255,.1); padding-top:8px; }
+  @media (min-width:1100px) {   /* wide: the chat beside the controls, so the dock stays low and he stays in view */
+    #dock { width:min(1180px, calc(100% - 24px)); display:grid; grid-template-columns:1fr 340px; grid-template-rows:auto auto auto auto auto; column-gap:18px; align-items:start; }
+    #row, #trace, #legend, #card, #more { grid-column:1; }
+    #chat { grid-column:2; grid-row:1 / span 5; margin-top:0; border-top:0; padding-top:0; border-left:1px solid rgba(255,255,255,.1); padding-left:18px; align-self:stretch; display:flex; flex-direction:column; }
+    #chatlog { flex:1 1 auto; max-height:132px; }
+    #say { bottom:224px; }
+  }
   #chatlog { display:flex; flex-direction:column; gap:3px; max-height:84px; overflow:hidden; font-size:13px; line-height:1.4; }
   #chatlog .you { color:var(--ui-dim); }
   #chatlog .him { color:#fff; }
@@ -151,6 +159,7 @@
   <details id="more"><summary>what this is</summary>
     <p><b>A model, not a mind.</b> A simulated spiking network (20,000 adaptive integrate-and-fire neurons on the same wiring as the rest of the site: excitatory and inhibitory populations per region, conduction delays, synaptic time constants, refractory periods, spike-frequency adaptation, background noise) runs continuously on the server. A shock is a pulse train injected into a random subset of the neurons under the clamp, bounded in amplitude and duration by the level. Nothing is reset between shocks: the second one meets a network still adapted from the first.</p>
     <p><b>What is measured.</b> Population firing rates in 20 ms bins against the network's own quiet baseline, the onset of a response, bursts, how many regions were recruited, the undershoot after the train and the time back inside the baseline band. The trace above is that measurement. If a shock makes no distinguishable response, the card says so.</p>
+    <p><b>The flatline is a rule of the piece.</b> The adaptation current of the network, averaged over the last 15 s, is a measured load. When it stays above 1.45 times its quiet level, which takes about ten level 5 shocks in a row and no amount of level 3, the background drive is cut and the spontaneous activity stops: the trace goes flat, the body hangs, he says nothing. A shock of level 3 or more restores the drive, the activity returns, and he talks about it. No neuron has such a rule; it is the piece's.</p>
     <p><b>What is art.</b> His body animates from three numbers read off the bins (rate above baseline, rate below it, adaptation above its baseline), through springs for the body's inertia; the camera, the lamp dip and his lines are a character's. The movements are artistic mappings of simulated signals, not human physiology. No living neurons and no hardware are connected. The character is fiction.</p>
     <table><tr><th>level</th><th>pulse</th><th>recruits</th><th>train</th></tr><tbody id="levels"></tbody></table>
     <p id="limits"></p>
@@ -192,6 +201,8 @@ function on(m) {
   else if (m.type === "ack") { ack(m); }
   else if (m.type === "event") { st.events.push(m); if (st.events.length > 60) st.events.shift(); eventLine(m);
     if (m.state === "delivered") { if (st.scene) st.scene.shock(); st.open = { id: m.id, level: m.level }; cardLine(); }
+    if (m.state === "flatline") { st.flat = true; setStatus("flatline · the drive collapsed · a shock of level 3 or more brings him back", "bad"); phaseLine(); }
+    if (m.state === "revived") { st.flat = false; if (st.scene) st.scene.revive(); setStatus(`back · flat for ${(m.dead_s || 0).toFixed(1)} s · brought back by a level ${m.level}`, "hot"); }
     if (m.state === "measured") { st.cards.push(m); if (st.cards.length > 10) st.cards.shift(); if (st.open && st.open.id === m.id) st.open = null; cardLine(m); } }
   else if (m.type === "say") { say(m); }
   else if (m.type === "chat") { chatAdd(m); }
@@ -214,9 +225,11 @@ function phaseLine() {
   const s = st.status || {}, tr = st.last;
   if (!s.available) { $("phase").textContent = "no measurement: the network is not running"; return; }
   if (!tr) { $("phase").textContent = "waiting for the first trace…"; return; }
-  const P = { warming: "warming up · no baseline yet", quiet: "quiet · at baseline", stimulated: "stimulus on", responding: "responding", settling: "settling back to baseline" };
-  const b = tr.baseline && tr.baseline.ready ? ` · baseline ${tr.baseline.rate.toFixed(1)} Hz` : "";
-  $("phase").textContent = (P[tr.phase] || tr.phase) + b + (tr.lag_ms > 500 ? ` · ${(tr.lag_ms / 1000).toFixed(1)} s behind` : "");
+  const P = { warming: "warming up · no baseline yet", quiet: "quiet · at baseline", stimulated: "stimulus on", responding: "responding", settling: "settling back to baseline", flat: "flat · no activity · the drive collapsed" };
+  const b = tr.baseline && tr.baseline.ready && tr.phase !== "flat" ? ` · baseline ${tr.baseline.rate.toFixed(1)} Hz` : "";
+  const ld = tr.load != null && tr.phase !== "flat" ? ` · load ${Math.round(100 * Math.min(1, tr.load / 1.6))}%` : "";
+  $("phase").textContent = (P[tr.phase] || tr.phase) + b + ld + (tr.lag_ms > 500 ? ` · ${(tr.lag_ms / 1000).toFixed(1)} s behind` : "");
+  $("phase").classList.toggle("flat", tr.phase === "flat");
 }
 function setStatus(t, cls) { const e = $("status"); e.textContent = t; e.className = cls || ""; }
 function levelsTable(levels, limits) {
@@ -266,6 +279,7 @@ function drawTrace() {
   if (base && base.ready) { g.strokeStyle = "rgba(148,148,161,.6)"; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(0, y(base.rate)); g.lineTo(W, y(base.rate)); g.stroke(); g.setLineDash([]);
     g.fillStyle = "rgba(255,255,255,.05)"; const y1 = y(base.rate + 2 * base.rate_sd), y2 = y(Math.max(lo, base.rate - 2 * base.rate_sd)); g.fillRect(0, y1, W, y2 - y1); }
   g.fillStyle = "rgba(255,91,91,.55)"; for (let i = 0; i < bins.length; i++) if (bins[i][4]) g.fillRect(x(i), H - 4, Math.max(1, W / 500), 4);
+  g.fillStyle = "rgba(255,91,91,.12)"; for (let i = 0; i < bins.length; i++) if (bins[i][6]) g.fillRect(x(i), 0, Math.max(1, W / 500), H);
   const line = (k, color, lw) => { g.strokeStyle = color; g.lineWidth = lw; g.beginPath(); for (let i = 0; i < bins.length; i++) { const p = y(bins[i][k]); i ? g.lineTo(x(i), p) : g.moveTo(x(i), p); } g.stroke(); };
   line(2, "#3f7bff", 1); line(1, "#fff", 1.4);
   g.fillStyle = "#9494a1"; g.font = "11px Geist Mono, monospace"; g.fillText("Hz", 6, 12); for (const v of [1, 10]) g.fillText(String(v), 6, y(v) + 4);
@@ -297,7 +311,7 @@ function chatSend(via) {
 }
 function chatAck(m) {
   const W = { ok: m.reply_in_s > 0.5 ? `sent · he answers in about ${Math.round(m.reply_in_s)} s` : "sent · he is answering",
-    throttled: `one message every 15 s · ${m.retry_s} s`, busy: "he is answering someone else · try again in a moment", empty: "" };
+    throttled: `one message every 15 s · ${m.retry_s} s`, busy: "he is answering someone else · try again in a moment", flat: "the trace is flat · a shock of level 3 or more brings him back", empty: "" };
   $("chatnote").textContent = W[m.state] || m.state;
 }
 $("chatrow").addEventListener("submit", ev => { ev.preventDefault(); chatSend("text"); });

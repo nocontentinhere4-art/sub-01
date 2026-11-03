@@ -52,6 +52,24 @@ through a head. The subset is drawn once per stimulus (modelled chance); nothing
 - numerically: v never above threshold, w bounded, no NaN over minutes of repeated stimulation; the refractory period
   caps every neuron's rate.
 
+## The flatline and the revival (a rule of the piece, owner 11-03)
+
+`Measure.load` is the mean adaptation current averaged over 15 s. When it stays above 1.6x its quiet level
+(`FLAT_LOAD_RATIO` 1.45; about ten level 5 shocks in a row from one visitor, never from level 3, measured at 20k), `ALIFNet.arrest()` sets
+the background drive to zero and the spontaneous activity stops: the trace is flat, the bins carry `flat`, nothing is
+measured against the baseline, the body hangs (`limp`), the lamp sinks, he is silent and the chat answers "flat". A
+shock of level `REVIVE_LEVEL` (3) or more calls `restart()` before its train: a `revived` event with the seconds flat
+and the level, a jolt in the body, a "back" line at once and then a longer line from the model about how it was
+(`SYSTEM_BACK`), or a rule line. No neuron has such a rule; it is written as the piece's and said so on the page.
+
+## The chat
+
+`speech.ChairChat`: messages from the chair page (typed, or spoken through the browser's own speech recognition; no
+audio leaves the device), one per visitor every 15 s, one answer at a time every 20 s at most, answered by the mind's
+metered model call (`SYSTEM_CHAT`) with the measured shocks as context and said in his voice where one answers. By
+the owner's rule there is no content filter on what visitors write and no gate on what he answers: the only bounds
+are length and rate. The room chat keeps its own filter.
+
 ## What is art
 
 The movements (head into the clamp, torso against the strap, shoulders, forearms and fingers on the armrests, feet,
