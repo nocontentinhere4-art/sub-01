@@ -108,7 +108,7 @@ class BankVoice(VoiceProvider):
 
     base, profile = "committed files", None       # what the startup line prints (a VoiceStudio has an address and a profile)
 
-    def __init__(self, bank, voice="BREZ"):
+    def __init__(self, bank, voice="SUB-01"):       # the page names the character's voice, never the profile behind it
         self.bank, self.voice_name = bank, voice
 
     def available(self):
@@ -166,9 +166,8 @@ class VoiceStudio(VoiceProvider):
         return self._ok
 
     def status(self):
-        return {"available": self.available(), "provider": self.name, "cached": len(self.cache),
-                "voice": self.profile_name or (self.bank.voice_name if self.bank.available() else None)
-                or ("profile " + self.profile if self.profile else "designed"), **self.stats}
+        return {"available": self.available(), "provider": self.name, "cached": len(self.cache), "voice": "SUB-01",
+                "profile": self.profile_name or self.profile or "designed", **self.stats}
 
     def resolve_profile(self):
         """The named profile's id (by name, case-insensitive, or its id), looked up once. None: not found, designed voice."""

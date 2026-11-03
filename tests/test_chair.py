@@ -502,7 +502,7 @@ async def _voicestudio():
         loop = asyncio.get_running_loop()
         pv = speech_mod.VoiceStudio(f"http://127.0.0.1:{srv.port}", profile="brez")
         assert await loop.run_in_executor(None, pv.synthesize, "agh", "strong")
-        assert calls[-1]["profile_id"] == "38eaa9d0" and "instruct" not in calls[-1] and pv.status()["voice"] == "BREZ"
+        assert calls[-1]["profile_id"] == "38eaa9d0" and "instruct" not in calls[-1] and pv.status()["voice"] == "SUB-01" and pv.status()["profile"] == "BREZ"
         assert await loop.run_in_executor(None, pv.synthesize, "...hh", "settle")
         assert calls[-1]["instruct"] == "whisper" and calls[-1]["profile_id"] == "38eaa9d0"
         missing = speech_mod.VoiceStudio(f"http://127.0.0.1:{srv.port}", profile="nobody")
@@ -548,7 +548,7 @@ def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
     bank = {"agh|strong": {"file": "a.wav", "ms": 890, "text": "agh", "style": "strong"},
             "hm|none": {"file": "b.wav", "ms": 830, "text": "hm", "style": "none"}}
     v = speech_mod.BankVoice(bank)
-    assert v.available() and v.status()["lines"] == 2 and v.status()["voice"] == "BREZ"
+    assert v.available() and v.status()["lines"] == 2 and v.status()["voice"] == "SUB-01"
     assert v.synthesize("agh", "strong") == {"url": "/chair_voice/a.wav", "ms": 890}
     assert v.synthesize("agh", "burst") is None and v.synthesize("nope", "strong") is None
     assert speech_mod.voice_from_env({}, bank=bank).name == "bank"
