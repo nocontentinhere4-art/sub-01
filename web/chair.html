@@ -41,18 +41,42 @@
   #more table { margin-top:6px; border-collapse:collapse; font:12px var(--ui-mono); color:var(--ui-dim); }
   #more td, #more th { padding:2px 10px 2px 0; text-align:left; font-weight:500; }
   #card { font:12px var(--ui-mono); color:var(--ui-dim); margin-top:6px; min-height:16px; }
+  #chat { margin-top:10px; border-top:1px solid rgba(255,255,255,.1); padding-top:8px; }
+  #chatlog { display:flex; flex-direction:column; gap:3px; max-height:84px; overflow:hidden; font-size:13px; line-height:1.4; }
+  #chatlog .you { color:var(--ui-dim); }
+  #chatlog .him { color:#fff; }
+  #chatlog b { font-weight:600; color:var(--ui-dim); margin-right:6px; }
+  #chatlog .via { font:11px var(--ui-mono); color:var(--ui-faint); margin-left:6px; }
+  #chatrow { display:flex; gap:8px; margin-top:8px; align-items:stretch; }
+  #chatin { flex:1 1 auto; min-width:0; font-size:14px; }
+  #mic { min-width:64px; }
+  #mic[aria-pressed="true"] { background:rgba(255,91,91,.35) !important; border-color:#ff5b5b !important; }
+  #mic[hidden] { display:none; }
+  #chatnote { margin-top:6px; min-height:14px; }
   #card b { color:#fff; font-weight:600; }
   .ui-seg > button { min-width:34px; }
-  @media (max-width:720px) {
+  @media (max-width:720px) {   /* phones (owner, 11-03: everything was too small): bigger targets, bigger type, a compact dock */
     #hdr .ui-nav { order:3; flex:0 0 100%; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:0 -9px; }
     #hdr .ui-nav::-webkit-scrollbar { display:none; }
     #hdr .ui-nav a { flex:none; }
     #hud { left:12px; right:12px; top:118px; max-width:none; }
-    #dock { bottom:34px; width:calc(100% - 16px); padding:10px 10px; }
-    #status { flex-basis:100%; }
-    #trace { height:56px; }
-    #say { bottom:236px; }
-    #more p { max-width:none; }
+    #hud .ui-caption { font-size:13px; }
+    #dock { bottom:32px; width:calc(100% - 12px); padding:10px 10px 8px; border-radius:14px; }
+    #row { gap:8px; }
+    #row > .ui-caption { display:none; }
+    #level { flex:1 1 auto; display:flex; }
+    #level > button { flex:1 1 0; min-height:40px; font-size:16px; }
+    #send { flex:0 0 auto; min-height:44px; font-size:15px; padding:8px 16px; }
+    #status { flex-basis:100%; font-size:13px; white-space:normal; }
+    #trace { height:48px; margin-top:8px; }
+    #legend { display:none; }
+    #card { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #chatlog { max-height:58px; font-size:14px; }
+    #chatin { font-size:16px; min-height:40px; }   /* 16 px: no zoom on focus */
+    #mic, #chatsend { min-height:40px; font-size:14px; }
+    #say { bottom:auto; top:190px; font-size:16px; }
+    #more summary { font-size:13px; }
+    #more p { max-width:none; font-size:14px; }
   }
   /* glass (owner, 11-03): the dock and its controls as liquid glass over the scene, in CSS alone: a backdrop blur, a
      translucent fill, a bright top edge, an inner lens ring and a soft specular that follows the pointer (--mx/--my from
@@ -115,6 +139,15 @@
   <canvas id="trace" width="920" height="72" aria-label="the measured population rate of the simulated network over the last ten seconds"></canvas>
   <div id="legend"><span class="all"><i></i>all neurons</span><span class="sm"><i></i>motor regions</span><span class="st"><i></i>stimulus on</span><span class="bl"><i></i>quiet baseline</span></div>
   <div id="card"></div>
+  <div id="chat">
+    <div id="chatlog" aria-live="polite"></div>
+    <form id="chatrow" autocomplete="off">
+      <input id="chatin" class="ui-input" type="text" maxlength="280" placeholder="say something to him" aria-label="your message to him">
+      <button type="button" class="ui-btn" id="mic" aria-pressed="false" title="hold to talk">talk</button>
+      <button type="submit" class="ui-btn" id="chatsend">send</button>
+    </form>
+    <div id="chatnote" class="ui-caption"></div>
+  </div>
   <details id="more"><summary>what this is</summary>
     <p><b>A model, not a mind.</b> A simulated spiking network (20,000 adaptive integrate-and-fire neurons on the same wiring as the rest of the site: excitatory and inhibitory populations per region, conduction delays, synaptic time constants, refractory periods, spike-frequency adaptation, background noise) runs continuously on the server. A shock is a pulse train injected into a random subset of the neurons under the clamp, bounded in amplitude and duration by the level. Nothing is reset between shocks: the second one meets a network still adapted from the first.</p>
     <p><b>What is measured.</b> Population firing rates in 20 ms bins against the network's own quiet baseline, the onset of a response, bursts, how many regions were recruited, the undershoot after the train and the time back inside the baseline band. The trace above is that measurement. If a shock makes no distinguishable response, the card says so.</p>
@@ -152,7 +185,7 @@ function connect() {
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function on(m) {
   if (m.type === "hello") { st.status = m.status; st.bins = (m.bins || []).slice(-500); st.last = m.trace; st.open = m.card; st.cards = m.cards || []; st.events = m.events || [];
-    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); $("voice").textContent = m.voice && m.voice.available ? "voice: " + (m.voice.voice ? m.voice.voice + (m.voice.provider === "bank" ? ", his lines rendered ahead" : " through " + m.voice.provider + " (local)") : m.voice.provider) : "voice: none, captions only"; }
+    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); chatRender(m.chat || []); $("voice").textContent = m.voice && m.voice.available ? "voice: " + (m.voice.voice ? m.voice.voice + (m.voice.provider === "bank" ? ", his lines rendered ahead" : " through " + m.voice.provider + " (local)") : m.voice.provider) : "voice: none, captions only"; }
   else if (m.type === "trace") { for (const b of m.bins) st.bins.push(b); if (st.bins.length > 520) st.bins.splice(0, st.bins.length - 500); st.last = m; st.open = m.card; st.baseline = m.baseline;
     if (st.scene) st.scene.setDrive(m.drive); drawTrace(); phaseLine(); if (st.open) cardLine(); }
   else if (m.type === "status") { st.status = m; applyStatus(); }
@@ -161,6 +194,8 @@ function on(m) {
     if (m.state === "delivered") { if (st.scene) st.scene.shock(); st.open = { id: m.id, level: m.level }; cardLine(); }
     if (m.state === "measured") { st.cards.push(m); if (st.cards.length > 10) st.cards.shift(); if (st.open && st.open.id === m.id) st.open = null; cardLine(m); } }
   else if (m.type === "say") { say(m); }
+  else if (m.type === "chat") { chatAdd(m); }
+  else if (m.type === "chat_ack") { chatAck(m); }
   else if (m.type === "say_cancel") { if (st.sayT && st.sayT.id === m.id) hideSay(); else stopAudio(); }
   else if (m.type === "full") { setStatus("the chair is full · try again in a minute", "bad"); }
 }
@@ -238,12 +273,48 @@ function drawTrace() {
 
 // --- his lines -----------------------------------------------------------------------------------------------------------
 function say(m) { const e = $("say"); e.innerHTML = ""; const t = document.createElement("span"); t.textContent = m.text; e.appendChild(t);
-  const s = document.createElement("small"); s.textContent = m.kind === "comment" ? "his line" : "his reaction"; e.appendChild(s); e.classList.add("on");
+  const s = document.createElement("small"); s.textContent = m.kind === "comment" ? "his line" : m.kind === "reply" ? "his answer" : "his reaction"; e.appendChild(s); e.classList.add("on");
   stopAudio();
   if (m.voice && m.voice.available && m.voice.url) { try { const a = new Audio(m.voice.url); st.audio = a; a.play().catch(() => { s.textContent += " · sound blocked until you tap the page"; }); } catch {} }
   if (st.sayT && st.sayT.h) clearTimeout(st.sayT.h); st.sayT = { id: m.id, h: setTimeout(hideSay, Math.max(1200, m.ms + 600)) }; }
 function stopAudio() { if (st.audio) { try { st.audio.pause(); } catch {} st.audio = null; } }
 function hideSay() { $("say").classList.remove("on"); st.sayT = null; stopAudio(); }
+
+// --- the chat: text, or speech through the browser's own recogniser (nothing recorded leaves the device) ---------------
+const chatLines = [];
+function chatRender(lines) { chatLines.length = 0; for (const l of lines) chatLines.push(l); chatDraw(); }
+function chatAdd(l) { chatLines.push(l); if (chatLines.length > 12) chatLines.shift(); chatDraw(); }
+function chatDraw() {
+  const log = $("chatlog"); log.innerHTML = "";
+  for (const l of chatLines.slice(-4)) { const d = document.createElement("div"); d.className = l.who === "him" ? "him" : "you";
+    const b = document.createElement("b"); b.textContent = l.who === "him" ? "him" : "you"; d.appendChild(b); d.appendChild(document.createTextNode(l.text));
+    if (l.via === "voice") { const v = document.createElement("span"); v.className = "via"; v.textContent = "spoken"; d.appendChild(v); }
+    log.appendChild(d); }
+}
+function chatSend(via) {
+  const text = $("chatin").value.trim(); if (!text) return;
+  send({ type: "chat", text, via: via || "text" }); $("chatin").value = ""; $("chatnote").textContent = "sending…";
+}
+function chatAck(m) {
+  const W = { ok: m.reply_in_s > 0.5 ? `sent · he answers in about ${Math.round(m.reply_in_s)} s` : "sent · he is answering",
+    throttled: `one message every 15 s · ${m.retry_s} s`, busy: "he is answering someone else · try again in a moment", empty: "" };
+  $("chatnote").textContent = W[m.state] || m.state;
+}
+$("chatrow").addEventListener("submit", ev => { ev.preventDefault(); chatSend("text"); });
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) { $("mic").hidden = true; $("chatnote").textContent = "speaking to him needs Chrome or Safari; typing works everywhere"; }
+else {
+  let rec = null, heard = "";
+  const start = () => { if (rec) return; heard = ""; rec = new SR(); rec.lang = navigator.language || "en-US"; rec.interimResults = true; rec.continuous = false;
+    rec.onresult = ev => { let t = ""; for (const r of ev.results) t += r[0].transcript; heard = t.trim(); $("chatin").value = heard; };
+    rec.onerror = ev => { $("chatnote").textContent = ev.error === "not-allowed" ? "the microphone was not allowed" : "could not hear that"; };
+    rec.onend = () => { rec = null; $("mic").setAttribute("aria-pressed", "false"); if (heard) chatSend("voice"); };
+    try { rec.start(); $("mic").setAttribute("aria-pressed", "true"); $("chatnote").textContent = "listening… release to send"; } catch { rec = null; } };
+  const stop = () => { if (rec) { try { rec.stop(); } catch {} } };
+  $("mic").addEventListener("pointerdown", ev => { ev.preventDefault(); start(); });
+  $("mic").addEventListener("pointerup", stop); $("mic").addEventListener("pointercancel", stop); $("mic").addEventListener("pointerleave", stop);
+  $("mic").addEventListener("keydown", ev => { if (ev.key === " " || ev.key === "Enter") { ev.preventDefault(); rec ? stop() : start(); } });
+}
 
 connect();
 </script>

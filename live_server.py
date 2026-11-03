@@ -1930,6 +1930,14 @@ class Live:
             self.brain.stimulate(group, amount * k)
         self.engine.stimulus(self.clock.now(), "message")
 
+    def chair_chat(self, text):
+        """A message from the chair page reaches the rate model like a room chat line (chat.py's rules), through the
+        sleep gain; the mind's reply is the chair's own (chair.py), not the desk's."""
+        stim, hits, emotion = chat_stimulus(text)
+        gain = self.engine.stimulus(self.clock.now(), "message")
+        for g, a in stim.items():
+            self.brain.stimulate(g, a * gain)
+
     async def handle_react(self, ws, k):
         ids = self.viewer_ids.get(ws, ())
         ok, reason = self.reactions.react(ids[0] if ids else id(ws), k, self.viewer_addr.get(ws))   # IP + UA, the address
@@ -2302,8 +2310,10 @@ async def main(args):
             print(f"chair: voice through {voice.voice.name} at {getattr(voice.voice, 'base', '?')} "
                   f"({'up' if voice.voice.available() else 'not answering yet'}; "
                   f"profile {getattr(voice.voice, 'profile', None) or 'none, designed'})", flush=True)
+        ask = lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None
         chair_hub = chair.Hub(chair.SimSource(), key_of=live.client_ip, on_delivered=live.chair_shock, speech=voice,
-                              admin_ok=lambda r: admin_ok(r) or bool(r.app.get(GATED)))
+                              admin_ok=lambda r: admin_ok(r) or bool(r.app.get(GATED)),
+                              chat=speech_mod.ChairChat(voice, ask=ask), on_chat=live.chair_chat)
         chair.attach(app, chair_hub, nocache=NOCACHE)
     if os.environ.get("CLIPS", "1") != "0":       # #59: daily clips for the social accounts, made in nice'd children
         live.clips = clips.ClipMaker(data_dir)

@@ -216,12 +216,14 @@ class SimSource(Source):
 
 # --- the hub -----------------------------------------------------------------------------------------------------------
 class Hub:
-    def __init__(self, source, key_of=None, clock=time.time, on_delivered=None, speech=None, admin_ok=None):
+    def __init__(self, source, key_of=None, clock=time.time, on_delivered=None, speech=None, admin_ok=None, chat=None, on_chat=None):
         self.source = source
         self.key_of = key_of or (lambda request: request.remote or "?")
         self.clock = clock
         self.on_delivered = on_delivered          # callable(event): the live brain gets the shock too (live_server)
         self.speech = speech                      # speech.Speech or None
+        self.chat = chat                          # speech.ChairChat or None (the page's chat)
+        self.on_chat = on_chat                    # callable(text): the message reaches the live brain too
         self.admin_ok = admin_ok or (lambda request: False)
         self.clients = set()
         self.buckets = {}                         # client key -> Bucket (memory only; stale ones pruned)
@@ -259,7 +261,8 @@ class Hub:
                            "client_every_s": CLIENT_EVERY_S, "client_burst": CLIENT_BURST},
                 "bins": list(self.bins), "trace": self.last_trace, "events": list(self.events)[-20:],
                 "card": self.open_card, "cards": list(self.cards), "label": LABEL,
-                "voice": self.speech.status() if self.speech else {"available": False}}
+                "voice": self.speech.status() if self.speech else {"available": False},
+                "chat": list(self.chat.log) if self.chat else None}
 
     # --- requests ----------------------------------------------------------------------------------------------------
     def submit(self, key, level):
@@ -368,8 +371,15 @@ class Hub:
                 await loop.run_in_executor(None, v.warm)
             await asyncio.sleep(60.0)
 
+    def chat_state(self):
+        """The measured state the chat's model call gets: the last cards and the phase, never a feeling."""
+        cards = [{k: c.get(k) for k in ("level", "peak_ratio", "burst", "recruit", "recovered_ms", "distinguishable")} for c in list(self.cards)[-3:]]
+        return {"phase": (self.last_trace or {}).get("phase"), "last_shocks": cards, "open": bool(self.open_card),
+                "source": self.source.status().get("kind")}
+
     async def run_comments(self):
-        """The comment the speech module asked for, written off the loop (the mind's metered model call)."""
+        """The comment or the chat answer the speech module asked for, written off the loop (the mind's metered model
+        call); the answer is then said (rendered when a voice answers) and shown to everyone."""
         loop = asyncio.get_running_loop()
         while True:
             job = self.speech.take_comment_job() if self.speech else None
@@ -382,6 +392,18 @@ class Hub:
                     except Exception as e:
                         print("chair: comment not written:", repr(e)[:100], flush=True)
                 self.speech.finish_comment(rid, text, cls, self.clock())
+            cj = self.chat.take_job(self.clock()) if self.chat else None
+            if cj:
+                mid, system, user = cj
+                text = None
+                if self.chat.ask:
+                    try:
+                        text = await loop.run_in_executor(None, self.chat.ask, system, user)
+                    except Exception as e:
+                        print("chair: answer not written:", repr(e)[:100], flush=True)
+                line = self.chat.finish(mid, text, self.clock())
+                if line:
+                    await self.broadcast(line)
             await asyncio.sleep(0.5)
 
     # --- from the source ------------------------------------------------------------------------------------------
@@ -478,6 +500,16 @@ class Hub:
                     continue
                 if isinstance(d, dict) and d.get("type") == "shock":
                     await ws.send_json(self.submit(key, d.get("level")))
+                elif isinstance(d, dict) and d.get("type") == "chat" and self.chat and isinstance(d.get("text"), str):
+                    ack, msg = self.chat.submit(key, d["text"], d.get("via"), self.clock(), self.chat_state())
+                    await ws.send_json(ack)
+                    if msg:
+                        await self.broadcast(msg)
+                        if self.on_chat:
+                            try:
+                                self.on_chat(msg["text"])
+                            except Exception as e:
+                                print("chair: chat hook:", repr(e)[:80], flush=True)
                 elif isinstance(d, dict) and d.get("type") == "status":
                     await ws.send_json({"type": "status", **self.status()})
         finally:
@@ -523,7 +555,8 @@ def attach(app, hub, page=HERE / "web" / "chair.html", nocache=None):
         return web.Response(body=wav, content_type="audio/wav", headers={"Cache-Control": "private, max-age=600"})
     app.router.add_get("/api/chair/voice/{key}.wav", voice_file)
     app.router.add_get("/api/chair/status", lambda r: web.json_response(
-        {**hub.status(), "stats": hub.stats, "cards": list(hub.cards)[-5:]}, headers=nocache))
+        {**hub.status(), "stats": hub.stats, "cards": list(hub.cards)[-5:],
+         "chat": hub.chat.stats if hub.chat else None}, headers=nocache))
 
     def op(fn):
         async def handler(request):

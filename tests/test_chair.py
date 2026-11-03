@@ -568,3 +568,26 @@ def test_every_voice_provider_survives_the_startup_log_line():
     for v in (speech_mod.NoVoice(), speech_mod.BankVoice({"a|b": {"file": "a.wav", "ms": 1}}), speech_mod.VoiceStudio("http://127.0.0.1:1")):
         line = f"{v.name} at {getattr(v, 'base', '?')} ({'up' if v.available() else 'not answering yet'}; profile {getattr(v, 'profile', None) or 'none, designed'})"
         assert v.name in line
+
+
+# --- the chair chat --------------------------------------------------------------------------------------------------------------
+def test_chair_chat_no_filter_limits_and_spoken_answer():
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    cc = speech_mod.ChairChat(sp, ask=None, clock=lambda: 0.0)
+    state = {"phase": "quiet", "last_shocks": [], "open": False, "source": "simulation"}
+    ack, msg = cc.submit("a", "  hey   are you ok? https://x.y $$$ ", "voice", 100.0, state)
+    assert ack["state"] == "ok" and msg["who"] == "you" and msg["via"] == "voice" and msg["text"] == "hey are you ok? https://x.y $$$"   # no filter
+    assert cc.submit("a", "again", "text", 101.0, state)[0]["state"] == "throttled"       # one every 15 s per visitor
+    assert cc.submit("b", "me too", "text", 101.0, state)[0]["state"] == "busy"           # one answer at a time
+    assert cc.submit("c", "", "text", 101.0, state)[0]["state"] == "empty"
+    assert cc.submit("c", "x" * 400, "text", 101.0, state)[0]["state"] == "busy" and len("x" * 400) > speech_mod.CHAT_MAX
+    job = cc.take_job(100.0)
+    assert job and job[0] == "m-1" and "SUB-01" in job[1] and "hey are you ok" in job[2] and "never" not in job[1].lower()
+    line = cc.finish("m-1", '"strapped in a chair and you ask if i am ok. peak was 4x. ' + "word " * 60 + '"', 102.0)
+    assert line["who"] == "him" and line["to"] == "m-1" and len(line["text"].split()) == speech_mod.REPLY_WORDS   # length is the only bound
+    out = sp.tick(102.1)
+    assert out and out[0]["type"] == "say" and out[0]["kind"] == "reply" and out[0]["text"] == line["text"]
+    assert cc.submit("b", "me too", "text", 103.0, state)[0]["state"] == "ok"              # free again
+    cc.take_job(130.0)
+    assert cc.finish("m-2", None, 130.0)["text"] in speech_mod.NO_MODEL_LINES                # no model: a plain line, never silence
+    assert cc.stats == {"messages": 2, "throttled": 1, "replies": 2, "model": 1}
