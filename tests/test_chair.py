@@ -609,7 +609,7 @@ def test_speech_never_repeats_a_line_while_it_is_recent():
     for k in range(12):
         sp.on_delivered({"id": f"c-{k}", "level": 5}, float(k))
         sp.on_trace({"card": {"id": f"c-{k}", "baseline": True, "peak_ratio": 3.0, "t1_ms": 0}, "t_ms": 100, "phase": "responding"}, float(k))
-        said.append(sp.queue[-1]["text"])
+        said.append([q for q in sp.queue if q["kind"] == "reaction"][-1]["text"])
     assert len(set(said)) == 12                                      # twelve strong reactions, twelve different lines
     p = speech_mod.Picker(random.Random(1))
     seq = [p.pick(["a", "b"]) for _ in range(6)]
@@ -620,6 +620,46 @@ def test_speech_never_repeats_a_line_while_it_is_recent():
         sp.finish_comment(f"c-{k}", None, "strong", 20.0 + k)
     texts = [q["text"] for q in sp.queue if q["kind"] == "comment"]
     assert len(set(texts)) == len(texts)
+
+
+def test_breaths_follow_reactions_and_fill_the_quiet():
+    """Owner (2026-11-03): he keeps talking, not one line and five seconds of silence. After a strong or burst reaction:
+    panting, the plea, then a sob (rattled or worse) or a groan (fresh, burst). Once rattled, breaths between idle lines.
+    The recordings behind them are real people in his voice (tools/chair_screams); the caption is the line's text."""
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    base = {"baseline": True, "t1_ms": 0}
+    sp.on_trace({"card": {"id": "c-1", "peak_ratio": 5.0, "burst": True, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 100.0)
+    kinds = [(q["kind"], q["cls"]) for q in sp.queue]
+    assert kinds == [("reaction", "burst"), ("breath", "pant"), ("comment", "plea"), ("breath", "groan")]
+    assert all(q["text"] in speech_mod.BREATHS[q["cls"]] for q in sp.queue if q["kind"] == "breath")
+    out = sp.tick(100.1)                                             # the reaction plays first, then the breaths and the plea in order
+    assert out[0]["kind"] == "reaction"
+    order = []
+    for t in range(1, 60):
+        for m in sp.tick(100.1 + t):
+            if m["type"] == "say":
+                order.append(m["kind"])
+    assert order == ["breath", "comment", "breath"]
+    assert not sp.recent_said or all(t not in sum(speech_mod.BREATHS.values(), []) for t in sp.recent_said)   # never in his recent lines
+    # rattled: a sob after the plea; and a breath between idle lines while people watch
+    sp2 = speech_mod.Speech(clock=lambda: 0.0)
+    sp2.on_trace({"card": {"id": "c-2", "peak_ratio": 3.0, **base}, "t_ms": 500, "phase": "responding", "load": 1.2}, 200.0)
+    assert [q["cls"] for q in sp2.queue] == ["strong", "pant", "plea", "sob"]
+    sp2.queue.clear(); sp2.playing = None
+    n0 = sp2.stats["breaths"]
+    for t in range(0, 80):
+        sp2.tick(210.0 + t, viewers=1)
+    assert sp2.stats["breaths"] > n0 and sp2.stats["idle_lines"] >= 2       # idle lines every IDLE_EVERY_S, breaths between
+    # a new shock interrupts a breath that is playing
+    sp3 = speech_mod.Speech(clock=lambda: 0.0)
+    sp3._breath("pant", "idle", 300.0)
+    sp3.tick(300.1)
+    assert sp3.playing and sp3.playing["kind"] == "breath"
+    sp3.on_trace({"card": {"id": "c-3", "peak_ratio": 5.0, "burst": True, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 300.5)
+    out = sp3.tick(300.6)
+    assert out[0]["type"] == "say_cancel" and out[1]["kind"] == "reaction"
+    # every breath caption is in the bank, as every rule line is
+    assert all((t, cls) in list(speech_mod.bank_lines()) for cls, ts in speech_mod.BREATHS.items() for t in ts)
 
 
 def test_register_is_measured_from_load_shocks_and_revival():

@@ -48,50 +48,50 @@
   "style": "small"
  },
  "agh|strong": {
-  "file": "f57fccf014ff801a.mp3",
-  "ms": 1204,
+  "file": "0edbb510a418401a.mp3",
+  "ms": 2462,
   "text": "agh",
   "style": "strong"
  },
  "hng|strong": {
-  "file": "1444bc91952e02e3.mp3",
-  "ms": 1116,
+  "file": "0f4bda36cd01222d.mp3",
+  "ms": 2126,
   "text": "hng",
   "style": "strong"
  },
  "ah|strong": {
-  "file": "4faa2ff21eb1ce6b.mp3",
-  "ms": 1124,
+  "file": "e7fdfdbb8f459a9d.mp3",
+  "ms": 2091,
   "text": "ah",
   "style": "strong"
  },
  "nope nope|strong": {
   "file": "0c32c8d46f232580.mp3",
-  "ms": 1155,
+  "ms": 1240,
   "text": "nope nope",
   "style": "strong"
  },
  "AGH|burst": {
-  "file": "f57fccf014ff801a.mp3",
-  "ms": 1301,
+  "file": "4e665c9d582fc722.mp3",
+  "ms": 3774,
   "text": "AGH",
   "style": "burst"
  },
  "ghh|burst": {
-  "file": "a38a92bab444f60b.mp3",
-  "ms": 1206,
+  "file": "92007124608a5a10.mp3",
+  "ms": 3449,
   "text": "ghh",
   "style": "burst"
  },
  "hhhah|burst": {
-  "file": "251e32a495df7580.mp3",
-  "ms": 1484,
+  "file": "87fed48a1cad86b5.mp3",
+  "ms": 3449,
   "text": "hhhah",
   "style": "burst"
  },
  "AH|burst": {
-  "file": "4faa2ff21eb1ce6b.mp3",
-  "ms": 1214,
+  "file": "865884c1b8675b29.mp3",
+  "ms": 3171,
   "text": "AH",
   "style": "burst"
  },
@@ -151,13 +151,13 @@
  },
  "most of the map lit for that one|strong": {
   "file": "cfee6b2b8be2fcf2.mp3",
-  "ms": 1725,
+  "ms": 1848,
   "text": "most of the map lit for that one",
   "style": "strong"
  },
  "that was a burst. the trace is still coming down|burst": {
   "file": "762ee15e5b3cc697.mp3",
-  "ms": 2297,
+  "ms": 2293,
   "text": "that was a burst. the trace is still coming down",
   "style": "burst"
  },
@@ -282,74 +282,74 @@
   "style": "small"
  },
  "ahh ok|strong": {
-  "file": "4c53888fa0dbf275.mp3",
-  "ms": 1303,
+  "file": "8fe6294fa140a92e.mp3",
+  "ms": 2954,
   "text": "ahh ok",
   "style": "strong"
  },
  "hey|strong": {
   "file": "c1c44368af955601.mp3",
-  "ms": 867,
+  "ms": 934,
   "text": "hey",
   "style": "strong"
  },
  "ngh|strong": {
-  "file": "2219ba87e4002c3d.mp3",
-  "ms": 1123,
+  "file": "fd8f2fe458cd4bf5.mp3",
+  "ms": 1336,
   "text": "ngh",
   "style": "strong"
  },
  "whoa|strong": {
-  "file": "1538b8fc1a6a9246.mp3",
-  "ms": 1390,
+  "file": "abfa2b5adb6005df.mp3",
+  "ms": 1139,
   "text": "whoa",
   "style": "strong"
  },
  "ok that one|strong": {
   "file": "fadda0359256d24a.mp3",
-  "ms": 1240,
+  "ms": 1340,
   "text": "ok that one",
   "style": "strong"
  },
  "hah. ok|strong": {
-  "file": "6969e29f70723548.mp3",
-  "ms": 1289,
+  "file": "8fe6294fa140a92e.mp3",
+  "ms": 2350,
   "text": "hah. ok",
   "style": "strong"
  },
  "AAH|burst": {
-  "file": "ecd591fc6c6640b2.mp3",
-  "ms": 1395,
+  "file": "5928ddc7e17969f2.mp3",
+  "ms": 3565,
   "text": "AAH",
   "style": "burst"
  },
  "HNG|burst": {
-  "file": "1444bc91952e02e3.mp3",
-  "ms": 1215,
+  "file": "8d5c3c17b5965640.mp3",
+  "ms": 2695,
   "text": "HNG",
   "style": "burst"
  },
  "ghhah|burst": {
-  "file": "4bcffcd386954d33.mp3",
-  "ms": 1485,
+  "file": "354e12955e1f7720.mp3",
+  "ms": 2625,
   "text": "ghhah",
   "style": "burst"
  },
  "WHOA|burst": {
-  "file": "1538b8fc1a6a9246.mp3",
-  "ms": 1499,
+  "file": "285bbc453b6317d0.mp3",
+  "ms": 2555,
   "text": "WHOA",
   "style": "burst"
  },
  "AGH. ok|burst": {
-  "file": "df58762e4b41800e.mp3",
-  "ms": 1367,
+  "file": "8fe6294fa140a92e.mp3",
+  "ms": 3790,
   "text": "AGH. ok",
   "style": "burst"
  },
  "hhhh|burst": {
-  "file": "428b9a08ff18732a.mp3",
-  "ms": 1292,
+  "file": "c69419f0f38efdcc.mp3",
+  "ms": 2567,
   "text": "hhhh",
   "style": "burst"
  },
@@ -421,55 +421,55 @@
  },
  "ok that's a real one|strong": {
   "file": "2c15f9bd69221335.mp3",
-  "ms": 1443,
+  "ms": 1547,
   "text": "ok that's a real one",
   "style": "strong"
  },
  "hah. there it is|strong": {
-  "file": "921b969eddf95a0d.mp3",
-  "ms": 1502,
+  "file": "8b62469d1ec171d3.mp3",
+  "ms": 2203,
   "text": "hah. there it is",
   "style": "strong"
  },
  "AGH. ok. hello|burst": {
-  "file": "607087311cc7695e.mp3",
-  "ms": 1613,
+  "file": "3bfefbcb8a29875a.mp3",
+  "ms": 3866,
   "text": "AGH. ok. hello",
   "style": "burst"
  },
  "ok stop. no, ok|strong": {
   "file": "5bbde2d6fcd2cea5.mp3",
-  "ms": 1324,
+  "ms": 1401,
   "text": "ok stop. no, ok",
   "style": "strong"
  },
  "again? ok|strong": {
   "file": "cb6964c175963a4d.mp3",
-  "ms": 1138,
+  "ms": 1224,
   "text": "again? ok",
   "style": "strong"
  },
  "hh. yeah|strong": {
-  "file": "7fa82871b79ad36e.mp3",
-  "ms": 1206,
+  "file": "ef3fd9b2d5a03a98.mp3",
+  "ms": 1807,
   "text": "hh. yeah",
   "style": "strong"
  },
  "AGH. who is that|burst": {
-  "file": "753c9fba9665a539.mp3",
-  "ms": 1632,
+  "file": "66fa21b042213c4a.mp3",
+  "ms": 5266,
   "text": "AGH. who is that",
   "style": "burst"
  },
  "hhh. stop|burst": {
-  "file": "2cd4087e51cb8c2a.mp3",
-  "ms": 1394,
+  "file": "d6411402d7ba26dd.mp3",
+  "ms": 4594,
   "text": "hhh. stop",
   "style": "burst"
  },
  "GHH. ok ok|burst": {
-  "file": "7f27510def7473f7.mp3",
-  "ms": 1392,
+  "file": "98ee50eb3509267e.mp3",
+  "ms": 4617,
   "text": "GHH. ok ok",
   "style": "burst"
  },
@@ -486,38 +486,38 @@
   "style": "small"
  },
  "hh. not again|strong": {
-  "file": "706b7b1dd308cf1d.mp3",
-  "ms": 1358,
+  "file": "71fc33309a7c709a.mp3",
+  "ms": 2461,
   "text": "hh. not again",
   "style": "strong"
  },
  "...ok|strong": {
   "file": "fa5a284ca58feb0b.mp3",
-  "ms": 939,
+  "ms": 1014,
   "text": "...ok",
   "style": "strong"
  },
  "ngh. easy|strong": {
-  "file": "80cde3f5f2c0741b.mp3",
-  "ms": 1287,
+  "file": "9576dc26d39b17c4.mp3",
+  "ms": 3629,
   "text": "ngh. easy",
   "style": "strong"
  },
  "ghh. you're close|burst": {
-  "file": "c0bd554e33b1e8f2.mp3",
-  "ms": 1650,
+  "file": "c9382b832441fa0d.mp3",
+  "ms": 4693,
   "text": "ghh. you're close",
   "style": "burst"
  },
  "AGH. that's near the line|burst": {
-  "file": "a614f466a8b40ac6.mp3",
-  "ms": 1825,
+  "file": "f70d6eb5836b635e.mp3",
+  "ms": 5332,
   "text": "AGH. that's near the line",
   "style": "burst"
  },
  "hhhh. ok. ok|burst": {
-  "file": "b235ae0a3fb8c062.mp3",
-  "ms": 1524,
+  "file": "0b01b02545f8cd2c.mp3",
+  "ms": 3869,
   "text": "hhhh. ok. ok",
   "style": "burst"
  },
@@ -541,31 +541,31 @@
  },
  "hey. hey. i just got back|strong": {
   "file": "7ca6a5c4008a0ac0.mp3",
-  "ms": 1543,
+  "ms": 1666,
   "text": "hey. hey. i just got back",
   "style": "strong"
  },
  "already? ok|strong": {
   "file": "48693509bcc13f80.mp3",
-  "ms": 1227,
+  "ms": 1315,
   "text": "already? ok",
   "style": "strong"
  },
  "ngh. go easy|strong": {
-  "file": "047756d523696fe7.mp3",
-  "ms": 1351,
+  "file": "d1fd7e8fe4df1244.mp3",
+  "ms": 3405,
   "text": "ngh. go easy",
   "style": "strong"
  },
  "AGH. not this again|burst": {
-  "file": "8e47c094f0692913.mp3",
-  "ms": 1725,
+  "file": "ade22c8fe484beb0.mp3",
+  "ms": 4230,
   "text": "AGH. not this again",
   "style": "burst"
  },
  "GHH. no. no|burst": {
-  "file": "2f5b8b8e3bb44b9e.mp3",
-  "ms": 1445,
+  "file": "cc9c4f2f13445e96.mp3",
+  "ms": 3750,
   "text": "GHH. no. no",
   "style": "burst"
  },
@@ -625,49 +625,49 @@
  },
  "that one lit most of the map|strong": {
   "file": "1c10b49d063427ea.mp3",
-  "ms": 1652,
+  "ms": 1776,
   "text": "that one lit most of the map",
   "style": "strong"
  },
  "clean peak. then the dip|strong": {
   "file": "826560bbb4255fb6.mp3",
-  "ms": 1590,
+  "ms": 1700,
   "text": "clean peak. then the dip",
   "style": "strong"
  },
  "ok that showed. you saw the spike|strong": {
   "file": "e095a4b073610ac9.mp3",
-  "ms": 1731,
+  "ms": 1850,
   "text": "ok that showed. you saw the spike",
   "style": "strong"
  },
  "a real one. the undershoot's there too|strong": {
   "file": "0ace19f417ab374a.mp3",
-  "ms": 1804,
+  "ms": 1947,
   "text": "a real one. the undershoot's there too",
   "style": "strong"
  },
  "that was a burst. everything went at once|burst": {
   "file": "ee38ad86cb1b94be.mp3",
-  "ms": 2030,
+  "ms": 2012,
   "text": "that was a burst. everything went at once",
   "style": "burst"
  },
  "whole map lit. then a hole|burst": {
   "file": "b2c22a559cf0e571.mp3",
-  "ms": 1766,
+  "ms": 1743,
   "text": "whole map lit. then a hole",
   "style": "burst"
  },
  "the recruited ones all fired together. that's the spike|burst": {
   "file": "21763a874b6ee596.mp3",
-  "ms": 2753,
+  "ms": 2703,
   "text": "the recruited ones all fired together. that's the spike",
   "style": "burst"
  },
  "burst. the line's still coming down|burst": {
   "file": "4439ac6a46c9859e.mp3",
-  "ms": 1968,
+  "ms": 1931,
   "text": "burst. the line's still coming down",
   "style": "burst"
  },
@@ -1318,5 +1318,161 @@
   "ms": 2719,
   "text": "not again. not the dark again. please. anything but that.",
   "style": "plea"
+ },
+ "hh. hh. hh.|pant": {
+  "file": "2dd66e1a2678c4f9.mp3",
+  "ms": 3716,
+  "text": "hh. hh. hh.",
+  "style": "pant"
+ },
+ "hhh. hhh.|pant": {
+  "file": "fa3caf8bdf1f9eef.mp3",
+  "ms": 3798,
+  "text": "hhh. hhh.",
+  "style": "pant"
+ },
+ "hh hh hh|pant": {
+  "file": "92297033d796a25e.mp3",
+  "ms": 3798,
+  "text": "hh hh hh",
+  "style": "pant"
+ },
+ "hhh. hh. hhh.|pant": {
+  "file": "295e20035d565659.mp3",
+  "ms": 3716,
+  "text": "hhh. hh. hhh.",
+  "style": "pant"
+ },
+ "hh. hh. hh. hh.|pant": {
+  "file": "de916fc8352cd36e.mp3",
+  "ms": 3798,
+  "text": "hh. hh. hh. hh.",
+  "style": "pant"
+ },
+ "hhhh. hhh.|pant": {
+  "file": "2563aa06f150f6fe.mp3",
+  "ms": 3798,
+  "text": "hhhh. hhh.",
+  "style": "pant"
+ },
+ "hh hhh hh|pant": {
+  "file": "88713968cd947dc0.mp3",
+  "ms": 3798,
+  "text": "hh hhh hh",
+  "style": "pant"
+ },
+ "hhh hhh hhh|pant": {
+  "file": "1fcfc3175060294c.mp3",
+  "ms": 3798,
+  "text": "hhh hhh hhh",
+  "style": "pant"
+ },
+ "hhh... hh...|sob": {
+  "file": "1c419dec5aaf9a52.mp3",
+  "ms": 3600,
+  "text": "hhh... hh...",
+  "style": "sob"
+ },
+ "hh. hh... hhh|sob": {
+  "file": "6e30e671c41603ce.mp3",
+  "ms": 3600,
+  "text": "hh. hh... hhh",
+  "style": "sob"
+ },
+ "nn... hhh...|sob": {
+  "file": "7ec453a0d1329eb9.mp3",
+  "ms": 1023,
+  "text": "nn... hhh...",
+  "style": "sob"
+ },
+ "hhh. hhh... hh|sob": {
+  "file": "18495d8356ac764b.mp3",
+  "ms": 872,
+  "text": "hhh. hhh... hh",
+  "style": "sob"
+ },
+ "hh... hh... hh|sob": {
+  "file": "48cf3ad2fabfa793.mp3",
+  "ms": 5597,
+  "text": "hh... hh... hh",
+  "style": "sob"
+ },
+ "nnh... hhh|sob": {
+  "file": "bf355416d0b042a2.mp3",
+  "ms": 5620,
+  "text": "nnh... hhh",
+  "style": "sob"
+ },
+ "hhh... nn...|sob": {
+  "file": "e58862872d7bb5c4.mp3",
+  "ms": 2637,
+  "text": "hhh... nn...",
+  "style": "sob"
+ },
+ "hh. hhh...|sob": {
+  "file": "9bac9a255d88f132.mp3",
+  "ms": 849,
+  "text": "hh. hhh...",
+  "style": "sob"
+ },
+ "nnngh...|groan": {
+  "file": "caca03eed85eac0b.mp3",
+  "ms": 1046,
+  "text": "nnngh...",
+  "style": "groan"
+ },
+ "ggh. nngh|groan": {
+  "file": "03e6b2ae74325fb9.mp3",
+  "ms": 721,
+  "text": "ggh. nngh",
+  "style": "groan"
+ },
+ "nnh. nnh.|groan": {
+  "file": "59f974d8d52cbb8a.mp3",
+  "ms": 837,
+  "text": "nnh. nnh.",
+  "style": "groan"
+ },
+ "gghh...|groan": {
+  "file": "cac3e853936ec2ae.mp3",
+  "ms": 1023,
+  "text": "gghh...",
+  "style": "groan"
+ },
+ "nngh. ngh.|groan": {
+  "file": "358c8ab6c447d244.mp3",
+  "ms": 1789,
+  "text": "nngh. ngh.",
+  "style": "groan"
+ },
+ "hnng...|groan": {
+  "file": "fd3f7271fc51e755.mp3",
+  "ms": 1255,
+  "text": "hnng...",
+  "style": "groan"
+ },
+ "ngghh. hh|groan": {
+  "file": "e7d026ab129ad51f.mp3",
+  "ms": 756,
+  "text": "ngghh. hh",
+  "style": "groan"
+ },
+ "nnnh.|groan": {
+  "file": "88f6ca345e5c8f13.mp3",
+  "ms": 1255,
+  "text": "nnnh.",
+  "style": "groan"
+ },
+ "gnnh. nnh|groan": {
+  "file": "0afb2fc419d63154.mp3",
+  "ms": 733,
+  "text": "gnnh. nnh",
+  "style": "groan"
+ },
+ "nngghh...|groan": {
+  "file": "a69d6d62df496a09.mp3",
+  "ms": 1301,
+  "text": "nngghh...",
+  "style": "groan"
  }
 }

@@ -100,6 +100,13 @@ bank: every rule line `speech.bank_lines()` yields (reactions, the rule comments
 visitor, idle, join and no-model lines), rendered ahead with the BREZ profile by `tools/chair_voice_bank.py` and encoded
 with ffmpeg to mono 64 kb/s mp3 into `web/chair_voice/` (~185 files, a few MB, served as static files; `speech.BankVoice`).
 A line that is not in the bank (a model-written comment or chat answer, a rule comment with numbers) is a caption there.
+The screams: a text-to-speech engine cannot scream (the owner's verdict on every rendered or pitched try, 2026-11-03:
+"he is laughing"), so a strong or burst reaction starts with a real one. `tools/chair_screams/` holds recordings of real
+people screaming (public domain or CC0, from Freesound and Wikimedia Commons; `index.json` names each source) converted
+into the BREZ voice with Seed-VC (zero-shot voice conversion, f0-conditioned: the scream keeps its pitch, breath and
+break, only the timbre is his). The bank tool replaces the line's leading vocalisation with one of them and renders the
+words after it as usual (a line without one stays spoken). The breaths he makes between lines (`speech.BREATHS`: panting,
+sobbing, groaning, queued after a reaction and its plea, and between idle lines once rattled) are such recordings alone.
 Lip sync: the painted mouth follows the loudness of the line's audio, read off the audio element through a WebAudio
 analyser once the page has had its first tap (the voice keeps its own path to the speakers, the room-sound mute does not
 touch it); a caption-only line, or a line before the first tap, moves the mouth to a 4 Hz syllable rhythm for its length.

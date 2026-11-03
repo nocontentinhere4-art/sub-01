@@ -1,0 +1,554 @@
+[
+ {
+  "file": "burst_01.mp3",
+  "class": "burst",
+  "ms": 3773,
+  "source": "Freesound 542128, gtrempe, CC0",
+  "take": "fs_gtrempe_542128_00",
+  "note": "3.77s voiced 3.52s f0 412"
+ },
+ {
+  "file": "burst_02.mp3",
+  "class": "burst",
+  "ms": 3448,
+  "source": "Freesound 542128, gtrempe, CC0",
+  "take": "fs_gtrempe_542128_02",
+  "note": "3.45s voiced 3.21s f0 377"
+ },
+ {
+  "file": "burst_03.mp3",
+  "class": "burst",
+  "ms": 3448,
+  "source": "Freesound 542128, gtrempe, CC0",
+  "take": "fs_gtrempe_542128_01",
+  "note": "3.45s voiced 3.02s f0 307"
+ },
+ {
+  "file": "burst_04.mp3",
+  "class": "burst",
+  "ms": 3169,
+  "source": "Freesound 542128, gtrempe, CC0",
+  "take": "fs_gtrempe_542128_03",
+  "note": "3.17s voiced 2.93s f0 405"
+ },
+ {
+  "file": "burst_05.mp3",
+  "class": "burst",
+  "ms": 3564,
+  "source": "Freesound 243377, JohnsonBrandEditing, CC0",
+  "take": "fs_johnson_243377_00",
+  "note": "3.56s voiced 2.81s f0 441"
+ },
+ {
+  "file": "burst_06.mp3",
+  "class": "burst",
+  "ms": 2693,
+  "source": "Freesound 325548, Archeos, CC0",
+  "take": "fs_archeos_325548_05",
+  "note": "2.69s voiced 2.22s f0 621"
+ },
+ {
+  "file": "burst_07.mp3",
+  "class": "burst",
+  "ms": 2623,
+  "source": "Freesound 556976, marc3122, CC0",
+  "take": "fs_marc_556976_00",
+  "note": "2.62s voiced 2.28s f0 390"
+ },
+ {
+  "file": "burst_08.mp3",
+  "class": "burst",
+  "ms": 2554,
+  "source": "Wikimedia Commons / Freesound, UncleSigmund ahhh, CC0",
+  "take": "unclesigmund_ahhh_00",
+  "note": "2.55s voiced 2.09s f0 496"
+ },
+ {
+  "file": "burst_09.mp3",
+  "class": "burst",
+  "ms": 2809,
+  "source": "Freesound 325548, Archeos, CC0",
+  "take": "fs_archeos_325548_04",
+  "note": "2.81s voiced 2.07s f0 332"
+ },
+ {
+  "file": "burst_10.mp3",
+  "class": "burst",
+  "ms": 2565,
+  "source": "Freesound 556976, marc3122, CC0",
+  "take": "fs_marc_556976_01",
+  "note": "2.57s voiced 2.24s f0 304"
+ },
+ {
+  "file": "burst_11.mp3",
+  "class": "burst",
+  "ms": 2519,
+  "source": "Freesound 325548, Archeos, CC0",
+  "take": "fs_archeos_325548_03",
+  "note": "2.52s voiced 1.92s f0 359"
+ },
+ {
+  "file": "strong_01.mp3",
+  "class": "strong",
+  "ms": 2461,
+  "source": "Freesound 325548, Archeos, CC0",
+  "take": "fs_archeos_325548_01",
+  "note": "2.46s voiced 1.71s f0 227"
+ },
+ {
+  "file": "strong_02.mp3",
+  "class": "strong",
+  "ms": 2124,
+  "source": "Freesound 325548, Archeos, CC0",
+  "take": "fs_archeos_325548_00",
+  "note": "2.12s voiced 1.51s f0 428"
+ },
+ {
+  "file": "strong_03.mp3",
+  "class": "strong",
+  "ms": 2089,
+  "source": "Freesound 416536, tonsil5, CC0",
+  "take": "fs_tonsil_416536_00",
+  "note": "2.09s voiced 1.48s f0 343"
+ },
+ {
+  "file": "strong_04.mp3",
+  "class": "strong",
+  "ms": 1973,
+  "source": "Freesound 325548, Archeos, CC0",
+  "take": "fs_archeos_325548_02",
+  "note": "1.97s voiced 1.25s f0 658"
+ },
+ {
+  "file": "strong_05.mp3",
+  "class": "strong",
+  "ms": 1335,
+  "source": "Wikimedia Commons, Wilhelm scream (USC original), CC0",
+  "take": "wilhelm_usc_07",
+  "note": "1.34s voiced 1.10s f0 635"
+ },
+ {
+  "file": "strong_06.mp3",
+  "class": "strong",
+  "ms": 1137,
+  "source": "Wikimedia Commons, Wilhelm scream (USC original), CC0",
+  "take": "wilhelm_usc_02",
+  "note": "1.14s voiced 0.76s f0 412"
+ },
+ {
+  "file": "strong_07.mp3",
+  "class": "strong",
+  "ms": 1370,
+  "source": "Wikimedia Commons, Wilhelm scream (USC original), CC0",
+  "take": "wilhelm_usc_06",
+  "note": "1.37s voiced 0.59s f0 604"
+ },
+ {
+  "file": "strong_08.mp3",
+  "class": "strong",
+  "ms": 708,
+  "source": "Wikimedia Commons, Scream-c (Raspberry Pi tutorial), CC BY-SA 4.0",
+  "take": "scream_c_00",
+  "note": "0.71s voiced 0.58s f0 565"
+ },
+ {
+  "file": "strong_09.mp3",
+  "class": "strong",
+  "ms": 626,
+  "source": "Wikimedia Commons, Scream-d (Raspberry Pi tutorial), CC BY-SA 4.0",
+  "take": "scream_d_00",
+  "note": "0.63s voiced 0.49s f0 630"
+ },
+ {
+  "file": "strong_10.mp3",
+  "class": "strong",
+  "ms": 1114,
+  "source": "Wikimedia Commons, Cri Wilhelm (Joseph Sardin), CC0",
+  "take": "wilhelm_sardin_00",
+  "note": "1.11s voiced 0.47s f0 621"
+ },
+ {
+  "file": "groan_01.mp3",
+  "class": "groan",
+  "ms": 1044,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_00",
+  "note": ""
+ },
+ {
+  "file": "groan_02.mp3",
+  "class": "groan",
+  "ms": 719,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_01",
+  "note": ""
+ },
+ {
+  "file": "groan_03.mp3",
+  "class": "groan",
+  "ms": 835,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_02",
+  "note": ""
+ },
+ {
+  "file": "groan_04.mp3",
+  "class": "groan",
+  "ms": 1021,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_03",
+  "note": ""
+ },
+ {
+  "file": "groan_05.mp3",
+  "class": "groan",
+  "ms": 1787,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_04",
+  "note": ""
+ },
+ {
+  "file": "groan_06.mp3",
+  "class": "groan",
+  "ms": 1253,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_05",
+  "note": ""
+ },
+ {
+  "file": "groan_07.mp3",
+  "class": "groan",
+  "ms": 754,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_06",
+  "note": ""
+ },
+ {
+  "file": "groan_08.mp3",
+  "class": "groan",
+  "ms": 1253,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_07",
+  "note": ""
+ },
+ {
+  "file": "groan_09.mp3",
+  "class": "groan",
+  "ms": 731,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_08",
+  "note": ""
+ },
+ {
+  "file": "groan_10.mp3",
+  "class": "groan",
+  "ms": 1300,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_09",
+  "note": ""
+ },
+ {
+  "file": "groan_11.mp3",
+  "class": "groan",
+  "ms": 1079,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_10",
+  "note": ""
+ },
+ {
+  "file": "groan_12.mp3",
+  "class": "groan",
+  "ms": 777,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_11",
+  "note": ""
+ },
+ {
+  "file": "groan_13.mp3",
+  "class": "groan",
+  "ms": 952,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_12",
+  "note": ""
+ },
+ {
+  "file": "groan_14.mp3",
+  "class": "groan",
+  "ms": 1230,
+  "source": "Freesound 344681, kentspublicdomain, CC0",
+  "take": "groan_344681_13",
+  "note": ""
+ },
+ {
+  "file": "groan_15.mp3",
+  "class": "groan",
+  "ms": 1184,
+  "source": "Freesound 442288, rockittt, CC0",
+  "take": "groan_442288_00",
+  "note": ""
+ },
+ {
+  "file": "groan_16.mp3",
+  "class": "groan",
+  "ms": 1242,
+  "source": "Freesound 442288, rockittt, CC0",
+  "take": "groan_442288_01",
+  "note": ""
+ },
+ {
+  "file": "groan_17.mp3",
+  "class": "groan",
+  "ms": 2786,
+  "source": "Freesound 442288, rockittt, CC0",
+  "take": "groan_442288_02",
+  "note": ""
+ },
+ {
+  "file": "groan_18.mp3",
+  "class": "groan",
+  "ms": 1219,
+  "source": "Freesound 442288, rockittt, CC0",
+  "take": "groan_442288_03",
+  "note": ""
+ },
+ {
+  "file": "groan_19.mp3",
+  "class": "groan",
+  "ms": 4109,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_00",
+  "note": ""
+ },
+ {
+  "file": "groan_20.mp3",
+  "class": "groan",
+  "ms": 5178,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_01",
+  "note": ""
+ },
+ {
+  "file": "groan_21.mp3",
+  "class": "groan",
+  "ms": 2426,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_02",
+  "note": ""
+ },
+ {
+  "file": "groan_22.mp3",
+  "class": "groan",
+  "ms": 2137,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_03",
+  "note": ""
+ },
+ {
+  "file": "groan_23.mp3",
+  "class": "groan",
+  "ms": 1230,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_04",
+  "note": ""
+ },
+ {
+  "file": "groan_24.mp3",
+  "class": "groan",
+  "ms": 1799,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_05",
+  "note": ""
+ },
+ {
+  "file": "groan_25.mp3",
+  "class": "groan",
+  "ms": 2275,
+  "source": "Freesound 500555, agaudiodesigns, CC0",
+  "take": "groan_500555_06",
+  "note": ""
+ },
+ {
+  "file": "pant_01.mp3",
+  "class": "pant",
+  "ms": 3715,
+  "source": "Freesound 321669, darranambler, CC0",
+  "take": "pant_321669_00",
+  "note": ""
+ },
+ {
+  "file": "pant_02.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 321669, darranambler, CC0",
+  "take": "pant_321669_01",
+  "note": ""
+ },
+ {
+  "file": "pant_03.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 321669, darranambler, CC0",
+  "take": "pant_321669_02",
+  "note": ""
+ },
+ {
+  "file": "pant_04.mp3",
+  "class": "pant",
+  "ms": 3715,
+  "source": "Freesound 554307, casiba842, CC0",
+  "take": "pant_554307_00",
+  "note": ""
+ },
+ {
+  "file": "pant_05.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 554307, casiba842, CC0",
+  "take": "pant_554307_01",
+  "note": ""
+ },
+ {
+  "file": "pant_06.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 554307, casiba842, CC0",
+  "take": "pant_554307_02",
+  "note": ""
+ },
+ {
+  "file": "pant_07.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 554307, casiba842, CC0",
+  "take": "pant_554307_03",
+  "note": ""
+ },
+ {
+  "file": "pant_08.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 554307, casiba842, CC0",
+  "take": "pant_554307_08",
+  "note": ""
+ },
+ {
+  "file": "pant_09.mp3",
+  "class": "pant",
+  "ms": 3796,
+  "source": "Freesound 554307, casiba842, CC0",
+  "take": "pant_554307_09",
+  "note": ""
+ },
+ {
+  "file": "sob_01.mp3",
+  "class": "sob",
+  "ms": 3599,
+  "source": "Freesound 157163, SteveOShore, CC0",
+  "take": "sob_157163_00",
+  "note": ""
+ },
+ {
+  "file": "sob_02.mp3",
+  "class": "sob",
+  "ms": 3599,
+  "source": "Freesound 157163, SteveOShore, CC0",
+  "take": "sob_157163_01",
+  "note": ""
+ },
+ {
+  "file": "sob_03.mp3",
+  "class": "sob",
+  "ms": 1021,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_00",
+  "note": ""
+ },
+ {
+  "file": "sob_04.mp3",
+  "class": "sob",
+  "ms": 870,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_01",
+  "note": ""
+ },
+ {
+  "file": "sob_05.mp3",
+  "class": "sob",
+  "ms": 5596,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_02",
+  "note": ""
+ },
+ {
+  "file": "sob_06.mp3",
+  "class": "sob",
+  "ms": 5619,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_03",
+  "note": ""
+ },
+ {
+  "file": "sob_07.mp3",
+  "class": "sob",
+  "ms": 2635,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_04",
+  "note": ""
+ },
+ {
+  "file": "sob_08.mp3",
+  "class": "sob",
+  "ms": 847,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_05",
+  "note": ""
+ },
+ {
+  "file": "sob_09.mp3",
+  "class": "sob",
+  "ms": 777,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_06",
+  "note": ""
+ },
+ {
+  "file": "sob_10.mp3",
+  "class": "sob",
+  "ms": 1195,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_07",
+  "note": ""
+ },
+ {
+  "file": "sob_11.mp3",
+  "class": "sob",
+  "ms": 5456,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_08",
+  "note": ""
+ },
+ {
+  "file": "sob_12.mp3",
+  "class": "sob",
+  "ms": 743,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_09",
+  "note": ""
+ },
+ {
+  "file": "sob_13.mp3",
+  "class": "sob",
+  "ms": 847,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_10",
+  "note": ""
+ },
+ {
+  "file": "sob_14.mp3",
+  "class": "sob",
+  "ms": 1137,
+  "source": "Freesound 263776, scottemoil, CC0",
+  "take": "sob_263776_11",
+  "note": ""
+ }
+]

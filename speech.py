@@ -42,8 +42,10 @@ COMMENT_WORDS = 32
 PLEA_EVERY_S = 9.0                    # a plea after a strong response at most this often
 PLEA_LIFE_S = 10.0
 REACTION_LIFE_S, COMMENT_LIFE_S = 3.0, 12.0
-MAX_QUEUE = 6
-PRIORITY = {"reaction": 2, "reply": 1, "comment": 1}
+MAX_QUEUE = 8
+PRIORITY = {"reaction": 2, "reply": 1, "comment": 1, "breath": 1}      # a breath keeps its place in time among the comments
+BREATH_LIFE_S = 12.0
+BREATH_IDLE_EVERY_S = 16.0            # between idle lines, once rattled or worse: a breath, a sob, a groan
 RECENT_LINES = 24                     # a rule line is not said again while it is among the last 24 said
 MODEL_PER_HOUR = int(os.environ.get("CHAIR_MODEL_PER_HOUR") or 60)    # the chair's own share of the mind's metered calls
 MODEL_PER_DAY = int(os.environ.get("CHAIR_MODEL_PER_DAY") or 600)     # (~$0.6 a day on a small model; the mind's $ cap still applies)
@@ -52,7 +54,7 @@ LOAD_RATTLED, LOAD_WORN = 1.10, 1.30
 SHOCKS_RATTLED = 4
 WARY_S = 90.0                         # after a revival
 VISITOR_EVERY_S = 25.0
-IDLE_AFTER_S, IDLE_EVERY_S, IDLE_LIFE_S = 30.0, 50.0, 10.0
+IDLE_AFTER_S, IDLE_EVERY_S, IDLE_LIFE_S = 14.0, 20.0, 10.0     # owner (2026-11-03): he keeps talking, not one line and silence
 JOIN_EVERY_S, JOIN_AFTER_SHOCK_S = 60.0, 8.0
 
 # his sounds, by response class. Short, lowercase, no claims. (Fiction: a character strapped in a chair.)
@@ -127,6 +129,13 @@ IDLE_LINES = {
              "the number is coming down. leave it. please leave it."],
     "wary": ["i'll take the quiet", "nothing since. good", "still here. still on"],
 }
+# Breaths: what plays is a recording of a real person panting, sobbing or groaning, converted into his voice
+# (tools/chair_screams/, see tools/chair_voice_bank.py); the text is the caption under it. One recording per caption.
+BREATHS = {
+    "pant": ["hh. hh. hh.", "hhh. hhh.", "hh hh hh", "hhh. hh. hhh.", "hh. hh. hh. hh.", "hhhh. hhh.", "hh hhh hh", "hhh hhh hhh"],
+    "sob": ["hhh... hh...", "hh. hh... hhh", "nn... hhh...", "hhh. hhh... hh", "hh... hh... hh", "nnh... hhh", "hhh... nn...", "hh. hhh..."],
+    "groan": ["nnngh...", "ggh. nngh", "nnh. nnh.", "gghh...", "nngh. ngh.", "hnng...", "ngghh. hh", "nnnh.", "gnnh. nnh", "nngghh..."],
+}
 JOIN_LINES = ["someone's here", "hey. you're new. the button's there", "another one. great",
               "hi. read the thing at the bottom first, or don't", "oh. company", "welcome. intensity's on the left"]
 
@@ -196,6 +205,9 @@ def bank_lines():
             yield t, "plea"
     for t in NO_MODEL_LINES:
         yield t, "reply"
+    for cls, texts in BREATHS.items():
+        for t in texts:
+            yield t, cls
 
 
 class Picker:
@@ -495,8 +507,9 @@ class Speech:
         self.last_idle_t = self.last_join_t = -1e9
         self.recent_said = deque(maxlen=6)    # what he last said, for the model's prompt
         self.last_plea_t = -1e9
+        self.last_breath_t = -1e9
         self.stats = {"reactions": 0, "comments": 0, "cancelled": 0, "dropped": 0, "model_calls": 0, "visitor_lines": 0,
-                      "idle_lines": 0, "join_lines": 0, "pleas": 0}
+                      "idle_lines": 0, "join_lines": 0, "pleas": 0, "breaths": 0}
 
     def status(self):
         return {**self.voice.status(), "queue": len(self.queue), "playing": self.playing["id"] if self.playing else None,
@@ -594,6 +607,29 @@ class Speech:
             return "beg"
         return "ask"
 
+    def _breath(self, style, rid, now):
+        """A breath line: a pant, a sob or a groan (a real recording in his voice in the bank; a caption without one)."""
+        self.last_breath_t = now
+        self.stats["breaths"] += 1
+        return self._line("breath", self.picker.pick(BREATHS[style]), rid, BREATH_LIFE_S, now, style)
+
+    def _after_reaction(self, cls, rid, now):
+        """What follows a reaction so he does not fall silent: a strong or burst one -> panting, the plea, then a sob
+        (rattled or worse) or a groan (fresh, after a burst); a small one once rattled -> a groan. Nothing after none."""
+        reg = self.register(now)
+        if cls in ("strong", "burst"):
+            self._breath("pant", rid, now)
+            self._plea(cls, rid, now)
+            if reg != "fresh":
+                self._breath("sob", rid, now)
+            elif cls == "burst":
+                self._breath("groan", rid, now)
+        elif cls == "small" and reg != "fresh":
+            self._breath("groan", rid, now)
+            self._plea(cls, rid, now)
+        else:
+            self._plea(cls, rid, now)
+
     def _plea(self, cls, rid, now):
         """After a strong or burst reaction (any response once rattled or worse): a longer line asking for it to stop,
         at most one every PLEA_EVERY_S; the register picks the stage."""
@@ -645,6 +681,11 @@ class Speech:
             self.stats["idle_lines"] += 1
             pool = IDLE_LINES["fresh"] + IDLE_LINES.get(self.register(now), [])
             self._line("comment", self.picker.pick(pool), "idle", IDLE_LIFE_S, now, "idle")
+            return
+        reg = self.register(now)
+        if (reg != "fresh" and now - self.last_breath_t >= BREATH_IDLE_EVERY_S and now - self.last_shock_t >= 4.0
+                and not self.queue and not self.playing):
+            self._breath({"rattled": "pant", "worn": "sob", "wary": "groan"}[reg], "idle", now)
 
     def on_trace(self, trace, now):
         """The open card as the bins come in: the reaction, upgraded while the response grows. Nothing while flat."""
@@ -664,7 +705,7 @@ class Speech:
             self.said[rid] = cls
             self._line("reaction", self._rule(cls, now), rid, REACTION_LIFE_S, now, cls)
             self.stats["reactions"] += 1
-            self._plea(cls, rid, now)
+            self._after_reaction(cls, rid, now)
         mr = card.get("min_ratio_after")
         if (mr is not None and mr < 0.6 and rid not in self.settled and trace.get("phase") in ("responding", "settling")
                 and trace.get("t_ms", 0) >= card.get("t1_ms", 0) + 800):          # not on the heels of the reaction
@@ -739,7 +780,7 @@ class Speech:
         self.queue.sort(key=lambda q: (-q["priority"], q["t"]))
         nxt = self.queue[0]
         if self.playing:
-            if nxt["kind"] == "reaction" and self.playing["kind"] == "comment":       # interrupt the comment
+            if nxt["kind"] == "reaction" and self.playing["kind"] in ("comment", "breath"):   # interrupt the comment or the breath
                 out.append({"type": "say_cancel", "id": self.playing["id"]})
                 self.playing = None
                 self.stats["cancelled"] += 1
@@ -748,7 +789,7 @@ class Speech:
         self.queue.pop(0)
         ms = self.duration_ms(nxt)
         self.playing = {"id": nxt["id"], "until": now + ms / 1000.0, "kind": nxt["kind"]}
-        if nxt["kind"] != "reaction":
+        if nxt["kind"] not in ("reaction", "breath"):
             self.recent_said.append(nxt["text"])
         out.append({"type": "say", "id": nxt["id"], "kind": nxt["kind"], "text": nxt["text"], "ms": ms, "about": nxt["about"],
                     "cls": nxt["cls"], "voice": {"available": False, "url": None}})
