@@ -238,6 +238,72 @@ def test_growth_persists_across_restarts_and_falls_back_on_mismatch_or_corruptio
     assert a.growth_path.stat().st_size < 50_000 + 11 * len(a.growth.formed["src"])
 
 
+def all_arrays_n_long(net):
+    """Every per-neuron array of a LiveNet is n long (a step would crash otherwise)."""
+    n = net.n
+    assert len(net.v) == len(net.ref) == len(net.count) == len(net.mu) == n
+    assert net.buf.size == net.D * n and len(net.rowptr) == n + 1
+    assert all(len(x["rowptr"]) == n + 1 for x in net.innate)
+    assert net.formed is None or (len(net.formed["rowptr"]) == n + 1 and len(net.formed["src"]) == net.formed["n"])
+    assert net.row_of is None or len(net.row_of) == n
+    assert len(net.region_of_np) == len(net.is_exc_np) == n
+
+
+def formed_some(brain, seed=1):
+    """Form some synapses with the activity rule and give them to the network (as idle() does)."""
+    rng = np.random.default_rng(seed)
+    counts = np.zeros(brain.net.n, dtype=np.int64)
+    counts[rng.choice(np.flatnonzero(brain.net.is_exc_np), 40, replace=False)] = 60
+    brain.growth.activity(brain.net, counts, 2000, rng)
+    f = brain.growth.formed
+    brain.net.set_formed(f["src"], f["dst"], f["w"], f["delay"])
+    assert brain.net.formed is not None
+
+
+def test_grow_keeps_the_state_arrays_n_long_with_formed_synapses_and_after_a_restart(tmp_path):
+    """The day network crashed in a loop (2026-11-03): with formed synapses present, grow() raised half-way (the
+    layout's n grown, v/ref/count/mu not) and the next idle step could not broadcast (30,000,) against (35,000,)."""
+    path = tmp_path / "spiking" / "live_weights.npz"
+    a = L.LiveBrain(SMALL, path, twin=True, log=lambda *x: None, per_day=300, cap=10 ** 6)
+    assert a.grow_today("2026-10-11")["added"] == 300
+    formed_some(a)
+    n_formed = a.net.formed["n"]
+    assert a.grow_today("2026-10-12")["added"] == 300                    # grow with formed synapses present
+    for net in (a.net, a.tw.net):
+        assert net.n == SMALL + 600
+        all_arrays_n_long(net)
+    assert a.net.formed["n"] == n_formed and a.net.n_syn == a.tw.net.n_syn + n_formed
+    a.idle(20)
+    a.tw.net.run(5)
+    a.save_growth()
+    # restart from the file (blocks replayed, formed synapses loaded), then the next day's step
+    b = L.LiveBrain(SMALL, path, twin=True, log=lambda *x: None, per_day=300, cap=10 ** 6)
+    assert b.net.n == SMALL + 600 and b.net.formed is not None
+    all_arrays_n_long(b.net)
+    assert b.grow_today("2026-10-13")["added"] == 300
+    for net in (b.net, b.tw.net):
+        assert net.n == SMALL + 900
+        all_arrays_n_long(net)
+    b.idle(20)
+    b.tw.net.run(5)
+    assert b.net.formed["n"] == n_formed and (b.net.formed["dst"] < SMALL + 600).all()
+    # a step that fails half-way leaves the network as it was: n and the arrays still agree, the step still runs
+    net = b.net
+    n0, blocks0, syn0 = net.n, len(net.blocks), net.n_syn
+    add = G.split_by_region(300, net.reg, net.cfg.hc_scale)
+    import spiking.growth as GG
+    real = GG.innate_synapses
+    try:
+        GG.innate_synapses = lambda *a, **k: (_ for _ in ()).throw(MemoryError("no room"))
+        with pytest.raises(MemoryError):
+            net.grow(add, len(net.blocks))
+    finally:
+        GG.innate_synapses = real
+    assert net.n == n0 and len(net.blocks) == blocks0 and net.n_syn == syn0
+    all_arrays_n_long(net)
+    net.run(5)
+
+
 # --- the cost guard ------------------------------------------------------------------------------------------------------
 def test_cost_guard_refuses_what_does_not_fit():
     assert G.fit_reason(500_000, 505_000) is None                         # nothing measured: not held against the step

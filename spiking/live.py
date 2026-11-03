@@ -188,18 +188,26 @@ class LiveNet(Layout):
         flight are dropped (growth happens between decisions). -> innate synapses added."""
         from spiking.growth import innate_synapses
         n_old = self.n
-        blk = self.grow_layout(add)
-        src, dst, w, delay = innate_synapses(self, blk, seed)
+        layout = (self.n, self.region_of_np, self.is_exc_np, list(self.blocks))
+        try:                                     # the layout grows first (innate_synapses reads it): undone on failure
+            blk = self.grow_layout(add)
+            src, dst, w, delay = innate_synapses(self, blk, seed)
+            innate = self._csr(src, dst, w, delay)
+            formed = None if self.formed is None else \
+                {**self._csr(self.formed["src"], self.formed["dst"], self.formed["w"], self.formed["delay"]),
+                 "src": self.formed["src"]}
+        except BaseException:                    # n must never disagree with the state arrays (the step would crash)
+            self.n, self.region_of_np, self.is_exc_np, self.blocks = layout
+            raise
         n, D = self.n, max(self.D, int(delay.max()) + 1 if len(delay) else 1)
         self.rowptr = np.concatenate([self.rowptr, np.full(n - n_old, self.rowptr[-1], dtype=np.int64)])
         self.slot_off = self.delay.astype(np.int64) * n + self.dst          # the ring buffer is (D, n): re-address
         for x in self.innate:
             x["rowptr"] = np.concatenate([x["rowptr"], np.full(n - n_old, x["rowptr"][-1], dtype=np.int64)])
             x["slot_off"] = x["delay"].astype(np.int64) * n + x["dst"]
-        self.innate.append(self._csr(src, dst, w, delay))
+        self.innate.append(innate)
         self.n_syn += len(src)
-        if self.formed is not None:
-            self.set_formed(self.formed["src"], self.formed["dst"], self.formed["w"], self.formed["delay"])
+        self.formed = formed                     # the formed synapses, re-addressed over the n neurons
         c = self.cfg
         rng = np.random.default_rng(c.seed + 3000 + 101 * len(self.blocks))
         self.v = np.concatenate([self.v, (rng.random(n - n_old) * (c.v_th - c.v_reset) + c.v_reset).astype(np.float32)])
@@ -219,6 +227,7 @@ class LiveNet(Layout):
         self.formed = self._csr(np.asarray(src, np.int32), np.asarray(dst, np.int32), np.asarray(w, np.float32),
                                 np.asarray(delay, np.uint8)) if len(src) else None
         if self.formed is not None:
+            self.formed["src"] = np.asarray(src, np.int32)                # kept: grow() re-addresses the set over n
             self.n_syn += self.formed["n"]
 
     def _deliver(self, rowptr, slot_off, w, spk, slot):
