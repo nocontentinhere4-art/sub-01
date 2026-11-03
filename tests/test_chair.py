@@ -479,7 +479,7 @@ def test_chair_page_wording_and_shell():
         assert s in html
     assert "fonts.googleapis" not in html and "unpkg" not in html
     js = (HERE / "web" / "chair_scene.js").read_text()
-    assert "setDrive" in js and "reduced" in js and "shock()" in js
+    assert "setDrive" in js and "reduced" in js and "shock(ev)" in js and "setRegister" in js and "attend(" in js
     assert re.search(r"\bAI\b", js) is None
 
 
