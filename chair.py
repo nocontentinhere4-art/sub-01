@@ -248,7 +248,8 @@ class Hub:
         s = self.source.status()
         s.update(stopped=self.stopped, queue=len(self.queue), viewers=len(self.clients),
                  cooldown_s=COOLDOWN_S, per_minute=PER_MINUTE, inflight=self.inflight["id"] if self.inflight else None,
-                 open=self.open_card["id"] if self.open_card else None, label=LABEL, flat=self.flat)
+                 open=self.open_card["id"] if self.open_card else None, label=LABEL, flat=self.flat,
+                 register=self.speech.register(self.clock()) if self.speech else None)
         if self.stopped:
             s["available"] = False
             s["why"] = "stopped by the operator"
@@ -343,7 +344,7 @@ class Hub:
             try:
                 await self.pump_once()
                 if self.speech:
-                    for msg in self.speech.tick(self.clock()):
+                    for msg in self.speech.tick(self.clock(), viewers=len(self.clients)):
                         await self._say(msg)
             except Exception as e:
                 print("chair: pump error:", repr(e)[:120], flush=True)
@@ -390,7 +391,7 @@ class Hub:
                 text = None
                 if self.speech.ask:
                     try:
-                        text = await loop.run_in_executor(None, self.speech.ask, system, user)
+                        text = await loop.run_in_executor(None, self.speech.ask_metered, system, user)
                     except Exception as e:
                         print("chair: comment not written:", repr(e)[:100], flush=True)
                 self.speech.finish_comment(rid, text, cls, self.clock())
@@ -400,7 +401,7 @@ class Hub:
                 text = None
                 if self.chat.ask:
                     try:
-                        text = await loop.run_in_executor(None, self.chat.ask, system, user)
+                        text = await loop.run_in_executor(None, self.chat.ask_metered, system, user)
                     except Exception as e:
                         print("chair: answer not written:", repr(e)[:100], flush=True)
                 line = self.chat.finish(mid, text, self.clock())
@@ -428,7 +429,7 @@ class Hub:
                 except Exception as e:
                     print("chair: delivered hook:", repr(e)[:100], flush=True)
             if self.speech:
-                self.speech.on_delivered(ev, now)
+                self.speech.on_delivered(ev, now, who=req.get("key"))      # the visitor's key stays in memory, never sent
         elif kind == "measured":
             card = {k: v for k, v in msg.items() if k != "type"}
             self.cards.append(card)
@@ -472,6 +473,7 @@ class Hub:
         self.last_trace = {k: v for k, v in msg.items() if k != "bins"}
         if self.speech:
             self.speech.on_trace(msg, self.clock())
+            msg["register"] = self.speech.register(self.clock())      # his measured register, shown on the page
         await self.broadcast(msg)
 
     async def _state(self, status):

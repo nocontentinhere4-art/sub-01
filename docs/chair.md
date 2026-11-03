@@ -14,7 +14,7 @@ fiction; no living neurons and no hardware are connected. The page says "Simulat
 | measurement | `spiking.alif.Measure` | 20 ms bins: population rate (all, excitatory, inhibitory, per group, per region), the mean adaptation current; a quiet-time baseline; per stimulus a response card (peak against baseline, onset, burst, recruitment, undershoot, time back in the band) → `measured` |
 | the body | `spiking.alif.drive_from` → `web/chair_scene.js` | three numbers read off each bin: tension (rate above baseline, log scale, 1 at 8x), slack (the undershoot), heavy (adaptation above its baseline); springs for inertia; bounded by the restraints |
 | the rest of him | `live_server.Live.chair_shock` | the same delivery stimulates the rate model's motor, salience and relay networks and the sleep circuit, so the brain page and the room feel it too |
-| his lines | `speech.py` | reactions from the response class as the bins come in; a comment at most every 45 s and every 4 shocks, written by the mind's metered model call from the measured numbers, or a rule line; one line at a time, reactions interrupt comments, stale lines dropped |
+| his lines | `speech.py` | reactions from the response class as the bins come in; a comment at most every 20 s and every 2 shocks, written by the mind's metered model call from the measured numbers (under the chair's own call meter, `CHAIR_MODEL_PER_HOUR` 24 / `CHAIR_MODEL_PER_DAY` 300), or a rule line; one line at a time, reactions interrupt comments, stale lines dropped. Against repetition: ~185 rule lines, none said again while it is among the last 24; a measured register (fresh / rattled / worn / wary, from the adaptation load, the shocks of the last minute and the time since a revival) adds its own lines and goes to the model with his recent lines; per-visitor memory (second, third, fifth shock from the same hand, a run of fives, a new hand); idle lines while people watch and nobody presses; a line when the viewer count rises |
 
 ## The network (`spiking/alif.py`)
 
@@ -90,9 +90,11 @@ cached and the reaction vocabulary is rendered ahead, so a reaction plays at onc
 (0.4-0.8 s per line on this Mac's GPU, measured). The hub renders off the event loop with a time limit; a line whose
 audio is late goes out as a caption. The page plays the audio from `/api/chair/voice/<key>.wav`, stops it on
 cancellation, and says when the browser blocks sound before a tap. Production cannot reach the app, so it plays the
-bank: every reaction line and every rule comment without a number in it, rendered ahead with the BREZ profile by
-`tools/chair_voice_bank.py` into `web/chair_voice/` (29 files, 1.7 MB, served as static files; `speech.BankVoice`).
-A line that is not in the bank (a model-written comment, a rule comment with numbers) is a caption there. No lip sync: the character has no face rig.
+bank: every rule line `speech.bank_lines()` yields (reactions, the rule comments without a number in them, the register,
+visitor, idle, join and no-model lines), rendered ahead with the BREZ profile by `tools/chair_voice_bank.py` and encoded
+with ffmpeg to mono 64 kb/s mp3 into `web/chair_voice/` (~185 files, a few MB, served as static files; `speech.BankVoice`).
+A line that is not in the bank (a model-written comment or chat answer, a rule comment with numbers) is a caption there.
+No lip sync: the character has no face rig.
 
 ## Operator
 

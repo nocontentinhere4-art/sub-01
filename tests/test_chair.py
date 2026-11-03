@@ -2,6 +2,7 @@
 the speech queue and the page's wording. Network tests use a 5,000-neuron net (same wiring code, seconds each)."""
 import asyncio
 import json
+import random
 import re
 import time
 from pathlib import Path
@@ -452,9 +453,10 @@ def test_speech_comment_frequency_is_bounded():
 
 
 def test_speech_lines_never_claim_feeling_or_consciousness():
-    text = " ".join(sum(speech_mod.REACTIONS.values(), []) + sum(speech_mod.RULE_COMMENTS.values(), [])).lower()
+    text = " ".join(t for t, _ in speech_mod.bank_lines()).lower()
     for bad in ("i feel", "hurts", "pain", "conscious", "alive", "i am human"):
         assert bad not in text
+    assert len(list(speech_mod.bank_lines())) >= 150                 # enough that an evening does not repeat
     assert "never say he feels" in speech_mod.SYSTEM_COMMENT.lower() or "feels pain" in speech_mod.SYSTEM_COMMENT
 
 
@@ -555,12 +557,114 @@ def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
     assert speech_mod.voice_from_env({}, bank={}).name == "none"
     vs = speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}, bank=bank)
     assert vs.name == "voicestudio" and vs.synthesize("agh", "strong")["url"] == "/chair_voice/a.wav"   # the bank answers first
-    # the committed bank: every reaction line is in it, with its own file
+    # the committed bank: every rule line (reactions, comments, register, visitor, idle, join, no-model) is in it, as mp3
     real = speech_mod.load_bank(HERE)
-    for cls, lines in speech_mod.REACTIONS.items():
-        for text in lines:
-            e = real[f"{text}|{cls}"]
-            assert (HERE / speech_mod.BANK_DIR / e["file"]).read_bytes()[:4] == b"RIFF" and 300 < e["ms"] < 4000
+    for text, cls in speech_mod.bank_lines():
+        e = real[f"{text}|{cls}"]
+        f = HERE / speech_mod.BANK_DIR / e["file"]
+        assert f.suffix == ".mp3" and f.stat().st_size > 1000 and 300 < e["ms"] < 6000, (text, cls)
+    assert sum(f.stat().st_size for f in (HERE / speech_mod.BANK_DIR).iterdir()) < 6e6     # small enough to commit
+
+
+def test_speech_never_repeats_a_line_while_it_is_recent():
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    said = []
+    for k in range(12):
+        sp.on_delivered({"id": f"c-{k}", "level": 5}, float(k))
+        sp.on_trace({"card": {"id": f"c-{k}", "baseline": True, "peak_ratio": 3.0, "t1_ms": 0}, "t_ms": 100, "phase": "responding"}, float(k))
+        said.append(sp.queue[-1]["text"])
+    assert len(set(said)) == 12                                      # twelve strong reactions, twelve different lines
+    p = speech_mod.Picker(random.Random(1))
+    seq = [p.pick(["a", "b"]) for _ in range(6)]
+    assert all(x != y for x, y in zip(seq, seq[1:]))                 # a tiny pool: never the same line twice in a row
+    for k in range(5):                                               # rule comments too, and the register's lines join the pool
+        sp.history.append({"id": f"c-{k}", "peak_ratio": 3.0, "recruit": 0.5})
+        sp.last_delivered = f"c-{k}"
+        sp.finish_comment(f"c-{k}", None, "strong", 20.0 + k)
+    texts = [q["text"] for q in sp.queue if q["kind"] == "comment"]
+    assert len(set(texts)) == len(texts)
+
+
+def test_register_is_measured_from_load_shocks_and_revival():
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    assert sp.register(0.0) == "fresh"
+    sp.on_trace({"load": 1.2}, 1.0)
+    assert sp.register(1.0) == "rattled"
+    sp.on_trace({"load": 1.35}, 2.0)
+    assert sp.register(2.0) == "worn"
+    sp.on_trace({"load": 1.0}, 3.0)
+    assert sp.register(3.0) == "fresh"
+    for k in range(speech_mod.SHOCKS_RATTLED):
+        sp.on_delivered({"id": f"c-{k}", "level": 2}, 10.0 + k)
+    assert sp.register(14.0) == "rattled" and sp.register(100.0) == "fresh"
+    sp.on_revived({"type": "revived", "dead_s": 3.0, "level": 4}, 200.0)
+    assert sp.register(200.0) == "wary" and sp.register(200.0 + speech_mod.WARY_S + 1) == "fresh"
+    assert set(sp.status()) >= {"register", "model", "queue"}
+    job = sp.take_comment_job()
+    assert job and "recent_lines" in job[2]
+    sp.history.append({"id": "c-9", "peak_ratio": 2.5})
+    sp.on_measured({"id": "c-9", "baseline": True, "peak_ratio": 2.5}, 300.0)
+    sp.on_measured({"id": "c-10", "baseline": True, "peak_ratio": 2.5}, 301.0)
+    job = sp.take_comment_job()
+    assert job and '"register"' in job[2] and "recent_lines" in job[2] and "register" in job[1]
+
+
+def test_visitor_memory_lines():
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    t = 0.0
+
+    def shock(who, level=3):
+        nonlocal t
+        t += 30.0
+        sp.on_delivered({"id": f"c-{int(t)}", "level": level}, t, who=who)
+        return [q["text"] for q in sp.queue if q["cls"] == "visitor"]
+    assert shock("a") == []                                          # a first hand, alone: nothing
+    assert shock("a")[-1] in speech_mod.VISITOR_LINES["second"]
+    assert shock("a")[-1] in speech_mod.VISITOR_LINES["third"]
+    assert shock("b")[-1] in speech_mod.VISITOR_LINES["new"]         # another hand while the first is active
+    assert sp.stats["visitor_lines"] == 3
+    shock("a", 5)
+    assert sp.stats["visitor_lines"] == 3                            # the fourth: nothing to say
+    assert shock("a", 5)[-1] in speech_mod.VISITOR_LINES["regular"]
+    assert shock("a", 5)[-1] in speech_mod.VISITOR_LINES["fives"]
+    sp.on_delivered({"id": "x", "level": 5}, t + 1.0, who="b")       # within VISITOR_EVERY_S: nothing, whoever it is
+    assert sp.stats["visitor_lines"] == 5
+    assert "a" not in json.dumps(sp.status()) or "visitors" not in sp.status()   # keys never leave the process
+
+
+def test_join_and_idle_lines_when_people_watch_and_nobody_presses():
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    assert sp.tick(0.0, viewers=0) == []
+    out = sp.tick(1.0, viewers=1)
+    assert out and out[0]["cls"] == "join" and out[0]["text"] in speech_mod.JOIN_LINES
+    assert sp.tick(2.0, viewers=2) == []                             # one join line a minute
+    for t in range(3, 41):
+        assert all(m.get("cls") != "idle" for m in sp.tick(float(t), viewers=2))
+    out = sp.tick(1.0 + speech_mod.IDLE_AFTER_S + 0.5, viewers=2)
+    assert out and out[0]["cls"] == "idle" and out[0]["text"] in sum(speech_mod.IDLE_LINES.values(), [])
+    sp.on_delivered({"id": "c-1", "level": 3}, 50.0)                 # a shock resets the quiet
+    assert all(m.get("cls") != "idle" for m in sp.tick(50.0 + speech_mod.IDLE_AFTER_S - 1, viewers=2))
+    out = sp.tick(50.0 + speech_mod.IDLE_EVERY_S + 1, viewers=2)
+    assert out and out[0]["cls"] == "idle" and sp.stats["idle_lines"] == 2
+    sp.on_flatline({"type": "flatline"}, 130.0)
+    assert sp.tick(400.0, viewers=2) == []                           # flat: nothing
+    sp.on_revived({"type": "revived", "dead_s": 5.0, "level": 4}, 401.0)
+    sp.queue.clear(); sp.pending_comment = None; sp.playing = None
+    assert sp.tick(900.0, viewers=0) == []                           # nobody watching: nothing
+
+
+def test_chair_model_meter_bounds_comment_and_chat_calls():
+    calls = []
+    sp = speech_mod.Speech(ask=lambda s, u: calls.append(u) or "a line", clock=lambda: 0.0)
+    sp.meter = speech_mod.CallMeter(per_hour=2, per_day=3)
+    assert sp.ask_metered("s", "u") == "a line" and sp.ask_metered("s", "u") == "a line"
+    assert sp.ask_metered("s", "u") is None and len(calls) == 2      # the hour's share is spent: a rule line instead
+    cc = speech_mod.ChairChat(sp, ask=lambda s, u: "an answer", clock=lambda: 0.0)
+    assert cc.ask_metered("s", "u") is None                          # the chat shares the meter
+    sp.meter.times.clear()
+    assert cc.ask_metered("s", "u") == "an answer"
+    assert sp.status()["model"]["calls_last_hour"] == 1
+    assert speech_mod.Speech(ask=None, clock=lambda: 0.0).ask_metered("s", "u") is None
 
 
 def test_every_voice_provider_survives_the_startup_log_line():

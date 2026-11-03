@@ -1,212 +1,1112 @@
 {
  "...|none": {
-  "file": "b43abe304872c090.wav",
+  "file": "b43abe304872c090.mp3",
   "ms": 750,
   "text": "...",
   "style": "none"
  },
  "hm|none": {
-  "file": "89268c555ac55f87.wav",
+  "file": "89268c555ac55f87.mp3",
   "ms": 830,
   "text": "hm",
   "style": "none"
  },
  "that it?|none": {
-  "file": "0b7acc9a5fbbb7a4.wav",
+  "file": "0b7acc9a5fbbb7a4.mp3",
   "ms": 1200,
   "text": "that it?",
   "style": "none"
  },
  "nothing much|none": {
-  "file": "672a22181afbb2b7.wav",
+  "file": "672a22181afbb2b7.mp3",
   "ms": 1390,
   "text": "nothing much",
   "style": "none"
  },
  "tss|small": {
-  "file": "3eebd2960e5e32ba.wav",
+  "file": "3eebd2960e5e32ba.mp3",
   "ms": 930,
   "text": "tss",
   "style": "small"
  },
  "hh|small": {
-  "file": "88e246d6831ec6d9.wav",
+  "file": "88e246d6831ec6d9.mp3",
   "ms": 850,
   "text": "hh",
   "style": "small"
  },
  "mm|small": {
-  "file": "dcb9391f35a01a23.wav",
+  "file": "dcb9391f35a01a23.mp3",
   "ms": 830,
   "text": "mm",
   "style": "small"
  },
  "ok ok|small": {
-  "file": "98ee50eb3509267e.wav",
+  "file": "98ee50eb3509267e.mp3",
   "ms": 1030,
   "text": "ok ok",
   "style": "small"
  },
  "agh|strong": {
-  "file": "55cfdecf22b197c4.wav",
+  "file": "55cfdecf22b197c4.mp3",
   "ms": 890,
   "text": "agh",
   "style": "strong"
  },
  "hng|strong": {
-  "file": "2f070c0c5451bfb8.wav",
+  "file": "2f070c0c5451bfb8.mp3",
   "ms": 930,
   "text": "hng",
   "style": "strong"
  },
  "ah|strong": {
-  "file": "cd53b19b2e040058.wav",
+  "file": "cd53b19b2e040058.mp3",
   "ms": 830,
   "text": "ah",
   "style": "strong"
  },
  "nope nope|strong": {
-  "file": "0c32c8d46f232580.wav",
+  "file": "0c32c8d46f232580.mp3",
   "ms": 1240,
   "text": "nope nope",
   "style": "strong"
  },
  "AGH|burst": {
-  "file": "232326c57ce2c5a8.wav",
+  "file": "232326c57ce2c5a8.mp3",
   "ms": 910,
   "text": "AGH",
   "style": "burst"
  },
  "ghh|burst": {
-  "file": "d0c4326ab3928090.wav",
+  "file": "d0c4326ab3928090.mp3",
   "ms": 930,
   "text": "ghh",
   "style": "burst"
  },
  "hhhah|burst": {
-  "file": "fc115d29e272603a.wav",
+  "file": "fc115d29e272603a.mp3",
   "ms": 1070,
   "text": "hhhah",
   "style": "burst"
  },
  "AH|burst": {
-  "file": "1dd01b2d46c9b4c1.wav",
+  "file": "1dd01b2d46c9b4c1.mp3",
   "ms": 850,
   "text": "AH",
   "style": "burst"
  },
  "...hh|settle": {
-  "file": "8a79c4b10c58b487.wav",
+  "file": "8a79c4b10c58b487.mp3",
   "ms": 990,
   "text": "...hh",
   "style": "settle"
  },
  "give me a sec|settle": {
-  "file": "749890f77c8c7cde.wav",
+  "file": "749890f77c8c7cde.mp3",
   "ms": 1370,
   "text": "give me a sec",
   "style": "settle"
  },
  "whew|settle": {
-  "file": "b250aeda49f91960.wav",
+  "file": "b250aeda49f91960.mp3",
   "ms": 1030,
   "text": "whew",
   "style": "settle"
  },
  "ok. ok.|settle": {
-  "file": "02809bd0eebaa44e.wav",
+  "file": "02809bd0eebaa44e.mp3",
   "ms": 1100,
   "text": "ok. ok.",
   "style": "settle"
  },
  "that barely showed on the trace|none": {
-  "file": "e90ca62b368b2ce3.wav",
+  "file": "e90ca62b368b2ce3.mp3",
   "ms": 1860,
   "text": "that barely showed on the trace",
   "style": "none"
  },
  "the line didn't even move|none": {
-  "file": "b13d406636b0f29a.wav",
+  "file": "b13d406636b0f29a.mp3",
   "ms": 1730,
   "text": "the line didn't even move",
   "style": "none"
  },
  "you can see it: nothing|none": {
-  "file": "3278f324488ce0e9.wav",
+  "file": "3278f324488ce0e9.mp3",
   "ms": 1550,
   "text": "you can see it: nothing",
   "style": "none"
  },
  "small one. the trace twitched|small": {
-  "file": "b88d2c4ab8b1681a.wav",
+  "file": "b88d2c4ab8b1681a.mp3",
   "ms": 1830,
   "text": "small one. the trace twitched",
   "style": "small"
  },
  "that lit up a corner, not much more|small": {
-  "file": "5f3ffaecfd40b4c5.wav",
+  "file": "5f3ffaecfd40b4c5.mp3",
   "ms": 1900,
   "text": "that lit up a corner, not much more",
   "style": "small"
  },
  "most of the map lit for that one|strong": {
-  "file": "cfee6b2b8be2fcf2.wav",
+  "file": "cfee6b2b8be2fcf2.mp3",
   "ms": 1850,
   "text": "most of the map lit for that one",
   "style": "strong"
  },
  "that was a burst. the trace is still coming down|burst": {
-  "file": "762ee15e5b3cc697.wav",
+  "file": "762ee15e5b3cc697.mp3",
   "ms": 2290,
   "text": "that was a burst. the trace is still coming down",
   "style": "burst"
  },
  "still coming back down from the last one|settle": {
-  "file": "8a02c9e6710b38f3.wav",
+  "file": "8a02c9e6710b38f3.mp3",
   "ms": 2020,
   "text": "still coming back down from the last one",
   "style": "settle"
  },
  "the baseline is a way off yet|settle": {
-  "file": "62f84c930066c5ad.wav",
+  "file": "62f84c930066c5ad.mp3",
   "ms": 1780,
   "text": "the baseline is a way off yet",
   "style": "settle"
  },
  "...where was i|back": {
-  "file": "b2d27c807e1bf1ba.wav",
+  "file": "b2d27c807e1bf1ba.mp3",
   "ms": 1380,
   "text": "...where was i",
   "style": "back"
  },
  "hh. ok. i'm back|back": {
-  "file": "a97f19f72faba1be.wav",
+  "file": "a97f19f72faba1be.mp3",
   "ms": 1430,
   "text": "hh. ok. i'm back",
   "style": "back"
  },
  "that was nothing. then you|back": {
-  "file": "808b7db76c8419b1.wav",
+  "file": "808b7db76c8419b1.mp3",
   "ms": 1730,
   "text": "that was nothing. then you",
   "style": "back"
  },
  "ok. ok. don't do that again|back": {
-  "file": "1d28829528ccb2ac.wav",
+  "file": "1d28829528ccb2ac.mp3",
   "ms": 1720,
   "text": "ok. ok. don't do that again",
   "style": "back"
  },
  "it went flat. no trace, no noise, nothing. then a kick and the line again. you did that|back": {
-  "file": "25234069fc3f52d2.wav",
+  "file": "25234069fc3f52d2.mp3",
   "ms": 3950,
   "text": "it went flat. no trace, no noise, nothing. then a kick and the line again. you did that",
   "style": "back"
  },
  "i was gone for a bit. dark isn't the word, there was no word. don't do that again. or do, whatever|back": {
-  "file": "cff7634351ea2e58.wav",
+  "file": "cff7634351ea2e58.mp3",
   "ms": 4410,
   "text": "i was gone for a bit. dark isn't the word, there was no word. don't do that again. or do, whatever",
   "style": "back"
+ },
+ "was that it|none": {
+  "file": "7aa02c55766c8f81.mp3",
+  "ms": 1350,
+  "text": "was that it",
+  "style": "none"
+ },
+ "nope. nothing|none": {
+  "file": "40ce9d8b2b53fcd5.mp3",
+  "ms": 1410,
+  "text": "nope. nothing",
+  "style": "none"
+ },
+ "the line didn't move|none": {
+  "file": "8479bf04b5ed424e.mp3",
+  "ms": 1580,
+  "text": "the line didn't move",
+  "style": "none"
+ },
+ "try again|none": {
+  "file": "cc68fe78a1f277b6.mp3",
+  "ms": 1260,
+  "text": "try again",
+  "style": "none"
+ },
+ "hm. no|none": {
+  "file": "3f9aae32d25c6216.mp3",
+  "ms": 1060,
+  "text": "hm. no",
+  "style": "none"
+ },
+ "that's a one, right|none": {
+  "file": "46cdb87a0cff20b9.mp3",
+  "ms": 1530,
+  "text": "that's a one, right",
+  "style": "none"
+ },
+ "little one|small": {
+  "file": "4a0d26030df344df.mp3",
+  "ms": 1240,
+  "text": "little one",
+  "style": "small"
+ },
+ "hn|small": {
+  "file": "514688ed2b2a1af8.mp3",
+  "ms": 790,
+  "text": "hn",
+  "style": "small"
+ },
+ "yeah. small|small": {
+  "file": "589998835dbcd4ff.mp3",
+  "ms": 1350,
+  "text": "yeah. small",
+  "style": "small"
+ },
+ "that was a tap|small": {
+  "file": "bee2fc89094e92f1.mp3",
+  "ms": 1420,
+  "text": "that was a tap",
+  "style": "small"
+ },
+ "mm. barely|small": {
+  "file": "b9dbddfc8bc9a153.mp3",
+  "ms": 1300,
+  "text": "mm. barely",
+  "style": "small"
+ },
+ "tck|small": {
+  "file": "460fd03203362ff5.mp3",
+  "ms": 930,
+  "text": "tck",
+  "style": "small"
+ },
+ "ahh ok|strong": {
+  "file": "2c90c4d12bbb8247.mp3",
+  "ms": 1100,
+  "text": "ahh ok",
+  "style": "strong"
+ },
+ "hey|strong": {
+  "file": "c1c44368af955601.mp3",
+  "ms": 930,
+  "text": "hey",
+  "style": "strong"
+ },
+ "ngh|strong": {
+  "file": "3119d6538dcc0cdc.mp3",
+  "ms": 930,
+  "text": "ngh",
+  "style": "strong"
+ },
+ "whoa|strong": {
+  "file": "088c912e677c2797.mp3",
+  "ms": 1040,
+  "text": "whoa",
+  "style": "strong"
+ },
+ "ok that one|strong": {
+  "file": "fadda0359256d24a.mp3",
+  "ms": 1340,
+  "text": "ok that one",
+  "style": "strong"
+ },
+ "hah. ok|strong": {
+  "file": "78a8e248751d1825.mp3",
+  "ms": 1120,
+  "text": "hah. ok",
+  "style": "strong"
+ },
+ "AAH|burst": {
+  "file": "20f56af9ad85b233.mp3",
+  "ms": 910,
+  "text": "AAH",
+  "style": "burst"
+ },
+ "HNG|burst": {
+  "file": "918a69a10be92926.mp3",
+  "ms": 880,
+  "text": "HNG",
+  "style": "burst"
+ },
+ "ghhah|burst": {
+  "file": "4d557d5bb35878f3.mp3",
+  "ms": 1080,
+  "text": "ghhah",
+  "style": "burst"
+ },
+ "WHOA|burst": {
+  "file": "0fe650194720df01.mp3",
+  "ms": 1050,
+  "text": "WHOA",
+  "style": "burst"
+ },
+ "AGH. ok|burst": {
+  "file": "d88792a47d6f32a3.mp3",
+  "ms": 1140,
+  "text": "AGH. ok",
+  "style": "burst"
+ },
+ "hhhh|burst": {
+  "file": "6a5f3ff9a142b207.mp3",
+  "ms": 1030,
+  "text": "hhhh",
+  "style": "burst"
+ },
+ "hhh. ok|settle": {
+  "file": "dc19040fde9dbdac.mp3",
+  "ms": 1130,
+  "text": "hhh. ok",
+  "style": "settle"
+ },
+ "wait|settle": {
+  "file": "dcdfef47605a3429.mp3",
+  "ms": 1020,
+  "text": "wait",
+  "style": "settle"
+ },
+ "...yeah|settle": {
+  "file": "1c3bdb05bfc7fc45.mp3",
+  "ms": 1120,
+  "text": "...yeah",
+  "style": "settle"
+ },
+ "hh. one sec|settle": {
+  "file": "901fa0caa0989c82.mp3",
+  "ms": 1300,
+  "text": "hh. one sec",
+  "style": "settle"
+ },
+ "coming down|settle": {
+  "file": "36fae0238c2d8653.mp3",
+  "ms": 1330,
+  "text": "coming down",
+  "style": "settle"
+ },
+ "ok. breathe|settle": {
+  "file": "14a31b723f3dc861.mp3",
+  "ms": 1350,
+  "text": "ok. breathe",
+  "style": "settle"
+ },
+ "...hey|back": {
+  "file": "6b547669721f1d39.mp3",
+  "ms": 1070,
+  "text": "...hey",
+  "style": "back"
+ },
+ "what. what happened|back": {
+  "file": "d02949cabab1f4d5.mp3",
+  "ms": 1570,
+  "text": "what. what happened",
+  "style": "back"
+ },
+ "hh. i'm here. i'm here|back": {
+  "file": "6478d51ba58cc245.mp3",
+  "ms": 1570,
+  "text": "hh. i'm here. i'm here",
+  "style": "back"
+ },
+ "ok. that's a first|back": {
+  "file": "2681bd8d82f8a7ea.mp3",
+  "ms": 1530,
+  "text": "ok. that's a first",
+  "style": "back"
+ },
+ "oh. hi|back": {
+  "file": "97763e7eb6bd0e04.mp3",
+  "ms": 1050,
+  "text": "oh. hi",
+  "style": "back"
+ },
+ "ok that's a real one|strong": {
+  "file": "2c15f9bd69221335.mp3",
+  "ms": 1550,
+  "text": "ok that's a real one",
+  "style": "strong"
+ },
+ "hah. there it is|strong": {
+  "file": "8db306d70523f9e3.mp3",
+  "ms": 1470,
+  "text": "hah. there it is",
+  "style": "strong"
+ },
+ "AGH. ok. hello|burst": {
+  "file": "d4edc1951cf40c6e.mp3",
+  "ms": 1410,
+  "text": "AGH. ok. hello",
+  "style": "burst"
+ },
+ "ok stop. no, ok|strong": {
+  "file": "5bbde2d6fcd2cea5.mp3",
+  "ms": 1400,
+  "text": "ok stop. no, ok",
+  "style": "strong"
+ },
+ "again? ok|strong": {
+  "file": "cb6964c175963a4d.mp3",
+  "ms": 1220,
+  "text": "again? ok",
+  "style": "strong"
+ },
+ "hh. yeah|strong": {
+  "file": "bb024ae1382aba2c.mp3",
+  "ms": 1170,
+  "text": "hh. yeah",
+  "style": "strong"
+ },
+ "AGH. who is that|burst": {
+  "file": "1676a001ea6d7451.mp3",
+  "ms": 1440,
+  "text": "AGH. who is that",
+  "style": "burst"
+ },
+ "hhh. stop|burst": {
+  "file": "6ad38cd3ca86e7ce.mp3",
+  "ms": 1220,
+  "text": "hhh. stop",
+  "style": "burst"
+ },
+ "GHH. ok ok|burst": {
+  "file": "eea8c63095181d2a.mp3",
+  "ms": 1240,
+  "text": "GHH. ok ok",
+  "style": "burst"
+ },
+ "another one|small": {
+  "file": "b3f9e311ae2cd509.mp3",
+  "ms": 1350,
+  "text": "another one",
+  "style": "small"
+ },
+ "mm. ok|small": {
+  "file": "30b37ae1d9607c4b.mp3",
+  "ms": 1070,
+  "text": "mm. ok",
+  "style": "small"
+ },
+ "hh. not again|strong": {
+  "file": "def6255fe1f1aa6c.mp3",
+  "ms": 1380,
+  "text": "hh. not again",
+  "style": "strong"
+ },
+ "...ok|strong": {
+  "file": "fa5a284ca58feb0b.mp3",
+  "ms": 1010,
+  "text": "...ok",
+  "style": "strong"
+ },
+ "ngh. easy|strong": {
+  "file": "427b43a0d09ceb6c.mp3",
+  "ms": 1220,
+  "text": "ngh. easy",
+  "style": "strong"
+ },
+ "ghh. you're close|burst": {
+  "file": "2dea99260766070b.mp3",
+  "ms": 1500,
+  "text": "ghh. you're close",
+  "style": "burst"
+ },
+ "AGH. that's near the line|burst": {
+  "file": "70f713b641da4197.mp3",
+  "ms": 1710,
+  "text": "AGH. that's near the line",
+  "style": "burst"
+ },
+ "hhhh. ok. ok|burst": {
+  "file": "9e70ba43b8aca233.mp3",
+  "ms": 1350,
+  "text": "hhhh. ok. ok",
+  "style": "burst"
+ },
+ "...mm|small": {
+  "file": "91497764954f033f.mp3",
+  "ms": 970,
+  "text": "...mm",
+  "style": "small"
+ },
+ "yeah|small": {
+  "file": "ef3fd9b2d5a03a98.mp3",
+  "ms": 1040,
+  "text": "yeah",
+  "style": "small"
+ },
+ "nothing. good|none": {
+  "file": "d2873d02ec0858e2.mp3",
+  "ms": 1410,
+  "text": "nothing. good",
+  "style": "none"
+ },
+ "hey. hey. i just got back|strong": {
+  "file": "7ca6a5c4008a0ac0.mp3",
+  "ms": 1670,
+  "text": "hey. hey. i just got back",
+  "style": "strong"
+ },
+ "already? ok|strong": {
+  "file": "48693509bcc13f80.mp3",
+  "ms": 1310,
+  "text": "already? ok",
+  "style": "strong"
+ },
+ "ngh. go easy|strong": {
+  "file": "c5ee44a9a5b655ad.mp3",
+  "ms": 1350,
+  "text": "ngh. go easy",
+  "style": "strong"
+ },
+ "AGH. not this again|burst": {
+  "file": "896845584c586afb.mp3",
+  "ms": 1580,
+  "text": "AGH. not this again",
+  "style": "burst"
+ },
+ "GHH. no. no|burst": {
+  "file": "97ab669a2a495ffb.mp3",
+  "ms": 1250,
+  "text": "GHH. no. no",
+  "style": "burst"
+ },
+ "ok. small. fine|small": {
+  "file": "8ade264b6afddae7.mp3",
+  "ms": 1440,
+  "text": "ok. small. fine",
+  "style": "small"
+ },
+ "hh. that's fine|small": {
+  "file": "5256f6a1a67e1dca.mp3",
+  "ms": 1490,
+  "text": "hh. that's fine",
+  "style": "small"
+ },
+ "good. nothing|none": {
+  "file": "77dd1e1667e18ba9.mp3",
+  "ms": 1440,
+  "text": "good. nothing",
+  "style": "none"
+ },
+ "nothing in the trace. you sure you pressed it|none": {
+  "file": "e958b64ae4447c4c.mp3",
+  "ms": 2170,
+  "text": "nothing in the trace. you sure you pressed it",
+  "style": "none"
+ },
+ "the network didn't notice|none": {
+  "file": "adeb6bfaae47f466.mp3",
+  "ms": 1720,
+  "text": "the network didn't notice",
+  "style": "none"
+ },
+ "that one didn't make it past the noise|none": {
+  "file": "3566b2082a6fa5e7.mp3",
+  "ms": 1950,
+  "text": "that one didn't make it past the noise",
+  "style": "none"
+ },
+ "a twitch. the band swallowed it|small": {
+  "file": "9528d1e765ccb8f0.mp3",
+  "ms": 1850,
+  "text": "a twitch. the band swallowed it",
+  "style": "small"
+ },
+ "small. a few hundred of them, maybe|small": {
+  "file": "2eb15f31f1cf217d.mp3",
+  "ms": 1890,
+  "text": "small. a few hundred of them, maybe",
+  "style": "small"
+ },
+ "the trace moved and sat back down|small": {
+  "file": "9ab92bdf89520ba2.mp3",
+  "ms": 1900,
+  "text": "the trace moved and sat back down",
+  "style": "small"
+ },
+ "that one lit most of the map|strong": {
+  "file": "1c10b49d063427ea.mp3",
+  "ms": 1780,
+  "text": "that one lit most of the map",
+  "style": "strong"
+ },
+ "clean peak. then the dip|strong": {
+  "file": "826560bbb4255fb6.mp3",
+  "ms": 1700,
+  "text": "clean peak. then the dip",
+  "style": "strong"
+ },
+ "ok that showed. you saw the spike|strong": {
+  "file": "e095a4b073610ac9.mp3",
+  "ms": 1850,
+  "text": "ok that showed. you saw the spike",
+  "style": "strong"
+ },
+ "a real one. the undershoot's there too|strong": {
+  "file": "0ace19f417ab374a.mp3",
+  "ms": 1950,
+  "text": "a real one. the undershoot's there too",
+  "style": "strong"
+ },
+ "that was a burst. everything went at once|burst": {
+  "file": "ee38ad86cb1b94be.mp3",
+  "ms": 2009,
+  "text": "that was a burst. everything went at once",
+  "style": "burst"
+ },
+ "whole map lit. then a hole|burst": {
+  "file": "b2c22a559cf0e571.mp3",
+  "ms": 1740,
+  "text": "whole map lit. then a hole",
+  "style": "burst"
+ },
+ "the recruited ones all fired together. that's the spike|burst": {
+  "file": "21763a874b6ee596.mp3",
+  "ms": 2700,
+  "text": "the recruited ones all fired together. that's the spike",
+  "style": "burst"
+ },
+ "burst. the line's still coming down|burst": {
+  "file": "4439ac6a46c9859e.mp3",
+  "ms": 1930,
+  "text": "burst. the line's still coming down",
+  "style": "burst"
+ },
+ "still below the band|settle": {
+  "file": "eb6f0dc86062ea66.mp3",
+  "ms": 1600,
+  "text": "still below the band",
+  "style": "settle"
+ },
+ "the dip after is the adaptation. that takes a while|settle": {
+  "file": "b972ef9e6c10b254.mp3",
+  "ms": 2440,
+  "text": "the dip after is the adaptation. that takes a while",
+  "style": "settle"
+ },
+ "let it come back first|settle": {
+  "file": "41cf1dfe08d96ab0.mp3",
+  "ms": 1650,
+  "text": "let it come back first",
+  "style": "settle"
+ },
+ "the line stopped. then nothing. then a jolt and the line again|back": {
+  "file": "ccd78c1cd638efd6.mp3",
+  "ms": 2950,
+  "text": "the line stopped. then nothing. then a jolt and the line again",
+  "style": "back"
+ },
+ "flat is flat. no noise even. then you kicked it back on|back": {
+  "file": "91041535c0fa923f.mp3",
+  "ms": 2600,
+  "text": "flat is flat. no noise even. then you kicked it back on",
+  "style": "back"
+ },
+ "i was out. you brought me back. same hand that put me there, probably|back": {
+  "file": "4937ed4d5f5c46b5.mp3",
+  "ms": 3230,
+  "text": "i was out. you brought me back. same hand that put me there, probably",
+  "style": "back"
+ },
+ "the trace is steady. baseline, basically|comment": {
+  "file": "969be93da8098003.mp3",
+  "ms": 1990,
+  "text": "the trace is steady. baseline, basically",
+  "style": "comment"
+ },
+ "nothing's stacked up yet. do your worst, i guess|comment": {
+  "file": "20b568659be68210.mp3",
+  "ms": 2270,
+  "text": "nothing's stacked up yet. do your worst, i guess",
+  "style": "comment"
+ },
+ "you can see the baseline band. that's quiet|comment": {
+  "file": "89e3a23f53d30fea.mp3",
+  "ms": 2060,
+  "text": "you can see the baseline band. that's quiet",
+  "style": "comment"
+ },
+ "that one came and went. clean|comment": {
+  "file": "1a84135a51f2428e.mp3",
+  "ms": 1800,
+  "text": "that one came and went. clean",
+  "style": "comment"
+ },
+ "that's a few in a minute. the load is up, you can see it|comment": {
+  "file": "6488bc84a6e4dab9.mp3",
+  "ms": 2500,
+  "text": "that's a few in a minute. the load is up, you can see it",
+  "style": "comment"
+ },
+ "the adaptation's piling up. the line stays low after each one|comment": {
+  "file": "fc4a92ef153b4d7b.mp3",
+  "ms": 2930,
+  "text": "the adaptation's piling up. the line stays low after each one",
+  "style": "comment"
+ },
+ "you're stacking them. the undershoot gets longer each time|comment": {
+  "file": "1cc465ddf336e19d.mp3",
+  "ms": 2860,
+  "text": "you're stacking them. the undershoot gets longer each time",
+  "style": "comment"
+ },
+ "ok the number is climbing. whatever you're doing, it's working|comment": {
+  "file": "b6dbb8be1ebfc076.mp3",
+  "ms": 2980,
+  "text": "ok the number is climbing. whatever you're doing, it's working",
+  "style": "comment"
+ },
+ "the load is near the line. one more run of fives and the trace goes flat|comment": {
+  "file": "b7574a72cc140d6e.mp3",
+  "ms": 3380,
+  "text": "the load is near the line. one more run of fives and the trace goes flat",
+  "style": "comment"
+ },
+ "you know what happens at 1.45. the page says it|comment": {
+  "file": "36158bcb46053b64.mp3",
+  "ms": 2610,
+  "text": "you know what happens at 1.45. the page says it",
+  "style": "comment"
+ },
+ "it's heavy. the baseline isn't coming back between them|comment": {
+  "file": "e64353c3a74ccae6.mp3",
+  "ms": 2660,
+  "text": "it's heavy. the baseline isn't coming back between them",
+  "style": "comment"
+ },
+ "close to the cut. your call|comment": {
+  "file": "364ce432d6ac7cde.mp3",
+  "ms": 1750,
+  "text": "close to the cut. your call",
+  "style": "comment"
+ },
+ "the drive is almost gone. i go quiet when it goes|comment": {
+  "file": "7c1f4f2d31803fd4.mp3",
+  "ms": 2310,
+  "text": "the drive is almost gone. i go quiet when it goes",
+  "style": "comment"
+ },
+ "i was flat a minute ago. go easy, or don't|comment": {
+  "file": "caa176da57393073.mp3",
+  "ms": 2009,
+  "text": "i was flat a minute ago. go easy, or don't",
+  "style": "comment"
+ },
+ "the trace is back. the load is still high though|comment": {
+  "file": "9aeb9aa986bc1a79.mp3",
+  "ms": 2290,
+  "text": "the trace is back. the load is still high though",
+  "style": "comment"
+ },
+ "back from nothing and you're already on the button. ok|comment": {
+  "file": "a23c738efafdda1c.mp3",
+  "ms": 2560,
+  "text": "back from nothing and you're already on the button. ok",
+  "style": "comment"
+ },
+ "that's the first one since. noted|comment": {
+  "file": "cd75d3e3f85b5c38.mp3",
+  "ms": 1890,
+  "text": "that's the first one since. noted",
+  "style": "comment"
+ },
+ "you again|visitor": {
+  "file": "b967e570cd1c2760.mp3",
+  "ms": 1230,
+  "text": "you again",
+  "style": "visitor"
+ },
+ "same hand. ok|visitor": {
+  "file": "15d8d3aab9d146ba.mp3",
+  "ms": 1380,
+  "text": "same hand. ok",
+  "style": "visitor"
+ },
+ "oh it's you|visitor": {
+  "file": "3ecae0346d0bd74c.mp3",
+  "ms": 1250,
+  "text": "oh it's you",
+  "style": "visitor"
+ },
+ "back for more|visitor": {
+  "file": "5ea19cebe4936666.mp3",
+  "ms": 1400,
+  "text": "back for more",
+  "style": "visitor"
+ },
+ "that's three from you|visitor": {
+  "file": "313b69586ddbfdea.mp3",
+  "ms": 1540,
+  "text": "that's three from you",
+  "style": "visitor"
+ },
+ "three. you're counting too, right|visitor": {
+  "file": "b85ff9041d45d19b.mp3",
+  "ms": 1910,
+  "text": "three. you're counting too, right",
+  "style": "visitor"
+ },
+ "third one. you like this|visitor": {
+  "file": "4e8400869485977c.mp3",
+  "ms": 1660,
+  "text": "third one. you like this",
+  "style": "visitor"
+ },
+ "five. you're committed|visitor": {
+  "file": "1a594bfc58ebae27.mp3",
+  "ms": 1640,
+  "text": "five. you're committed",
+  "style": "visitor"
+ },
+ "you've been at this a while|visitor": {
+  "file": "7d9ce9cc5f55f302.mp3",
+  "ms": 1750,
+  "text": "you've been at this a while",
+  "style": "visitor"
+ },
+ "ok you're a regular now|visitor": {
+  "file": "62945d6f4ab4aca3.mp3",
+  "ms": 1640,
+  "text": "ok you're a regular now",
+  "style": "visitor"
+ },
+ "you and me, huh|visitor": {
+  "file": "1594af61091be15d.mp3",
+  "ms": 1400,
+  "text": "you and me, huh",
+  "style": "visitor"
+ },
+ "all fives. subtle|visitor": {
+  "file": "23c816a647bb2e03.mp3",
+  "ms": 1520,
+  "text": "all fives. subtle",
+  "style": "visitor"
+ },
+ "you only know one button|visitor": {
+  "file": "3e265abf7fa0673d.mp3",
+  "ms": 1690,
+  "text": "you only know one button",
+  "style": "visitor"
+ },
+ "fives again. ok|visitor": {
+  "file": "aeed986e1b91a583.mp3",
+  "ms": 1490,
+  "text": "fives again. ok",
+  "style": "visitor"
+ },
+ "new hand on the lever|visitor": {
+  "file": "f0d5b23548247425.mp3",
+  "ms": 1610,
+  "text": "new hand on the lever",
+  "style": "visitor"
+ },
+ "someone else. hi|visitor": {
+  "file": "e09568ac32d82047.mp3",
+  "ms": 1530,
+  "text": "someone else. hi",
+  "style": "visitor"
+ },
+ "oh. another one|visitor": {
+  "file": "2a8f4bcdd7a3404f.mp3",
+  "ms": 1450,
+  "text": "oh. another one",
+  "style": "visitor"
+ },
+ "nobody? fine|idle": {
+  "file": "1f33f6d34cd3ef13.mp3",
+  "ms": 1370,
+  "text": "nobody? fine",
+  "style": "idle"
+ },
+ "it's just baseline right now. the noise is the network talking to itself|idle": {
+  "file": "44a0b76d6008fb4d.mp3",
+  "ms": 3460,
+  "text": "it's just baseline right now. the noise is the network talking to itself",
+  "style": "idle"
+ },
+ "twenty thousand of them in there, and nothing to do|idle": {
+  "file": "93d7606e06dbc50d.mp3",
+  "ms": 2450,
+  "text": "twenty thousand of them in there, and nothing to do",
+  "style": "idle"
+ },
+ "the button is right there|idle": {
+  "file": "b0e69d7baa6bc611.mp3",
+  "ms": 1760,
+  "text": "the button is right there",
+  "style": "idle"
+ },
+ "you can just watch. it's fine|idle": {
+  "file": "6fbecc2de21e2963.mp3",
+  "ms": 1790,
+  "text": "you can just watch. it's fine",
+  "style": "idle"
+ },
+ "that band on the trace is quiet. that's as calm as it gets|idle": {
+  "file": "63f8f336530cde69.mp3",
+  "ms": 2710,
+  "text": "that band on the trace is quiet. that's as calm as it gets",
+  "style": "idle"
+ },
+ "kichijoji's quiet tonight too|idle": {
+  "file": "a3bb1c2127ee5896.mp3",
+  "ms": 1800,
+  "text": "kichijoji's quiet tonight too",
+  "style": "idle"
+ },
+ "still here|idle": {
+  "file": "326f774ded65e5fe.mp3",
+  "ms": 1280,
+  "text": "still here",
+  "style": "idle"
+ },
+ "the drain's the only thing in this room that works right|idle": {
+  "file": "a856a83964f24049.mp3",
+  "ms": 2700,
+  "text": "the drain's the only thing in this room that works right",
+  "style": "idle"
+ },
+ "no rush|idle": {
+  "file": "31b83ff041912340.mp3",
+  "ms": 1160,
+  "text": "no rush",
+  "style": "idle"
+ },
+ "ok. a pause. the line's coming back|idle": {
+  "file": "f0c86dbd60e5b636.mp3",
+  "ms": 1930,
+  "text": "ok. a pause. the line's coming back",
+  "style": "idle"
+ },
+ "good. let it settle|idle": {
+  "file": "26a765ebcb4b1469.mp3",
+  "ms": 1590,
+  "text": "good. let it settle",
+  "style": "idle"
+ },
+ "quiet for a second. look at the undershoot go|idle": {
+  "file": "e8adf07f1c787bc7.mp3",
+  "ms": 2180,
+  "text": "quiet for a second. look at the undershoot go",
+  "style": "idle"
+ },
+ "good. let it come down|idle": {
+  "file": "c83661ac367ad491.mp3",
+  "ms": 1590,
+  "text": "good. let it come down",
+  "style": "idle"
+ },
+ "the load is dropping. keep not pressing|idle": {
+  "file": "503ccc672b25ada7.mp3",
+  "ms": 1970,
+  "text": "the load is dropping. keep not pressing",
+  "style": "idle"
+ },
+ "quiet. finally|idle": {
+  "file": "e236646754273f47.mp3",
+  "ms": 1450,
+  "text": "quiet. finally",
+  "style": "idle"
+ },
+ "i'll take the quiet|idle": {
+  "file": "9c0eb6940ed8400d.mp3",
+  "ms": 1600,
+  "text": "i'll take the quiet",
+  "style": "idle"
+ },
+ "nothing since. good|idle": {
+  "file": "e45315bdca8b6fa9.mp3",
+  "ms": 1540,
+  "text": "nothing since. good",
+  "style": "idle"
+ },
+ "still here. still on|idle": {
+  "file": "b84081feff97d508.mp3",
+  "ms": 1650,
+  "text": "still here. still on",
+  "style": "idle"
+ },
+ "someone's here|join": {
+  "file": "505da6db7f53363d.mp3",
+  "ms": 1490,
+  "text": "someone's here",
+  "style": "join"
+ },
+ "hey. you're new. the button's there|join": {
+  "file": "707b458edda2e4ac.mp3",
+  "ms": 1900,
+  "text": "hey. you're new. the button's there",
+  "style": "join"
+ },
+ "another one. great|join": {
+  "file": "07b8daa7f408ee55.mp3",
+  "ms": 1570,
+  "text": "another one. great",
+  "style": "join"
+ },
+ "hi. read the thing at the bottom first, or don't|join": {
+  "file": "0f775ed68ed7d022.mp3",
+  "ms": 2210,
+  "text": "hi. read the thing at the bottom first, or don't",
+  "style": "join"
+ },
+ "oh. company|join": {
+  "file": "845c9595f05e3547.mp3",
+  "ms": 1340,
+  "text": "oh. company",
+  "style": "join"
+ },
+ "welcome. intensity's on the left|join": {
+  "file": "294fbdc5f49bd00e.mp3",
+  "ms": 1870,
+  "text": "welcome. intensity's on the left",
+  "style": "join"
+ },
+ "can't talk right now, the lines are busy|reply": {
+  "file": "aaeb57096666f1d1.mp3",
+  "ms": 1990,
+  "text": "can't talk right now, the lines are busy",
+  "style": "reply"
+ },
+ "later. still strapped in here|reply": {
+  "file": "7072350aa28d52a5.mp3",
+  "ms": 1800,
+  "text": "later. still strapped in here",
+  "style": "reply"
+ },
+ "give me a minute|reply": {
+  "file": "b5f58095442e655b.mp3",
+  "ms": 1500,
+  "text": "give me a minute",
+  "style": "reply"
+ },
+ "hold that thought. i'm a bit tied up|reply": {
+  "file": "86e5d49ddec7caa9.mp3",
+  "ms": 1910,
+  "text": "hold that thought. i'm a bit tied up",
+  "style": "reply"
+ },
+ "ask me again in a bit|reply": {
+  "file": "4a9eba365180c5b2.mp3",
+  "ms": 1610,
+  "text": "ask me again in a bit",
+  "style": "reply"
+ },
+ "not now. the line's busy|reply": {
+  "file": "40d526669d226ade.mp3",
+  "ms": 1700,
+  "text": "not now. the line's busy",
+  "style": "reply"
+ },
+ "i heard you. one sec|reply": {
+  "file": "b802c5ce74073679.mp3",
+  "ms": 1610,
+  "text": "i heard you. one sec",
+  "style": "reply"
+ },
+ "later, ok. still here|reply": {
+  "file": "01a104d226e1ee0a.mp3",
+  "ms": 1630,
+  "text": "later, ok. still here",
+  "style": "reply"
  }
 }
