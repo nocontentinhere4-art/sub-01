@@ -2304,8 +2304,10 @@ async def main(args):
             os.environ["VOICE_STUDIO_URL"] = args.voice_url
         if args.voice_profile:
             os.environ["VOICE_STUDIO_PROFILE"] = args.voice_profile
-        voice = speech_mod.Speech(ask=lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None,
-                                  voice=speech_mod.voice_from_env())
+        # a model comment after a shock only while hourly calls stay for the chat (CHAT_RESERVE, as for page reads):
+        # otherwise the comment is a rule line from the bank, and "ask me again in a bit" stops answering every message
+        comment_ask = lambda sy, us: live.mind._ask("chair", sy, us) if live.mind and live.mind.calls_left() > CHAT_RESERVE else None
+        voice = speech_mod.Speech(ask=comment_ask, voice=speech_mod.voice_from_env())
         if voice.voice.name != "none":                # (never let a log line stop the start: every provider is duck-typed here)
             print(f"chair: voice through {voice.voice.name} at {getattr(voice.voice, 'base', '?')} "
                   f"({'up' if voice.voice.available() else 'not answering yet'}; "
