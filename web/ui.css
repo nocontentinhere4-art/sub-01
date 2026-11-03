@@ -460,3 +460,12 @@ h1, h2, h3 { text-wrap:balance; } p, li { text-wrap:pretty; }
   border:1px solid rgba(255,255,255,.08); }
 :is(.ui-hdr, #hdr.ui-hdr) > .ui-spacer { flex:0 0 16px; }
 @media (max-width: 720px) { :is(.ui-hdr, #hdr.ui-hdr) { width:calc(100% - 16px); padding:8px 12px 0; } }
+
+/* the coin (owner, 2026-11-03): one chip with the contract address, tap to copy (deck.js builds it), after the nav on wide
+   screens, first in the nav's row on phones, and on the intro's first screen above the hint. Case kept: the address is
+   case-sensitive. The X account is a nav link like the pages. */
+.ui-ca { text-transform:none; letter-spacing:0; cursor:pointer; flex:none; align-self:center; pointer-events:auto; text-decoration:none;
+  font-family:var(--ui-mono); font-size:12px; font-weight:500; min-height:26px; padding:3px 9px; color:var(--ui-fg2); background:var(--ui-fill); border-color:var(--ui-hair2);
+  font-variant-numeric:tabular-nums; transition:border-color .2s var(--ui-ease), color .2s var(--ui-ease), background .2s var(--ui-ease); }
+.ui-ca:hover, .ui-ca:focus-visible, .ui-ca.done { border-color:var(--ui-fg2); color:var(--ui-fg); background:var(--ui-fill2); }
+.ui-nav > .ui-ca { margin:0 6px 0 4px; min-height:32px; padding:4px 11px; font-size:13px; }

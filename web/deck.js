@@ -36,7 +36,7 @@
 
   // the current nav link (by pathname; "/" only for "/")
   try {
-    const links = [...document.querySelectorAll(".ui-nav a[href]")];
+    const links = [...document.querySelectorAll(".ui-nav a[href]")].filter(a => a.target !== "_blank");   // the X link is not a page
     const mine = links.filter(a => {
       let u; try { u = new URL(a.getAttribute("href"), location.href); } catch (e) { return false; }
       return u.origin === location.origin && norm(u.pathname) === here;
@@ -177,6 +177,36 @@
     const t = document.createElement("div"); t.className = "ui-toast"; t.setAttribute("role", "status"); t.textContent = text; document.body.appendChild(t);
     setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 350); }, ms);
   } catch (e) { /* no body */ } };
+  // the coin (owner, 2026-11-03, after the trader panel; then "simpler and cleaner"): one chip with the contract address,
+  // tap to copy, after the nav on wide screens and first in the nav's row on phones, and once more on the intro's first
+  // screen above the hint; the X account is one more nav link. Built here once so no page carries its own copy.
+  const CA = "6WCtKQfkWurd77tCCAYWuL5TwyAvuovTzworfnfupump", X_URL = "https://x.com/SUBZERONE01";
+  UI.coin = () => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "ui-chip ui-ca"; b.title = "copy the contract address";
+    b.setAttribute("aria-label", "contract address " + CA + ", copy");
+    const short = "CA " + CA.slice(0, 4) + "\u2026" + CA.slice(-4); b.textContent = short;
+    b.addEventListener("click", async () => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(CA); ok = true; } catch (e) { /* refused or absent */ }
+      if (!ok) { try { const ta = document.createElement("textarea"); ta.value = CA; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove(); } catch (e) { /* no clipboard at all */ } }
+      clearTimeout(b._t); b.textContent = ok ? "copied" : CA; b.classList.toggle("done", ok);
+      b._t = setTimeout(() => { b.textContent = short; b.classList.remove("done"); }, ok ? 1600 : 6000);
+      UI.toast(ok ? "contract address copied" : "copy was refused: the address is shown in full for a moment");
+    });
+    return b;
+  };
+  try {
+    const phone = matchMedia("(max-width: 720px)").matches;
+    for (const nav of document.querySelectorAll(".ui-hdr > .ui-nav")) {
+      if (nav.parentElement.querySelector(".ui-ca")) continue;
+      if (!nav.querySelector("a[href^='https://x.com/']")) { const x = document.createElement("a"); x.href = X_URL; x.target = "_blank"; x.rel = "noopener"; x.title = "SUB-01 on X"; x.textContent = "x"; nav.appendChild(x); }
+      if (phone) nav.prepend(UI.coin()); else nav.after(UI.coin());
+    }
+    const foot = document.querySelector("#intro .i-foot");
+    if (foot && !foot.querySelector(".ui-ca")) foot.prepend(UI.coin());
+  } catch (e) { /* a page without a header */ }
+
   UI.state = (btn, state, text, ms = 1200) => { try {
     if (!btn) return;
     if (!("uiLabel" in btn.dataset)) btn.dataset.uiLabel = btn.textContent;
