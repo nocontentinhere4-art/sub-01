@@ -92,9 +92,11 @@ class VoiceStudio(VoiceProvider):
     X-Audio-Id and X-Audio-Duration headers; GET /health says whether it is up. Only reachable where the app runs
     (loopback), so production stays on NoVoice unless VOICE_STUDIO_URL points somewhere that answers.
 
-    The voice is designed, not cloned: OmniVoice's `instruct` is a tag vocabulary (male, young adult, moderate pitch,
-    whisper, accents; it has no emotion tags), and a fixed seed keeps the same designed voice across lines. The one
-    expressive tag the engine supports, whisper, is used for the settling lines; nothing else is pretended.
+    The voice is a saved profile of the app when one is named (`profile`, by name or id, resolved through GET
+    /profiles; the owner chose "BREZ", 2026-11-03), else a designed one: OmniVoice's `instruct` is a tag vocabulary
+    (male, young adult, moderate pitch, whisper, accents; it has no emotion tags), and a fixed seed keeps the same
+    designed voice across lines. The one expressive tag the engine supports, whisper, is used for the settling lines
+    with either voice; nothing else is pretended.
     Renders are cached by (text, tags) and the reaction vocabulary is rendered ahead (warm) so a reaction does not
     wait on the engine; comments render on demand (a few seconds on this laptop's GPU)."""
     name = "voicestudio"
@@ -104,10 +106,11 @@ class VoiceStudio(VoiceProvider):
     STEPS = 8                                # draft quality: a short line in ~1-2 s on an Apple GPU
     CACHE = 64
 
-    def __init__(self, base_url, timeout=20.0, clock=time.time):
+    def __init__(self, base_url, timeout=20.0, clock=time.time, profile=None):
         import urllib.request
         self.base = base_url.rstrip("/")
         self.timeout, self.clock = timeout, clock
+        self.profile, self.profile_id, self.profile_name = (profile or "").strip() or None, None, None
         self._ok, self._checked = False, -1e9
         self.cache = {}                      # (text, tags) -> {"wav": bytes, "ms": int, "id": str}
         self.order = []
@@ -126,18 +129,40 @@ class VoiceStudio(VoiceProvider):
         return self._ok
 
     def status(self):
-        return {"available": self.available(), "provider": self.name, "cached": len(self.cache), **self.stats}
+        return {"available": self.available(), "provider": self.name, "cached": len(self.cache),
+                "voice": self.profile_name or ("profile " + self.profile if self.profile else "designed"), **self.stats}
+
+    def resolve_profile(self):
+        """The named profile's id (by name, case-insensitive, or its id), looked up once. None: not found, designed voice."""
+        if self.profile is None or self.profile_id is not None:
+            return self.profile_id
+        try:
+            with self._urllib.urlopen(self.base + "/profiles", timeout=5.0) as r:
+                for p in json.loads(r.read().decode()):
+                    if p.get("id") == self.profile or str(p.get("name", "")).lower() == self.profile.lower():
+                        self.profile_id, self.profile_name = p["id"], p.get("name")
+                        break
+            if self.profile_id is None:
+                print(f"voicestudio: no profile named {self.profile!r}: using the designed voice", flush=True)
+                self.profile = None
+        except Exception as e:
+            print("voicestudio: profiles not read:", repr(e)[:80], flush=True)
+        return self.profile_id
 
     def tags_for(self, style):
+        if self.profile is not None:                                   # a profile is the voice; only whisper on top
+            return "whisper" if style == "settle" else ""
         return self.STYLE.get(style, self.TAGS)
 
     def key(self, text, style):
         import hashlib
-        return hashlib.sha1(f"{text}|{self.tags_for(style)}|{self.SEED}".encode()).hexdigest()[:16]
+        return hashlib.sha1(f"{text}|{self.tags_for(style)}|{self.SEED}|{self.profile_id or ''}".encode()).hexdigest()[:16]
 
     def synthesize(self, text, style):
         """-> {"url": "/api/chair/voice/<key>.wav", "ms": int} or None. Blocking (the hub runs it off the loop)."""
         import uuid
+        if self.profile is not None and self.profile_id is None:
+            self.resolve_profile()
         k = self.key(text, style)
         if k in self.cache:
             self.stats["hits"] += 1
@@ -145,7 +170,11 @@ class VoiceStudio(VoiceProvider):
         if not self.available():
             return None
         boundary = "----sub01" + uuid.uuid4().hex
-        fields = {"text": text, "instruct": self.tags_for(style), "seed": str(self.SEED), "num_step": str(self.STEPS), "speed": "1.0"}
+        fields = {"text": text, "seed": str(self.SEED), "num_step": str(self.STEPS), "speed": "1.0"}
+        if self.tags_for(style):
+            fields["instruct"] = self.tags_for(style)
+        if self.profile_id:
+            fields["profile_id"] = self.profile_id
         body = b"".join(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{n}\"\r\n\r\n{v}\r\n".encode() for n, v in fields.items()) + f"--{boundary}--\r\n".encode()
         req = self._urllib.Request(self.base + "/generate", data=body, method="POST",
                                    headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
@@ -181,10 +210,11 @@ class VoiceStudio(VoiceProvider):
 
 
 def voice_from_env(env=None):
-    """VOICE_STUDIO_URL set -> VoiceStudio, else NoVoice."""
+    """VOICE_STUDIO_URL set -> VoiceStudio (VOICE_STUDIO_PROFILE: a saved profile's name or id), else NoVoice."""
     import os
-    url = (env or os.environ).get("VOICE_STUDIO_URL", "").strip()
-    return VoiceStudio(url) if url else NoVoice()
+    env = env or os.environ
+    url = env.get("VOICE_STUDIO_URL", "").strip()
+    return VoiceStudio(url, profile=env.get("VOICE_STUDIO_PROFILE", "")) if url else NoVoice()
 
 
 class Speech:

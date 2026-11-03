@@ -64,8 +64,9 @@ every line he says. Under reduced motion: no tremor, no lamp dip. The character 
 `speech.VoiceStudio` talks to the owner's local VoiceStudio app (github.com/debpalash/VoiceStudio, AGPL-3.0, the
 OmniVoice engine) through its local HTTP API: `POST /generate` (text, instruct tags, seed, steps) answers WAV bytes
 with `X-Audio-Duration`; `GET /health` says whether it is up. The server passes `--voice-url http://localhost:3900`
-(or `VOICE_STUDIO_URL`); without it `NoVoice` reports unavailable and the lines are captions. The voice is designed
-from tags ("male, young adult, moderate pitch", fixed seed), not cloned from anyone. OmniVoice has no emotion tags,
+(or `VOICE_STUDIO_URL`); without it `NoVoice` reports unavailable and the lines are captions. The voice is the app's saved
+profile named by `--voice-profile` / `VOICE_STUDIO_PROFILE` (the owner chose "BREZ", a profile of his own app), else a
+designed one from tags ("male, young adult, moderate pitch", fixed seed). OmniVoice has no emotion tags,
 so the only expressive delivery is its whisper tag on the settling lines; nothing else is pretended. Renders are
 cached and the reaction vocabulary is rendered ahead, so a reaction plays at once; a comment renders on demand
 (0.4-0.8 s per line on this Mac's GPU, measured). The hub renders off the event loop with a time limit; a line whose

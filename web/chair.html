@@ -125,7 +125,7 @@ function connect() {
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function on(m) {
   if (m.type === "hello") { st.status = m.status; st.bins = (m.bins || []).slice(-500); st.last = m.trace; st.open = m.card; st.cards = m.cards || []; st.events = m.events || [];
-    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); $("voice").textContent = m.voice && m.voice.available ? "voice: " + m.voice.provider + " (local)" : "voice: none, captions only"; }
+    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); $("voice").textContent = m.voice && m.voice.available ? "voice: " + (m.voice.voice ? m.voice.voice + " through " : "") + m.voice.provider + " (local)" : "voice: none, captions only"; }
   else if (m.type === "trace") { for (const b of m.bins) st.bins.push(b); if (st.bins.length > 520) st.bins.splice(0, st.bins.length - 500); st.last = m; st.open = m.card; st.baseline = m.baseline;
     if (st.scene) st.scene.setDrive(m.drive); drawTrace(); phaseLine(); if (st.open) cardLine(); }
   else if (m.type === "status") { st.status = m; applyStatus(); }

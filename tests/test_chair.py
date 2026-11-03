@@ -479,11 +479,24 @@ async def _voicestudio():
         return chair.web.Response(body=b"RIFF" + bytes(96), content_type="audio/wav",
                                   headers={"X-Audio-Id": "abc", "X-Audio-Duration": "0.9"})
 
+    async def profiles(request):
+        return chair.web.json_response([{"id": "38eaa9d0", "name": "BREZ", "kind": "clone"}])
+
     app = chair.web.Application()
     app.router.add_get("/health", health)
+    app.router.add_get("/profiles", profiles)
     app.router.add_post("/generate", generate)
     async with TestServer(app) as srv:
         loop = asyncio.get_running_loop()
+        pv = speech_mod.VoiceStudio(f"http://127.0.0.1:{srv.port}", profile="brez")
+        assert await loop.run_in_executor(None, pv.synthesize, "agh", "strong")
+        assert calls[-1]["profile_id"] == "38eaa9d0" and "instruct" not in calls[-1] and pv.status()["voice"] == "BREZ"
+        assert await loop.run_in_executor(None, pv.synthesize, "...hh", "settle")
+        assert calls[-1]["instruct"] == "whisper" and calls[-1]["profile_id"] == "38eaa9d0"
+        missing = speech_mod.VoiceStudio(f"http://127.0.0.1:{srv.port}", profile="nobody")
+        assert await loop.run_in_executor(None, missing.synthesize, "hm", "none")
+        assert "profile_id" not in calls[-1] and calls[-1]["instruct"] == speech_mod.VoiceStudio.TAGS   # falls back, says so
+        calls.clear()
         v = speech_mod.VoiceStudio(f"http://127.0.0.1:{srv.port}")
         assert await loop.run_in_executor(None, v.available)
         a = await loop.run_in_executor(None, v.synthesize, "agh", "strong")
@@ -512,6 +525,7 @@ async def _voicestudio():
                 await hub._say(msg)
             assert got and got[0]["voice"]["available"] and got[0]["ms"] == 900 and sp.playing["until"] == 0.9
     assert speech_mod.voice_from_env({}).name == "none" and speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}).name == "voicestudio"
+    assert speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x", "VOICE_STUDIO_PROFILE": "BREZ"}).profile == "BREZ"
 
 
 async def _collect(got, msg):

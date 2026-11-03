@@ -2294,10 +2294,13 @@ async def main(args):
     if os.environ.get("SUB01_CHAIR", "1") != "0":
         if args.voice_url:
             os.environ["VOICE_STUDIO_URL"] = args.voice_url
+        if args.voice_profile:
+            os.environ["VOICE_STUDIO_PROFILE"] = args.voice_profile
         voice = speech_mod.Speech(ask=lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None,
                                   voice=speech_mod.voice_from_env())
         if voice.voice.name != "none":
-            print(f"chair: voice through {voice.voice.name} at {voice.voice.base} ({'up' if voice.voice.available() else 'not answering yet'})", flush=True)
+            print(f"chair: voice through {voice.voice.name} at {voice.voice.base} ({'up' if voice.voice.available() else 'not answering yet'}; "
+                  f"profile {voice.voice.profile or 'none, designed'})", flush=True)
         chair_hub = chair.Hub(chair.SimSource(), key_of=live.client_ip, on_delivered=live.chair_shock, speech=voice,
                               admin_ok=lambda r: admin_ok(r) or bool(r.app.get(GATED)))
         chair.attach(app, chair_hub, nocache=NOCACHE)
@@ -2508,6 +2511,8 @@ def build_parser():
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
     p.add_argument("--voice-url", default=os.environ.get("VOICE_STUDIO_URL", ""),
                    help="the chair's voice: a VoiceStudio app's local API, e.g. http://localhost:3900 (default: no voice, captions)")
+    p.add_argument("--voice-profile", default=os.environ.get("VOICE_STUDIO_PROFILE", ""),
+                   help="a saved VoiceStudio profile for his voice, by name or id (default: a designed voice)")
     return p
 
 
