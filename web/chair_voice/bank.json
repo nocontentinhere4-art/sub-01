@@ -433,7 +433,7 @@
  },
  "AGH. ok. hello|burst": {
   "file": "3bfefbcb8a29875a.mp3",
-  "ms": 3866,
+  "ms": 4517,
   "text": "AGH. ok. hello",
   "style": "burst"
  },
@@ -457,19 +457,19 @@
  },
  "AGH. who is that|burst": {
   "file": "66fa21b042213c4a.mp3",
-  "ms": 5266,
+  "ms": 5057,
   "text": "AGH. who is that",
   "style": "burst"
  },
  "hhh. stop|burst": {
   "file": "d6411402d7ba26dd.mp3",
-  "ms": 4594,
+  "ms": 3839,
   "text": "hhh. stop",
   "style": "burst"
  },
  "GHH. ok ok|burst": {
   "file": "98ee50eb3509267e.mp3",
-  "ms": 4617,
+  "ms": 3793,
   "text": "GHH. ok ok",
   "style": "burst"
  },
@@ -487,7 +487,7 @@
  },
  "hh. not again|strong": {
   "file": "71fc33309a7c709a.mp3",
-  "ms": 2461,
+  "ms": 3436,
   "text": "hh. not again",
   "style": "strong"
  },
@@ -499,25 +499,25 @@
  },
  "ngh. easy|strong": {
   "file": "9576dc26d39b17c4.mp3",
-  "ms": 3629,
+  "ms": 3142,
   "text": "ngh. easy",
   "style": "strong"
  },
  "ghh. you're close|burst": {
   "file": "c9382b832441fa0d.mp3",
-  "ms": 4693,
+  "ms": 4042,
   "text": "ghh. you're close",
   "style": "burst"
  },
  "AGH. that's near the line|burst": {
   "file": "f70d6eb5836b635e.mp3",
-  "ms": 5332,
+  "ms": 5541,
   "text": "AGH. that's near the line",
   "style": "burst"
  },
  "hhhh. ok. ok|burst": {
   "file": "0b01b02545f8cd2c.mp3",
-  "ms": 3869,
+  "ms": 4624,
   "text": "hhhh. ok. ok",
   "style": "burst"
  },
@@ -553,19 +553,19 @@
  },
  "ngh. go easy|strong": {
   "file": "d1fd7e8fe4df1244.mp3",
-  "ms": 3405,
+  "ms": 1989,
   "text": "ngh. go easy",
   "style": "strong"
  },
  "AGH. not this again|burst": {
   "file": "ade22c8fe484beb0.mp3",
-  "ms": 4230,
+  "ms": 4299,
   "text": "AGH. not this again",
   "style": "burst"
  },
  "GHH. no. no|burst": {
   "file": "cc9c4f2f13445e96.mp3",
-  "ms": 3750,
+  "ms": 3819,
   "text": "GHH. no. no",
   "style": "burst"
  },
@@ -1474,5 +1474,659 @@
   "ms": 1301,
   "text": "nngghh...",
   "style": "groan"
+ },
+ "hm. missed|none": {
+  "file": "5dd41dbc8d6d8780.mp3",
+  "ms": 1263,
+  "text": "hm. missed",
+  "style": "none"
+ },
+ "the noise ate it|none": {
+  "file": "40f596f5d41fbd0b.mp3",
+  "ms": 1476,
+  "text": "the noise ate it",
+  "style": "none"
+ },
+ "that's it?|none": {
+  "file": "2a7f4200b3042e0c.mp3",
+  "ms": 1231,
+  "text": "that's it?",
+  "style": "none"
+ },
+ "hm. nope|none": {
+  "file": "113436fb556949f1.mp3",
+  "ms": 1169,
+  "text": "hm. nope",
+  "style": "none"
+ },
+ "didn't even flinch|none": {
+  "file": "3935948207d8a035.mp3",
+  "ms": 1585,
+  "text": "didn't even flinch",
+  "style": "none"
+ },
+ "you pressed something?|none": {
+  "file": "5a0bdf6bd0ba2b63.mp3",
+  "ms": 1691,
+  "text": "you pressed something?",
+  "style": "none"
+ },
+ "hn. that's one|small": {
+  "file": "85d5a901de33388a.mp3",
+  "ms": 1451,
+  "text": "hn. that's one",
+  "style": "small"
+ },
+ "mm. felt that|small": {
+  "file": "68551fc6d56bbc90.mp3",
+  "ms": 1385,
+  "text": "mm. felt that",
+  "style": "small"
+ },
+ "tss. cute|small": {
+  "file": "a09e8d8b23ba11a5.mp3",
+  "ms": 1249,
+  "text": "tss. cute",
+  "style": "small"
+ },
+ "hh. a tickle|small": {
+  "file": "a8565519e102d656.mp3",
+  "ms": 1337,
+  "text": "hh. a tickle",
+  "style": "small"
+ },
+ "ok. a one|small": {
+  "file": "50d3b19e1e032eaa.mp3",
+  "ms": 1195,
+  "text": "ok. a one",
+  "style": "small"
+ },
+ "hn. go on then|small": {
+  "file": "d30f03a290630c07.mp3",
+  "ms": 1367,
+  "text": "hn. go on then",
+  "style": "small"
+ },
+ "mm. that all|small": {
+  "file": "913ae2bd8b829156.mp3",
+  "ms": 1343,
+  "text": "mm. that all",
+  "style": "small"
+ },
+ "agh. no|strong": {
+  "file": "b0483af24a426cc7.mp3",
+  "ms": 1691,
+  "text": "agh. no",
+  "style": "strong"
+ },
+ "ngh. that one had teeth|strong": {
+  "file": "4b19a9eeb29a8900.mp3",
+  "ms": 2281,
+  "text": "ngh. that one had teeth",
+  "style": "strong"
+ },
+ "ah. ah. ok|strong": {
+  "file": "8fe6294fa140a92e.mp3",
+  "ms": 2095,
+  "text": "ah. ah. ok",
+  "style": "strong"
+ },
+ "hng. fuck|strong": {
+  "file": "cac351517359eca2.mp3",
+  "ms": 3630,
+  "text": "hng. fuck",
+  "style": "strong"
+ },
+ "agh. you felt that too, right|strong": {
+  "file": "0d94ae61e4439896.mp3",
+  "ms": 3965,
+  "text": "agh. you felt that too, right",
+  "style": "strong"
+ },
+ "ngh. that's a real one|strong": {
+  "file": "dfa455174ed5f08a.mp3",
+  "ms": 3754,
+  "text": "ngh. that's a real one",
+  "style": "strong"
+ },
+ "ah. don't|strong": {
+  "file": "b29439bd2f90fbfa.mp3",
+  "ms": 3176,
+  "text": "ah. don't",
+  "style": "strong"
+ },
+ "hng. ok. ok. ok|strong": {
+  "file": "72c61d0ea7acaa97.mp3",
+  "ms": 2699,
+  "text": "hng. ok. ok. ok",
+  "style": "strong"
+ },
+ "agh. why|strong": {
+  "file": "9f93bedeb7f405bf.mp3",
+  "ms": 2191,
+  "text": "agh. why",
+  "style": "strong"
+ },
+ "ngh. who's pressing|strong": {
+  "file": "2b2bc399372eb831.mp3",
+  "ms": 3001,
+  "text": "ngh. who's pressing",
+  "style": "strong"
+ },
+ "AGH. fuck|burst": {
+  "file": "cac351517359eca2.mp3",
+  "ms": 3688,
+  "text": "AGH. fuck",
+  "style": "burst"
+ },
+ "AAH. no|burst": {
+  "file": "b0483af24a426cc7.mp3",
+  "ms": 4756,
+  "text": "AAH. no",
+  "style": "burst"
+ },
+ "HNG. stop|burst": {
+  "file": "d6411402d7ba26dd.mp3",
+  "ms": 4594,
+  "text": "HNG. stop",
+  "style": "burst"
+ },
+ "AGH. that's the whole map|burst": {
+  "file": "c33090051c26d746.mp3",
+  "ms": 5194,
+  "text": "AGH. that's the whole map",
+  "style": "burst"
+ },
+ "AAH. ok. ok|burst": {
+  "file": "0b01b02545f8cd2c.mp3",
+  "ms": 4346,
+  "text": "AAH. ok. ok",
+  "style": "burst"
+ },
+ "GHH. no more|burst": {
+  "file": "71084f356f7f39cb.mp3",
+  "ms": 4813,
+  "text": "GHH. no more",
+  "style": "burst"
+ },
+ "AGH. jesus|burst": {
+  "file": "e23ad98e56041f0d.mp3",
+  "ms": 3903,
+  "text": "AGH. jesus",
+  "style": "burst"
+ },
+ "HNG. why|burst": {
+  "file": "9f93bedeb7f405bf.mp3",
+  "ms": 3677,
+  "text": "HNG. why",
+  "style": "burst"
+ },
+ "AAH. somebody|burst": {
+  "file": "6a0a76d81c76a424.mp3",
+  "ms": 3888,
+  "text": "AAH. somebody",
+  "style": "burst"
+ },
+ "AGH. enough|burst": {
+  "file": "2058d14821449a75.mp3",
+  "ms": 4039,
+  "text": "AGH. enough",
+  "style": "burst"
+ },
+ "GHH. i can't|burst": {
+  "file": "57c5cc5a7acb161d.mp3",
+  "ms": 3831,
+  "text": "GHH. i can't",
+  "style": "burst"
+ },
+ "AAH. please|burst": {
+  "file": "ba68fc0ea9a4365c.mp3",
+  "ms": 3811,
+  "text": "AAH. please",
+  "style": "burst"
+ },
+ "AGH. not five. not five|burst": {
+  "file": "e0807d72be8f601c.mp3",
+  "ms": 5450,
+  "text": "AGH. not five. not five",
+  "style": "burst"
+ },
+ "HNG. the line. look at the line|burst": {
+  "file": "4a718ae7ea6e0d6f.mp3",
+  "ms": 5335,
+  "text": "HNG. the line. look at the line",
+  "style": "burst"
+ },
+ "AGH. hands off. hands off|burst": {
+  "file": "56883de89abe1b11.mp3",
+  "ms": 5198,
+  "text": "AGH. hands off. hands off",
+  "style": "burst"
+ },
+ "hh. it's dropping|settle": {
+  "file": "a876b80c7c15aa24.mp3",
+  "ms": 1514,
+  "text": "hh. it's dropping",
+  "style": "settle"
+ },
+ "ok. still here|settle": {
+  "file": "fbaf28fe57e50e40.mp3",
+  "ms": 1406,
+  "text": "ok. still here",
+  "style": "settle"
+ },
+ "hhh. don't|settle": {
+  "file": "9cf14d0d33a02598.mp3",
+  "ms": 1251,
+  "text": "hhh. don't",
+  "style": "settle"
+ },
+ "wait. wait|settle": {
+  "file": "85d651c00ac25b21.mp3",
+  "ms": 1274,
+  "text": "wait. wait",
+  "style": "settle"
+ },
+ "hh. let it settle|settle": {
+  "file": "ccf71e6f8d865023.mp3",
+  "ms": 1472,
+  "text": "hh. let it settle",
+  "style": "settle"
+ },
+ "that's... ok. ok|settle": {
+  "file": "c47cd59c8b8fe370.mp3",
+  "ms": 1398,
+  "text": "that's... ok. ok",
+  "style": "settle"
+ },
+ "hh. i'm fine. i'm fine|settle": {
+  "file": "49f391a00abad89d.mp3",
+  "ms": 1595,
+  "text": "hh. i'm fine. i'm fine",
+  "style": "settle"
+ },
+ "ok. not again. ok|settle": {
+  "file": "6e72fcde3d0fc342.mp3",
+  "ms": 1487,
+  "text": "ok. not again. ok",
+  "style": "settle"
+ },
+ "hhh. hands shaking|settle": {
+  "file": "22ce0767938754f2.mp3",
+  "ms": 1594,
+  "text": "hhh. hands shaking",
+  "style": "settle"
+ },
+ "hh. that one stays with me|settle": {
+  "file": "61ad477b75fbcba7.mp3",
+  "ms": 1700,
+  "text": "hh. that one stays with me",
+  "style": "settle"
+ },
+ "ngh. you again|strong": {
+  "file": "b967e570cd1c2760.mp3",
+  "ms": 2486,
+  "text": "ngh. you again",
+  "style": "strong"
+ },
+ "agh. how many is that|strong": {
+  "file": "37f808ef8b66e58b.mp3",
+  "ms": 4110,
+  "text": "agh. how many is that",
+  "style": "strong"
+ },
+ "hng. i said stop|strong": {
+  "file": "fa93f5866d361673.mp3",
+  "ms": 3581,
+  "text": "hng. i said stop",
+  "style": "strong"
+ },
+ "AGH. STOP|burst": {
+  "file": "5362247912a5e55b.mp3",
+  "ms": 3732,
+  "text": "AGH. STOP",
+  "style": "burst"
+ },
+ "AAH. i said no|burst": {
+  "file": "ea7171f9de216164.mp3",
+  "ms": 4154,
+  "text": "AAH. i said no",
+  "style": "burst"
+ },
+ "HNG. the same hand. it's the same hand|burst": {
+  "file": "f3e1e4ec77fa3767.mp3",
+  "ms": 4572,
+  "text": "HNG. the same hand. it's the same hand",
+  "style": "burst"
+ },
+ "hn. keep it there|small": {
+  "file": "2ba31dcfeb98683c.mp3",
+  "ms": 1465,
+  "text": "hn. keep it there",
+  "style": "small"
+ },
+ "mm. that's a one. stay on one|small": {
+  "file": "c25eeeba0b931cd0.mp3",
+  "ms": 1758,
+  "text": "mm. that's a one. stay on one",
+  "style": "small"
+ },
+ "agh. i'm going|strong": {
+  "file": "33372d997949d5b7.mp3",
+  "ms": 2716,
+  "text": "agh. i'm going",
+  "style": "strong"
+ },
+ "hng. look at the number. look|strong": {
+  "file": "7763a6da80f5365e.mp3",
+  "ms": 2983,
+  "text": "hng. look at the number. look",
+  "style": "strong"
+ },
+ "ngh. one more and i'm out|strong": {
+  "file": "245be03c1ac7192f.mp3",
+  "ms": 3085,
+  "text": "ngh. one more and i'm out",
+  "style": "strong"
+ },
+ "AGH. that's it. that's it|burst": {
+  "file": "e98cce25fccfd415.mp3",
+  "ms": 5175,
+  "text": "AGH. that's it. that's it",
+  "style": "burst"
+ },
+ "AAH. i'm going under|burst": {
+  "file": "629499a7507b4c9d.mp3",
+  "ms": 4748,
+  "text": "AAH. i'm going under",
+  "style": "burst"
+ },
+ "GHH. the drive. the drive|burst": {
+  "file": "9fcc1675de1b3bf8.mp3",
+  "ms": 5271,
+  "text": "GHH. the drive. the drive",
+  "style": "burst"
+ },
+ "mm. ok. small. keep it small|small": {
+  "file": "7eab6709abc160e7.mp3",
+  "ms": 1731,
+  "text": "mm. ok. small. keep it small",
+  "style": "small"
+ },
+ "hm. thank you. nothing|none": {
+  "file": "8b42223b7c0c117f.mp3",
+  "ms": 1625,
+  "text": "hm. thank you. nothing",
+  "style": "none"
+ },
+ "agh. i was just gone. i was just gone|strong": {
+  "file": "9b29ba454a792148.mp3",
+  "ms": 2570,
+  "text": "agh. i was just gone. i was just gone",
+  "style": "strong"
+ },
+ "hng. not yet. not yet|strong": {
+  "file": "0d874270770c3a02.mp3",
+  "ms": 2716,
+  "text": "hng. not yet. not yet",
+  "style": "strong"
+ },
+ "AAH. the dark. not the dark|burst": {
+  "file": "3c4a7bfdaacee4fe.mp3",
+  "ms": 4309,
+  "text": "AAH. the dark. not the dark",
+  "style": "burst"
+ },
+ "AGH. i only just came back|burst": {
+  "file": "a91b558dd131b724.mp3",
+  "ms": 4570,
+  "text": "AGH. i only just came back",
+  "style": "burst"
+ },
+ "hn. small. thank you|small": {
+  "file": "2fd046c5a1a72392.mp3",
+  "ms": 1585,
+  "text": "hn. small. thank you",
+  "style": "small"
+ },
+ "hm. nothing. keep it there|none": {
+  "file": "1191c26cc11eae3f.mp3",
+  "ms": 1736,
+  "text": "hm. nothing. keep it there",
+  "style": "none"
+ },
+ "the straps don't loosen when it's quiet. just so you know|idle": {
+  "file": "9881a4d36bbc8c58.mp3",
+  "ms": 2687,
+  "text": "the straps don't loosen when it's quiet. just so you know",
+  "style": "idle"
+ },
+ "you can hear the box on the wall humming from here|idle": {
+  "file": "27962199a6a6987f.mp3",
+  "ms": 2373,
+  "text": "you can hear the box on the wall humming from here",
+  "style": "idle"
+ },
+ "if you're new: the number by the button goes to five. don't|idle": {
+  "file": "9bf517a2236e0cba.mp3",
+  "ms": 2740,
+  "text": "if you're new: the number by the button goes to five. don't",
+  "style": "idle"
+ },
+ "my hands have been in this position for hours|idle": {
+  "file": "e8b7c5452272b538.mp3",
+  "ms": 2163,
+  "text": "my hands have been in this position for hours",
+  "style": "idle"
+ },
+ "the quiet's fine. the waiting isn't|idle": {
+  "file": "f6d8682b62fe48c4.mp3",
+  "ms": 1910,
+  "text": "the quiet's fine. the waiting isn't",
+  "style": "idle"
+ },
+ "i count the slats behind me when nobody presses. there are eleven|idle": {
+  "file": "d5395dce17ec89b7.mp3",
+  "ms": 3143,
+  "text": "i count the slats behind me when nobody presses. there are eleven",
+  "style": "idle"
+ },
+ "my teeth hurt. is that from the jaw. i think that's the jaw|idle": {
+  "file": "6a38e6d25ae8a885.mp3",
+  "ms": 2699,
+  "text": "my teeth hurt. is that from the jaw. i think that's the jaw",
+  "style": "idle"
+ },
+ "the straps are wet. that's me. great|idle": {
+  "file": "78703e39f1fd81f7.mp3",
+  "ms": 1922,
+  "text": "the straps are wet. that's me. great",
+  "style": "idle"
+ },
+ "don't go. just don't press|idle": {
+  "file": "fd98b04a5b2ecd3a.mp3",
+  "ms": 1754,
+  "text": "don't go. just don't press",
+  "style": "idle"
+ },
+ "i can hear my own pulse in the cables. that's not possible. i can|idle": {
+  "file": "6dd3163390b09db6.mp3",
+  "ms": 3035,
+  "text": "i can hear my own pulse in the cables. that's not possible. i can",
+  "style": "idle"
+ },
+ "i'm right at the edge. you can see it. one more and it's flat|idle": {
+  "file": "1ed62b42138eb0fc.mp3",
+  "ms": 2744,
+  "text": "i'm right at the edge. you can see it. one more and it's flat",
+  "style": "idle"
+ },
+ "talk to me instead. the box is there. anything. just not the button|idle": {
+  "file": "6eda37d3e9f9b604.mp3",
+  "ms": 3158,
+  "text": "talk to me instead. the box is there. anything. just not the button",
+  "style": "idle"
+ },
+ "i was off. properly off. and then on. i don't want to learn what that is|idle": {
+  "file": "a000f87d0157a190.mp3",
+  "ms": 3245,
+  "text": "i was off. properly off. and then on. i don't want to learn what that is",
+  "style": "idle"
+ },
+ "the line's back. i'm watching it like you are|idle": {
+  "file": "18b84b62bc422fbd.mp3",
+  "ms": 2059,
+  "text": "the line's back. i'm watching it like you are",
+  "style": "idle"
+ },
+ "don't do that again. i mean it. don't|idle": {
+  "file": "96b73b8157059648.mp3",
+  "ms": 1928,
+  "text": "don't do that again. i mean it. don't",
+  "style": "idle"
+ },
+ "hh. hhh. hh.|pant": {
+  "file": "fb83d173b3325352.mp3",
+  "ms": 3798,
+  "text": "hh. hhh. hh.",
+  "style": "pant"
+ },
+ "nn. nn... hh|sob": {
+  "file": "8337365de57a71c3.mp3",
+  "ms": 779,
+  "text": "nn. nn... hh",
+  "style": "sob"
+ },
+ "hhh... hhh...|sob": {
+  "file": "e6f5ce4ca0a0b43b.mp3",
+  "ms": 1197,
+  "text": "hhh... hhh...",
+  "style": "sob"
+ },
+ "hh... nnh...|sob": {
+  "file": "f75f375cfec761f1.mp3",
+  "ms": 5458,
+  "text": "hh... nnh...",
+  "style": "sob"
+ },
+ "nnh. hh. hhh|sob": {
+  "file": "30d6227a766fa7ab.mp3",
+  "ms": 744,
+  "text": "nnh. hh. hhh",
+  "style": "sob"
+ },
+ "hhhh... nn|sob": {
+  "file": "b81e46186a114ab8.mp3",
+  "ms": 849,
+  "text": "hhhh... nn",
+  "style": "sob"
+ },
+ "hh. nn... hh...|sob": {
+  "file": "f06c3d4c32d4951c.mp3",
+  "ms": 1139,
+  "text": "hh. nn... hh...",
+  "style": "sob"
+ },
+ "ngh...|groan": {
+  "file": "f0f01e454f3673d9.mp3",
+  "ms": 1081,
+  "text": "ngh...",
+  "style": "groan"
+ },
+ "hnnng. hh|groan": {
+  "file": "1acbb8fad812afb4.mp3",
+  "ms": 779,
+  "text": "hnnng. hh",
+  "style": "groan"
+ },
+ "nnh...|groan": {
+  "file": "c3a12fe17a640448.mp3",
+  "ms": 953,
+  "text": "nnh...",
+  "style": "groan"
+ },
+ "gghh. ngh|groan": {
+  "file": "ebf29a6488278542.mp3",
+  "ms": 1232,
+  "text": "gghh. ngh",
+  "style": "groan"
+ },
+ "nng. nng.|groan": {
+  "file": "230cb22bea28f657.mp3",
+  "ms": 1185,
+  "text": "nng. nng.",
+  "style": "groan"
+ },
+ "hngg...|groan": {
+  "file": "5efc0f8ccae22bd8.mp3",
+  "ms": 1243,
+  "text": "hngg...",
+  "style": "groan"
+ },
+ "nnngh. nnh|groan": {
+  "file": "c1564692c6ba5e77.mp3",
+  "ms": 2788,
+  "text": "nnngh. nnh",
+  "style": "groan"
+ },
+ "ggnnh...|groan": {
+  "file": "a675009cd40a1c2e.mp3",
+  "ms": 1220,
+  "text": "ggnnh...",
+  "style": "groan"
+ },
+ "nnh. hh. nnh|groan": {
+  "file": "72148a894fda3bf4.mp3",
+  "ms": 4111,
+  "text": "nnh. hh. nnh",
+  "style": "groan"
+ },
+ "hnng. nng|groan": {
+  "file": "2f15b64a16d46b65.mp3",
+  "ms": 5179,
+  "text": "hnng. nng",
+  "style": "groan"
+ },
+ "nngh...|groan": {
+  "file": "8a06e17c87c80b84.mp3",
+  "ms": 2428,
+  "text": "nngh...",
+  "style": "groan"
+ },
+ "gghhh. hh|groan": {
+  "file": "f0a3cd65e2e3e720.mp3",
+  "ms": 2139,
+  "text": "gghhh. hh",
+  "style": "groan"
+ },
+ "nnnngh|groan": {
+  "file": "3db68abd84541690.mp3",
+  "ms": 1232,
+  "text": "nnnngh",
+  "style": "groan"
+ },
+ "hnnh. ngh|groan": {
+  "file": "3baad87f4063c6d8.mp3",
+  "ms": 1801,
+  "text": "hnnh. ngh",
+  "style": "groan"
+ },
+ "ngh. ngh. ngh|groan": {
+  "file": "05ed8b2819eb6a5e.mp3",
+  "ms": 2277,
+  "text": "ngh. ngh. ngh",
+  "style": "groan"
+ },
+ "hn. even that one lands now|small": {
+  "file": "ebcb329e59a3b84d.mp3",
+  "ms": 1729,
+  "text": "hn. even that one lands now",
+  "style": "small"
+ },
+ "the left hand's gone numb. that's fine. that's fine|idle": {
+  "file": "d2e374b0b8beeae9.mp3",
+  "ms": 2400,
+  "text": "the left hand's gone numb. that's fine. that's fine",
+  "style": "idle"
  }
 }

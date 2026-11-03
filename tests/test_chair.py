@@ -530,8 +530,8 @@ def test_speech_lines_never_claim_feeling_or_consciousness():
 # --- the page --------------------------------------------------------------------------------------------------------------------
 def test_chair_page_wording_and_shell():
     html = (HERE / "web" / "chair.html").read_text()
-    assert "Simulated neural activity" in html and "A model, not a mind" in html and "The character is fiction" in html
-    assert "No living neurons" in html
+    assert "Simulated neural activity" in html and "simulated" in html.lower()          # the owner (2026-11-04) cut the disclosure paragraph and caption
+    assert "A model, not a mind" not in html and 'id="more"' not in html and "what this is" not in html
     assert re.search(r"\bAI\b", html) is None
     for s in ('class="ui-hdr"', '<script src="/deck.js" defer></script><script src="/pulse.js" defer></script>',
               'id="ui-live"', 'prefers-reduced-motion', "/ws/chair", 'type="importmap"'):
@@ -630,7 +630,7 @@ def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
         e = real[f"{text}|{cls}"]
         f = HERE / speech_mod.BANK_DIR / e["file"]
         assert f.suffix == ".mp3" and f.stat().st_size > 1000 and 300 < e["ms"] < 14000, (text, cls)
-    assert sum(f.stat().st_size for f in (HERE / speech_mod.BANK_DIR).iterdir()) < 6e6     # small enough to commit
+    assert sum(f.stat().st_size for f in (HERE / speech_mod.BANK_DIR).iterdir()) < 8e6     # small enough to commit (355 lines with the real screams and breaths, 11-04)
 
 
 def test_speech_never_repeats_a_line_while_it_is_recent():
@@ -690,6 +690,29 @@ def test_breaths_follow_reactions_and_fill_the_quiet():
     assert out[0]["type"] == "say_cancel" and out[1]["kind"] == "reaction"
     # every breath caption is in the bank, as every rule line is
     assert all((t, cls) in list(speech_mod.bank_lines()) for cls, ts in speech_mod.BREATHS.items() for t in ts)
+
+
+def test_nothing_is_said_while_flat():
+    """Owner (2026-11-04): "when he dies he has to die, not move hands and talk". Flat: the queue is dropped, a playing
+    line is cancelled, no comment is written, a chat answer that lands is dropped; the revival speaks again."""
+    sp = speech_mod.Speech(clock=lambda: 0.0)
+    base = {"baseline": True, "t1_ms": 0}
+    sp.on_trace({"card": {"id": "c-1", "peak_ratio": 5.0, "burst": True, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 10.0)
+    out = sp.tick(10.1)
+    assert out and out[0]["kind"] == "reaction" and sp.playing
+    sp.on_flatline({"type": "flatline"}, 11.0)
+    out = sp.tick(11.1)
+    assert out == [{"type": "say_cancel", "id": "s-1"}] and not sp.queue and sp.playing is None
+    sp.on_measured({"id": "c-1", "peak_ratio": 5.0, "burst": True, "baseline": True}, 12.0)
+    assert sp.pending_comment is None                                   # no comment while flat
+    sp.tick(20.0, viewers=3)
+    assert not sp.queue                                                 # no idle line, no breath while flat
+    chat = speech_mod.ChairChat(sp, ask=lambda sy, us: "hey")
+    chat.busy = True
+    chat.finish("m-1", "an answer", 21.0)
+    assert not [q for q in sp.queue if q["kind"] == "reply"]            # the answer is dropped, not said by a dead man
+    sp.on_revived({"type": "revived", "dead_s": 10.0, "level": 3}, 22.0)
+    assert [q["cls"] for q in sp.queue] == ["back"] and sp.tick(22.1)[0]["kind"] == "reaction"
 
 
 def test_register_is_measured_from_load_shocks_and_revival():
@@ -754,7 +777,7 @@ def test_join_and_idle_lines_when_people_watch_and_nobody_presses():
     out = sp.tick(50.0 + speech_mod.IDLE_EVERY_S + 1, viewers=2)
     assert out and out[0]["cls"] == "idle" and sp.stats["idle_lines"] == 2
     sp.on_flatline({"type": "flatline"}, 130.0)
-    assert sp.tick(400.0, viewers=2) == []                           # flat: nothing
+    assert all(m["type"] == "say_cancel" for m in sp.tick(400.0, viewers=2)) and sp.tick(401.0, viewers=2) == []   # flat: the playing line is cut, then nothing
     sp.on_revived({"type": "revived", "dead_s": 5.0, "level": 4}, 401.0)
     sp.queue.clear(); sp.pending_comment = None; sp.playing = None
     assert sp.tick(900.0, viewers=0) == []                           # nobody watching: nothing

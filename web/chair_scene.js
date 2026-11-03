@@ -423,7 +423,7 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   }
   function frame(dt) {
     for (const n of keep) { const b = bones[n]; if (b && rest[n]) b.quaternion.copy(rest[n]); }   // the clip only rewrites a bone when its value changes
-    mixer.update(dt);
+    mixer.update(dt * Math.max(0, 1 - 1.5 * S.limp.x));                                              // flat: the seated clip stops with him (dead is dead: no hands, no breath)
     for (const n of keep) { const b = bones[n]; if (b) rest[n] = (rest[n] || new THREE.Quaternion()).copy(b.quaternion); }
     body(dt);
     boy.updateMatrixWorld(true); headgear();
