@@ -362,22 +362,34 @@ async def _two_clients():
         await _two_clients_on(client, hub)
 
 
+async def _recv(ws, statuses):
+    """The next message that is not a viewer-count status (those are collected)."""
+    while True:
+        m = await ws.receive_json()
+        if m.get("type") == "status":
+            statuses.append(m)
+            continue
+        return m
+
+
 async def _two_clients_on(client, hub):
+    st = []
     w1 = await client.ws_connect("/ws/chair", headers={"X-Key": "one"})
     w2 = await client.ws_connect("/ws/chair", headers={"X-Key": "two"})
-    h1, h2 = await w1.receive_json(), await w2.receive_json()
+    h1, h2 = await _recv(w1, st), await _recv(w2, st)
     assert h1["type"] == "hello" and h2["type"] == "hello" and h1["levels"] == h2["levels"]
     await w1.send_json({"type": "shock", "level": 4})
-    ack = await w1.receive_json()
+    ack = await _recv(w1, st)
     assert ack["type"] == "ack" and ack["state"] == "queued" and ack["id"] == "c-1"
-    e1, e2 = await w1.receive_json(), await w2.receive_json()
+    e1, e2 = await _recv(w1, st), await _recv(w2, st)
     assert e1 == e2 and e1["state"] == "queued"
+    assert st and st[-1]["viewers"] == 2                              # both pages learned the second viewer joined
     await hub.pump_once()
     await hub._event({"type": "delivered", "id": "c-1", "level": 4, "t_ms": 500.0, "n_recruited": 10, "dur_ms": 800})
-    d1, d2 = await w1.receive_json(), await w2.receive_json()
+    d1, d2 = await _recv(w1, st), await _recv(w2, st)
     assert d1 == d2 and d1["state"] == "delivered" and d1["t_ms"] == 500.0 and "t_wall" in d1
     await w2.send_json({"type": "shock", "level": "x"})
-    assert (await w2.receive_json())["state"] == "refused"
+    assert (await _recv(w2, st))["state"] == "refused"
     r = await client.post("/api/chair/stop")
     assert r.status == 401                                           # the operator needs the token
     r = await client.get("/api/chair/status")

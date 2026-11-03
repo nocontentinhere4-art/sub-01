@@ -468,6 +468,7 @@ class Hub:
         self.last_viewer = self.clock()
         try:
             await ws.send_json(self.hello())
+            await self._viewers()
             async for msg in ws:
                 if msg.type != web.WSMsgType.TEXT:
                     continue
@@ -481,7 +482,12 @@ class Hub:
                     await ws.send_json({"type": "status", **self.status()})
         finally:
             self.clients.discard(ws)
+            await self._viewers()
         return ws
+
+    async def _viewers(self):
+        """The viewer count changed: every page shows it (a status message)."""
+        await self.broadcast({"type": "status", **self.status()})
 
     # --- operator ---------------------------------------------------------------------------------------------------
     async def stop(self):
