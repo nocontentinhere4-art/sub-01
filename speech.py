@@ -82,8 +82,109 @@ class VoiceProvider:
 
 
 class NoVoice(VoiceProvider):
-    """No voice service is configured in this repository: lines are captions."""
+    """No voice service is configured: lines are captions."""
     name = "none"
+
+
+class VoiceStudio(VoiceProvider):
+    """The owner's local VoiceStudio app (github.com/debpalash/VoiceStudio, AGPL-3.0; the OmniVoice engine), through
+    its local HTTP API: POST /generate (multipart form: text, instruct, seed, num_step, speed) answers WAV bytes with
+    X-Audio-Id and X-Audio-Duration headers; GET /health says whether it is up. Only reachable where the app runs
+    (loopback), so production stays on NoVoice unless VOICE_STUDIO_URL points somewhere that answers.
+
+    The voice is designed, not cloned: OmniVoice's `instruct` is a tag vocabulary (male, young adult, moderate pitch,
+    whisper, accents; it has no emotion tags), and a fixed seed keeps the same designed voice across lines. The one
+    expressive tag the engine supports, whisper, is used for the settling lines; nothing else is pretended.
+    Renders are cached by (text, tags) and the reaction vocabulary is rendered ahead (warm) so a reaction does not
+    wait on the engine; comments render on demand (a few seconds on this laptop's GPU)."""
+    name = "voicestudio"
+    TAGS = "male, young adult, moderate pitch"
+    STYLE = {"settle": TAGS + ", whisper"}
+    SEED = 7
+    STEPS = 8                                # draft quality: a short line in ~1-2 s on an Apple GPU
+    CACHE = 64
+
+    def __init__(self, base_url, timeout=20.0, clock=time.time):
+        import urllib.request
+        self.base = base_url.rstrip("/")
+        self.timeout, self.clock = timeout, clock
+        self._ok, self._checked = False, -1e9
+        self.cache = {}                      # (text, tags) -> {"wav": bytes, "ms": int, "id": str}
+        self.order = []
+        self.stats = {"renders": 0, "errors": 0, "hits": 0}
+        self._urllib = urllib.request
+
+    def available(self):
+        now = self.clock()
+        if now - self._checked > 30.0:
+            self._checked = now
+            try:
+                with self._urllib.urlopen(self.base + "/health", timeout=3.0) as r:
+                    self._ok = r.status == 200 and json.loads(r.read().decode()).get("status") == "ok"
+            except Exception:
+                self._ok = False
+        return self._ok
+
+    def status(self):
+        return {"available": self.available(), "provider": self.name, "cached": len(self.cache), **self.stats}
+
+    def tags_for(self, style):
+        return self.STYLE.get(style, self.TAGS)
+
+    def key(self, text, style):
+        import hashlib
+        return hashlib.sha1(f"{text}|{self.tags_for(style)}|{self.SEED}".encode()).hexdigest()[:16]
+
+    def synthesize(self, text, style):
+        """-> {"url": "/api/chair/voice/<key>.wav", "ms": int} or None. Blocking (the hub runs it off the loop)."""
+        import uuid
+        k = self.key(text, style)
+        if k in self.cache:
+            self.stats["hits"] += 1
+            return {"url": f"/api/chair/voice/{k}.wav", "ms": self.cache[k]["ms"]}
+        if not self.available():
+            return None
+        boundary = "----sub01" + uuid.uuid4().hex
+        fields = {"text": text, "instruct": self.tags_for(style), "seed": str(self.SEED), "num_step": str(self.STEPS), "speed": "1.0"}
+        body = b"".join(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{n}\"\r\n\r\n{v}\r\n".encode() for n, v in fields.items()) + f"--{boundary}--\r\n".encode()
+        req = self._urllib.Request(self.base + "/generate", data=body, method="POST",
+                                   headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        try:
+            with self._urllib.urlopen(req, timeout=self.timeout) as r:
+                wav = r.read()
+                dur = r.headers.get("X-Audio-Duration")
+                ms = int(float(dur) * 1000) if dur else None
+        except Exception as e:
+            self.stats["errors"] += 1
+            print("voicestudio: render failed:", repr(e)[:100], flush=True)
+            return None
+        if ms is None:
+            ms = int(len(wav) / 48.0)        # 24 kHz 16-bit mono: 48 bytes a millisecond
+        self.stats["renders"] += 1
+        self.cache[k] = {"wav": wav, "ms": ms, "text": text}
+        self.order.append(k)
+        while len(self.order) > self.CACHE:
+            self.cache.pop(self.order.pop(0), None)
+        return {"url": f"/api/chair/voice/{k}.wav", "ms": ms}
+
+    def audio(self, key):
+        c = self.cache.get(key)
+        return c["wav"] if c else None
+
+    def warm(self):
+        """Render the reaction vocabulary ahead (a background thread at start). Stops at the first failure."""
+        for cls, lines in REACTIONS.items():
+            for text in lines:
+                if self.synthesize(text, cls) is None:
+                    return False
+        return True
+
+
+def voice_from_env(env=None):
+    """VOICE_STUDIO_URL set -> VoiceStudio, else NoVoice."""
+    import os
+    url = (env or os.environ).get("VOICE_STUDIO_URL", "").strip()
+    return VoiceStudio(url) if url else NoVoice()
 
 
 class Speech:
@@ -222,15 +323,17 @@ class Speech:
                 return out
         self.queue.pop(0)
         ms = self.duration_ms(nxt)
-        audio = None
-        if self.voice.available():
-            try:
-                audio = self.voice.synthesize(nxt["text"], nxt["cls"])
-                if audio and audio.get("ms"):
-                    ms = int(audio["ms"])
-            except Exception:
-                audio = None
         self.playing = {"id": nxt["id"], "until": now + ms / 1000.0, "kind": nxt["kind"]}
         out.append({"type": "say", "id": nxt["id"], "kind": nxt["kind"], "text": nxt["text"], "ms": ms, "about": nxt["about"],
-                    "cls": nxt["cls"], "voice": {"available": bool(audio), "url": (audio or {}).get("url")}})
+                    "cls": nxt["cls"], "voice": {"available": False, "url": None}})
         return out
+
+    def voiced(self, msg, audio, now):
+        """The hub rendered the line (off the loop): the audio and its true length go on the message and the clock."""
+        if audio and audio.get("url"):
+            msg["voice"] = {"available": True, "url": audio["url"]}
+            if audio.get("ms"):
+                msg["ms"] = int(audio["ms"])
+                if self.playing and self.playing["id"] == msg["id"]:
+                    self.playing["until"] = now + msg["ms"] / 1000.0
+        return msg

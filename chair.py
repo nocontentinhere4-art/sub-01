@@ -47,6 +47,7 @@ IDLE_PAUSE_S = 45.0
 TRACE_KEEP = 500                  # bins kept for a late joiner (10 s at 20 ms)
 EVENTS_KEEP = 60
 MAX_WS = 200
+SAY_WAIT_S, SAY_WAIT_COMMENT_S = 2.5, 12.0   # how long a line waits for its audio (cached reactions answer at once)
 LABEL = "Simulated neural activity"
 STATES = ("queued", "delivered", "measured", "refused", "dropped", "throttled", "full", "unavailable", "stopped")
 
@@ -339,10 +340,33 @@ class Hub:
                 await self.pump_once()
                 if self.speech:
                     for msg in self.speech.tick(self.clock()):
-                        await self.broadcast(msg)
+                        await self._say(msg)
             except Exception as e:
                 print("chair: pump error:", repr(e)[:120], flush=True)
             await asyncio.sleep(0.1)
+
+    async def _say(self, msg):
+        """A line to say: rendered by the voice provider off the loop when one answers (a reaction waits at most
+        SAY_WAIT_S for it, a comment longer), then broadcast with its audio; without a voice, the caption alone."""
+        if msg.get("type") == "say" and self.speech and self.speech.voice.available():
+            loop = asyncio.get_running_loop()
+            wait = SAY_WAIT_S if msg.get("kind") == "reaction" else SAY_WAIT_COMMENT_S
+            try:
+                audio = await asyncio.wait_for(loop.run_in_executor(None, self.speech.voice.synthesize, msg["text"], msg.get("cls")), wait)
+            except (asyncio.TimeoutError, Exception) as e:
+                audio = None
+                print("chair: voice not ready in time:", repr(e)[:80], flush=True)
+            self.speech.voiced(msg, audio, self.clock())
+        await self.broadcast(msg)
+
+    async def warm_voice(self):
+        """Render the reaction vocabulary ahead when the voice is up (and again after it comes back)."""
+        loop = asyncio.get_running_loop()
+        while True:
+            v = self.speech.voice if self.speech else None
+            if v is not None and hasattr(v, "warm") and v.available() and len(getattr(v, "cache", {})) < 12:
+                await loop.run_in_executor(None, v.warm)
+            await asyncio.sleep(60.0)
 
     async def run_comments(self):
         """The comment the speech module asked for, written off the loop (the mind's metered model call)."""
@@ -484,6 +508,14 @@ def attach(app, hub, page=HERE / "web" / "chair.html", nocache=None):
     nocache = nocache or {"Cache-Control": "no-store"}
     app.router.add_get("/chair", lambda r: web.FileResponse(page, headers=nocache))
     app.router.add_get("/ws/chair", hub.ws_handler)
+    async def voice_file(request):             # a rendered line, from the provider's cache (web/chair.html plays it)
+        key = request.match_info["key"]
+        v = hub.speech.voice if hub.speech else None
+        wav = v.audio(key) if (v is not None and hasattr(v, "audio") and key.isalnum()) else None
+        if wav is None:
+            raise web.HTTPNotFound(text="no such line")
+        return web.Response(body=wav, content_type="audio/wav", headers={"Cache-Control": "private, max-age=600"})
+    app.router.add_get("/api/chair/voice/{key}.wav", voice_file)
     app.router.add_get("/api/chair/status", lambda r: web.json_response(
         {**hub.status(), "stats": hub.stats, "cards": list(hub.cards)[-5:]}, headers=nocache))
 

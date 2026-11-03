@@ -73,6 +73,7 @@
   <div class="ui-caption" id="src">Simulated neural activity</div>
   <div class="ui-caption" id="phase">connecting…</div>
   <div class="ui-caption" id="viewers"></div>
+  <div class="ui-caption" id="voice"></div>
 </div>
 <div id="say" aria-live="polite"></div>
 <div id="dock" class="ui-dock">
@@ -124,7 +125,7 @@ function connect() {
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function on(m) {
   if (m.type === "hello") { st.status = m.status; st.bins = (m.bins || []).slice(-500); st.last = m.trace; st.open = m.card; st.cards = m.cards || []; st.events = m.events || [];
-    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); if (m.voice && !m.voice.available) $("say").dataset.voice = "off"; }
+    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); $("voice").textContent = m.voice && m.voice.available ? "voice: " + m.voice.provider + " (local)" : "voice: none, captions only"; }
   else if (m.type === "trace") { for (const b of m.bins) st.bins.push(b); if (st.bins.length > 520) st.bins.splice(0, st.bins.length - 500); st.last = m; st.open = m.card; st.baseline = m.baseline;
     if (st.scene) st.scene.setDrive(m.drive); drawTrace(); phaseLine(); if (st.open) cardLine(); }
   else if (m.type === "status") { st.status = m; applyStatus(); }
@@ -133,7 +134,7 @@ function on(m) {
     if (m.state === "delivered") { if (st.scene) st.scene.shock(); st.open = { id: m.id, level: m.level }; cardLine(); }
     if (m.state === "measured") { st.cards.push(m); if (st.cards.length > 10) st.cards.shift(); if (st.open && st.open.id === m.id) st.open = null; cardLine(m); } }
   else if (m.type === "say") { say(m); }
-  else if (m.type === "say_cancel") { if (st.sayT && st.sayT.id === m.id) hideSay(); }
+  else if (m.type === "say_cancel") { if (st.sayT && st.sayT.id === m.id) hideSay(); else stopAudio(); }
   else if (m.type === "full") { setStatus("the chair is full · try again in a minute", "bad"); }
 }
 function applyStatus() {
@@ -213,9 +214,11 @@ function drawTrace() {
 // --- his lines -----------------------------------------------------------------------------------------------------------
 function say(m) { const e = $("say"); e.innerHTML = ""; const t = document.createElement("span"); t.textContent = m.text; e.appendChild(t);
   const s = document.createElement("small"); s.textContent = m.kind === "comment" ? "his line" : "his reaction"; e.appendChild(s); e.classList.add("on");
-  if (m.voice && m.voice.available && m.voice.url) { try { const a = new Audio(m.voice.url); a.play().catch(() => {}); } catch {} }
+  stopAudio();
+  if (m.voice && m.voice.available && m.voice.url) { try { const a = new Audio(m.voice.url); st.audio = a; a.play().catch(() => { s.textContent += " · sound blocked until you tap the page"; }); } catch {} }
   if (st.sayT && st.sayT.h) clearTimeout(st.sayT.h); st.sayT = { id: m.id, h: setTimeout(hideSay, Math.max(1200, m.ms + 600)) }; }
-function hideSay() { $("say").classList.remove("on"); st.sayT = null; }
+function stopAudio() { if (st.audio) { try { st.audio.pause(); } catch {} st.audio = null; } }
+function hideSay() { $("say").classList.remove("on"); st.sayT = null; stopAudio(); }
 
 connect();
 </script>

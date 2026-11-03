@@ -459,3 +459,60 @@ def test_chair_page_wording_and_shell():
     js = (HERE / "web" / "chair_scene.js").read_text()
     assert "setDrive" in js and "reduced" in js and "shock()" in js
     assert re.search(r"\bAI\b", js) is None
+
+
+# --- the voice provider ----------------------------------------------------------------------------------------------------------
+def test_voicestudio_provider_against_a_fake_app():
+    asyncio.run(_voicestudio())
+
+
+async def _voicestudio():
+    from aiohttp.test_utils import TestServer
+    calls = []
+
+    async def health(request):
+        return chair.web.json_response({"status": "ok"})
+
+    async def generate(request):
+        form = await request.post()
+        calls.append(dict(form))
+        return chair.web.Response(body=b"RIFF" + bytes(96), content_type="audio/wav",
+                                  headers={"X-Audio-Id": "abc", "X-Audio-Duration": "0.9"})
+
+    app = chair.web.Application()
+    app.router.add_get("/health", health)
+    app.router.add_post("/generate", generate)
+    async with TestServer(app) as srv:
+        loop = asyncio.get_running_loop()
+        v = speech_mod.VoiceStudio(f"http://127.0.0.1:{srv.port}")
+        assert await loop.run_in_executor(None, v.available)
+        a = await loop.run_in_executor(None, v.synthesize, "agh", "strong")
+        assert a["ms"] == 900 and a["url"].startswith("/api/chair/voice/") and a["url"].endswith(".wav")
+        assert calls[-1]["text"] == "agh" and calls[-1]["instruct"] == speech_mod.VoiceStudio.TAGS and calls[-1]["seed"] == "7"
+        b = await loop.run_in_executor(None, v.synthesize, "agh", "strong")
+        assert b == a and len(calls) == 1 and v.stats["hits"] == 1          # cached
+        c = await loop.run_in_executor(None, v.synthesize, "...hh", "settle")
+        assert "whisper" in calls[-1]["instruct"] and c["url"] != a["url"]
+        key = a["url"].rsplit("/", 1)[1][:-4]
+        assert v.audio(key)[:4] == b"RIFF" and v.audio("nope") is None
+        # the hub serves the cached render and the say path carries the audio
+        sp = speech_mod.Speech(voice=v, clock=lambda: 0.0)
+        hub = chair.Hub(FakeSource(), speech=sp, clock=lambda: 0.0)
+        app2 = chair.web.Application()
+        chair.attach(app2, hub)
+        from aiohttp.test_utils import TestClient
+        async with TestClient(TestServer(app2)) as client:
+            r = await client.get(a["url"])
+            assert r.status == 200 and r.content_type == "audio/wav" and (await r.read())[:4] == b"RIFF"
+            assert (await client.get("/api/chair/voice/zzzz.wav")).status == 404
+            got = []
+            hub.broadcast = lambda msg: _collect(got, msg)
+            sp._line("reaction", "agh", "c-1", speech_mod.REACTION_LIFE_S, 0.0, "strong")
+            for msg in sp.tick(0.1):
+                await hub._say(msg)
+            assert got and got[0]["voice"]["available"] and got[0]["ms"] == 900 and sp.playing["until"] == 0.9
+    assert speech_mod.voice_from_env({}).name == "none" and speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}).name == "voicestudio"
+
+
+async def _collect(got, msg):
+    got.append(msg)

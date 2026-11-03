@@ -2292,7 +2292,12 @@ async def main(args):
     add_ops_routes(app, live, data_dir)
     chair_hub = None                              # the chair (chair.py): visitors' simulated shocks to his network
     if os.environ.get("SUB01_CHAIR", "1") != "0":
-        voice = speech_mod.Speech(ask=lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None)
+        if args.voice_url:
+            os.environ["VOICE_STUDIO_URL"] = args.voice_url
+        voice = speech_mod.Speech(ask=lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None,
+                                  voice=speech_mod.voice_from_env())
+        if voice.voice.name != "none":
+            print(f"chair: voice through {voice.voice.name} at {voice.voice.base} ({'up' if voice.voice.available() else 'not answering yet'})", flush=True)
         chair_hub = chair.Hub(chair.SimSource(), key_of=live.client_ip, on_delivered=live.chair_shock, speech=voice,
                               admin_ok=lambda r: admin_ok(r) or bool(r.app.get(GATED)))
         chair.attach(app, chair_hub, nocache=NOCACHE)
@@ -2444,7 +2449,7 @@ async def main(args):
         tasks.append(supervised("spiking live", cpu_net.run))
     if chair_hub:
         tasks += [supervised("chair net", chair_hub.source.run), supervised("chair", chair_hub.pump),
-                  supervised("chair voice", chair_hub.run_comments)]
+                  supervised("chair voice", chair_hub.run_comments), supervised("chair warm", chair_hub.warm_voice)]
     if getattr(live, "clips", None):
         tasks.append(supervised("clips", lambda: live.clips.run(live, args.port), backoff=60))
     me, stopping = asyncio.current_task(), []
@@ -2501,6 +2506,8 @@ def build_parser():
     p.add_argument("--vote-round", type=float, default=None,
                    help="seconds per viewers' vote round (default SUB01_VOTE_ROUND_S or 3600)")
     p.add_argument("--trust-proxy", action="store_true", help="rate-limit by X-Forwarded-For (behind a reverse proxy)")
+    p.add_argument("--voice-url", default=os.environ.get("VOICE_STUDIO_URL", ""),
+                   help="the chair's voice: a VoiceStudio app's local API, e.g. http://localhost:3900 (default: no voice, captions)")
     return p
 
 
