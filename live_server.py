@@ -50,6 +50,8 @@ import chess_game
 import clips
 import music as music_mod
 import costs
+import chair
+import speech as speech_mod
 from browse_service import BrowserClient, BrowserDown, LocalBrowser
 from search_sources import live_interest
 import interests
@@ -1919,6 +1921,15 @@ class Live:
         ok, reason = self.votes.cast(ids, k, addr=self.viewer_addr.get(ws))
         await ws.send_json({"type": "vote_ack", "ok": ok, "reason": reason, "mine": self.votes.mine(ids)})
 
+    def chair_shock(self, ev):
+        """A stimulus the chair's network just took (chair.py) also reaches the rate model, so the whole site sees
+        it: the motor, salience and relay networks get a stimulus scaled by the level, and the sleep circuit gets
+        arousal input (a shock is not gated by attention the way a chat line is)."""
+        k = max(1, min(5, int(ev.get("level") or 1))) / 5.0
+        for group, amount in (("somatomotor", 8.0), ("salience", 5.0), ("relay", 4.0)):
+            self.brain.stimulate(group, amount * k)
+        self.engine.stimulus(self.clock.now(), "message")
+
     async def handle_react(self, ws, k):
         ids = self.viewer_ids.get(ws, ())
         ok, reason = self.reactions.react(ids[0] if ids else id(ws), k, self.viewer_addr.get(ws))   # IP + UA, the address
@@ -2279,6 +2290,12 @@ async def main(args):
         live.mind = mind_mod.Mind(data_dir, budget=mind_mod.mind_budget(data_dir), clock=live.clock.now)
 
     add_ops_routes(app, live, data_dir)
+    chair_hub = None                              # the chair (chair.py): visitors' simulated shocks to his network
+    if os.environ.get("SUB01_CHAIR", "1") != "0":
+        voice = speech_mod.Speech(ask=lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None)
+        chair_hub = chair.Hub(chair.SimSource(), key_of=live.client_ip, on_delivered=live.chair_shock, speech=voice,
+                              admin_ok=lambda r: admin_ok(r) or bool(r.app.get(GATED)))
+        chair.attach(app, chair_hub, nocache=NOCACHE)
     if os.environ.get("CLIPS", "1") != "0":       # #59: daily clips for the social accounts, made in nice'd children
         live.clips = clips.ClipMaker(data_dir)
         live.clips.ledger = live.ledger
@@ -2425,6 +2442,9 @@ async def main(args):
         tasks.append(manager.run())
     if cpu_net:
         tasks.append(supervised("spiking live", cpu_net.run))
+    if chair_hub:
+        tasks += [supervised("chair net", chair_hub.source.run), supervised("chair", chair_hub.pump),
+                  supervised("chair voice", chair_hub.run_comments)]
     if getattr(live, "clips", None):
         tasks.append(supervised("clips", lambda: live.clips.run(live, args.port), backoff=60))
     me, stopping = asyncio.current_task(), []
@@ -2446,6 +2466,8 @@ async def main(args):
             manager.shutdown()
         if cpu_net:
             await cpu_net.stop()
+        if chair_hub:
+            await chair_hub.source.stop()
         live.save_screens()                               # #89: today's screens survive the deploy
         if live.browser:
             try:
