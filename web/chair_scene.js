@@ -208,7 +208,19 @@ export async function createScene({ canvas, lite = false, small = false, reduced
 
   // --- the chair, built round the pose: a heavy oak frame, a slatted back, padded arms, straps with buckles --------------
   const chair = new THREE.Group(); scene.add(chair);
-  const hips = wp("Hips"), knL = wp("LeftLeg"), knR = wp("RightLeg"), hL = wp("LeftHand"), hR = wp("RightHand"), head = wp("Head"), top = wp("head_end") || head.clone().add(V(0, 0.12, 0));
+  const hips = wp("Hips"), knL = wp("LeftLeg"), knR = wp("RightLeg"), hL = wp("LeftHand"), hR = wp("RightHand"), head = wp("Head");
+  // the crown and the chin, read off the skinned head mesh in this pose: the rig's head_end bone points off the forehead
+  // (16 cm ahead of and 8 cm below the top of the hair on this model), so a cap placed on it hung in front of his face
+  const skull = (() => {
+    let hm = null; boy.traverse(o => { if (!hm && o.isSkinnedMesh && (Array.isArray(o.material) ? o.material : [o.material]).some(m => m && m.name === "owner_head")) hm = o; });
+    if (!hm) return null;
+    hm.skeleton.update(); const pos = hm.geometry.attributes.position, v = new THREE.Vector3(); let topY = -Infinity, botY = Infinity;
+    for (let i = 0; i < pos.count; i++) { hm.getVertexPosition(i, v); topY = Math.max(topY, v.y); botY = Math.min(botY, v.y); }
+    let n = 0, cx = 0, cz = 0, chin = null;                                                   // the band where the rim sits, 4 to 8 cm under the top; the chin: the lowest, most forward point
+    for (let i = 0; i < pos.count; i++) { hm.getVertexPosition(i, v); const d = topY - v.y; if (d > 0.04 && d < 0.08) { n++; cx += v.x; cz += v.z; } if (v.y < botY + 0.02 && (!chin || v.z > chin.z)) chin = v.clone(); }
+    return n ? { top: V(cx / n, topY, cz / n), chin } : null;
+  })();
+  const top = skull ? skull.top : wp("head_end") || head.clone().add(V(0, 0.12, 0));
   const spine = wp("Spine"), fL = wp("LeftFoot"), fR = wp("RightFoot"), elL = wp("LeftForeArm"), elR = wp("RightForeArm");
   // he faces +z (the camera); the hips bone sits ~0.23 m above the seat on this rig; the seat runs from behind the hips to
   // just short of the knees, the back posts stand behind it
@@ -250,19 +262,22 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   // so they turn and wander with it: the cap is on him, not over him); the bracket stays on the frame and its arm is a
   // hinged, telescoping link from the bracket to the cap; the two head cables re-anchor to the stud as it moves
   const clamp = new THREE.Group(); chair.add(clamp);
-  const capY = top.y - 0.018;                                                                 // the rim on the hair, not above it
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 0.06, 24), metal); cap.position.set(top.x, capY + 0.02, top.z); cap.castShadow = true; clamp.add(cap);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 10, 32), sponge); rim.position.set(top.x, capY - 0.005, top.z); rim.rotation.x = Math.PI / 2; clamp.add(rim);
+  const capY = top.y - 0.06;                                                                  // the rim round the crown where the skull is as wide as the ring, the cap over the hair
+  const headUp = bones.Head ? V(0, 1, 0).applyQuaternion(bones.Head.getWorldQuaternion(new THREE.Quaternion())).normalize() : V(0, 1, 0);
+  const capG = new THREE.Group(); capG.position.set(top.x, capY, top.z); capG.quaternion.setFromUnitVectors(V(0, 1, 0), headUp); clamp.add(capG);   // the cap sits square on the skull's axis
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 0.06, 24), metal); cap.position.set(0, 0.035, 0); cap.castShadow = true; capG.add(cap);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 10, 32), sponge); rim.position.set(0, -0.005, 0); rim.rotation.x = Math.PI / 2; capG.add(rim);
   const stud = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, emissive: 0x3a7fc0, emissiveIntensity: 0.0, roughness: 0.3, metalness: 0.6 }));
-  stud.position.set(top.x, capY + 0.055, top.z); clamp.add(stud);
+  stud.position.set(0, 0.07, 0); capG.add(stud);
   const studW = new THREE.Vector3(), capW = new THREE.Vector3(), armTo = new THREE.Vector3();
-  const bracketTop = V(top.x, capY + 0.045, backZ + 0.05);                                    // where the arm hinges on the frame
-  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.03, backH - 0.12 - (capY + 0.04), 0.03), dark); bracket.position.set(top.x, (capY + 0.04 + backH - 0.12) / 2, backZ + 0.05); clamp.add(bracket);
+  const bracketTop = V(top.x, capY + 0.06, backZ + 0.05);                                     // where the arm hinges on the frame
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.03, backH - 0.12 - (capY + 0.055), 0.03), dark); bracket.position.set(top.x, (capY + 0.055 + backH - 0.12) / 2, backZ + 0.05); clamp.add(bracket);
   const armLen0 = top.z - backZ - 0.03;
   const bArm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, armLen0), dark); bArm.castShadow = true; clamp.add(bArm);
-  const chin = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 30, Math.PI), leather); chin.position.set(head.x, head.y - 0.03, head.z + 0.0); chin.rotation.set(0, 0, Math.PI); chin.scale.set(1, 0.9, 1); clamp.add(chin);
+  const chinAt = skull ? V(top.x, skull.chin.y + 0.085, skull.chin.z - 0.025) : V(head.x, head.y - 0.03, head.z);   // under the jaw, ear to ear
+  const chin = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 30, Math.PI), leather); chin.position.copy(chinAt); chin.rotation.set(0, 0, Math.PI); chin.scale.set(1, 0.9, 1); clamp.add(chin);
   boy.updateMatrixWorld(true); chair.updateMatrixWorld(true);
-  if (bones.Head) for (const o of [cap, rim, stud, chin]) bones.Head.attach(o);               // world transforms kept; from now on they move with the head
+  if (bones.Head) for (const o of [capG, chin]) bones.Head.attach(o);                         // world transforms kept; from now on they move with the head
   stud.getWorldPosition(studW); glow.position.copy(studW).add(V(0, 0.05, 0.05));
   const cables = [];                                                                          // {mesh, pts, r, off, anchor}: the head cables, re-anchored to the stud
   const tube = (pts, r, mat, follow = false) => { const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, r, 7, false), mat); m.castShadow = true; chair.add(m);
@@ -271,7 +286,7 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   function headgear() {                                                                       // each frame: the arm from the bracket to the cap, the cables from the stud
     cap.getWorldPosition(capW); stud.getWorldPosition(studW);
     glow.position.copy(studW).add(tmpA.set(0, 0.05, 0.05));
-    armTo.copy(capW); chair.worldToLocal(armTo); armTo.y += 0.025; armTo.z -= 0.06;            // the arm meets the cap at its back edge
+    armTo.copy(capW); chair.worldToLocal(armTo); armTo.y += 0.01; armTo.z -= 0.075;            // the arm meets the cap at its back edge
     bArm.position.copy(bracketTop).add(armTo).multiplyScalar(0.5); bArm.lookAt(chair.localToWorld(tmpA.copy(armTo)));
     bArm.scale.z = Math.max(0.3, bracketTop.distanceTo(armTo) / armLen0);
     for (const c of cables) { tmpA.copy(studW).add(c.off); chair.worldToLocal(tmpA);
@@ -280,8 +295,8 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   const junction = box(0.2, 0.28, 0.07, dark, -1.55, 1.7, -1.26);
   const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.03), metal); lever.position.set(-1.55, 1.78, -1.2); lever.rotation.x = -0.5; scene.add(lever);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 10), new THREE.MeshStandardMaterial({ color: 0x7a1a1a, roughness: 0.4 })); knob.position.set(-1.55, 1.87, -1.15); scene.add(knob);
-  tube([V(top.x, capY + 0.05, top.z), V(top.x - 0.1, capY + 0.28, top.z - 0.12), V(-0.7, 2.3, -0.7), V(-1.45, 2.1, -1.2), V(-1.55, 1.85, -1.23)], 0.013, dark, true);
-  tube([V(top.x + 0.03, capY + 0.045, top.z + 0.02), V(top.x + 0.25, capY + 0.12, top.z - 0.1), V(0.45, 1.3, -0.8), V(0.6, 0.2, -0.9), V(-1.4, 0.06, -1.15), V(-1.55, 1.55, -1.23)], 0.011, dark, true);
+  tube([V(top.x, capY + 0.065, top.z), V(top.x - 0.1, capY + 0.3, top.z - 0.12), V(-0.7, 2.3, -0.7), V(-1.45, 2.1, -1.2), V(-1.55, 1.85, -1.23)], 0.013, dark, true);
+  tube([V(top.x + 0.03, capY + 0.06, top.z + 0.02), V(top.x + 0.25, capY + 0.14, top.z - 0.1), V(0.45, 1.3, -0.8), V(0.6, 0.2, -0.9), V(-1.4, 0.06, -1.15), V(-1.55, 1.55, -1.23)], 0.011, dark, true);
   tube([V(hL.x - 0.05, hL.y - 0.03, hL.z), V(hL.x - 0.35, hL.y - 0.35, hL.z + 0.1), V(-1.0, 0.06, -0.5), V(-1.55, 1.57, -1.23)], 0.008, dark);
   const plate = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.24, 0.02), new THREE.MeshStandardMaterial({ color: 0x1b1b1f, roughness: 0.5 })); plate.position.set(0, 2.8, -1.28); scene.add(plate);
 
