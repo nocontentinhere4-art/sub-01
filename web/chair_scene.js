@@ -1,8 +1,8 @@
-// SUB-01 · the chair scene (web/chair.html): the character seated in a tall wooden chair, head cap, straps and cables,
+// SUB-01 · the chair scene (web/chair.html): the character seated in a tall wooden chair, temple electrodes, straps and cables,
 // under one hanging lamp in a block-walled cell, after the reference image. His body moves from the measured numbers
 // (chair.py Drive: tension, slack, heavy, flat), never from the button: the only things that follow the button are the
 // lamp dip and the sparks at delivery. The procedural layer is additive on the seated clip and bounded by the restraints
-// (the head stays in the cap, the wrists under the straps, the torso against the belt), with springs for the body's own
+// (the head stays between the electrodes, the wrists under the straps, the torso against the belt), with springs for the body's own
 // inertia; on top, what a body does on its own (the idle, the panting after, twitches, a swallow), none of it from the button.
 // Flat (the rule of the piece): the body hangs, the lamp sinks; revival: a gasp and a jolt from the measured burst.
 // Artistic mappings of simulated signals, not physiology. Everything here is procedural geometry: no bought model.
@@ -210,15 +210,16 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   const chair = new THREE.Group(); scene.add(chair);
   const hips = wp("Hips"), knL = wp("LeftLeg"), knR = wp("RightLeg"), hL = wp("LeftHand"), hR = wp("RightHand"), head = wp("Head");
   // the crown and the chin, read off the skinned head mesh in this pose: the rig's head_end bone points off the forehead
-  // (16 cm ahead of and 8 cm below the top of the hair on this model), so a cap placed on it hung in front of his face
+  // (16 cm ahead of and 8 cm below the top of the hair on this model), so anything placed on it hung in front of his face
   const skull = (() => {
     let hm = null; boy.traverse(o => { if (!hm && o.isSkinnedMesh && (Array.isArray(o.material) ? o.material : [o.material]).some(m => m && m.name === "owner_head")) hm = o; });
     if (!hm) return null;
     hm.skeleton.update(); const pos = hm.geometry.attributes.position, v = new THREE.Vector3(); let topY = -Infinity, botY = Infinity;
     for (let i = 0; i < pos.count; i++) { hm.getVertexPosition(i, v); topY = Math.max(topY, v.y); botY = Math.min(botY, v.y); }
-    let n = 0, cx = 0, cz = 0, chin = null;                                                   // the band where the rim sits, 4 to 8 cm under the top; the chin: the lowest, most forward point
-    for (let i = 0; i < pos.count; i++) { hm.getVertexPosition(i, v); const d = topY - v.y; if (d > 0.04 && d < 0.08) { n++; cx += v.x; cz += v.z; } if (v.y < botY + 0.02 && (!chin || v.z > chin.z)) chin = v.clone(); }
-    return n ? { top: V(cx / n, topY, cz / n), chin } : null;
+    let n = 0, cx = 0, cz = 0, chin = null, tL = null, tR = null;                             // the crown: the band 4 to 8 cm under the top; the chin: the lowest, most forward point; the temples: the widest points 11 to 15 cm under the top
+    for (let i = 0; i < pos.count; i++) { hm.getVertexPosition(i, v); const d = topY - v.y; if (d > 0.04 && d < 0.08) { n++; cx += v.x; cz += v.z; } if (v.y < botY + 0.02 && (!chin || v.z > chin.z)) chin = v.clone();
+      if (d > 0.11 && d < 0.15) { if (!tL || v.x > tL.x) tL = v.clone(); if (!tR || v.x < tR.x) tR = v.clone(); } }
+    return n ? { top: V(cx / n, topY, cz / n), chin, tL, tR } : null;
   })();
   const top = skull ? skull.top : wp("head_end") || head.clone().add(V(0, 0.12, 0));
   const spine = wp("Spine"), fL = wp("LeftFoot"), fR = wp("RightFoot"), elL = wp("LeftForeArm"), elR = wp("RightForeArm");
@@ -258,49 +259,36 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   const lapBuckle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.014), metal); lapBuckle.position.set(hips.x, hips.y + 0.02, hips.z + 0.17); chair.add(lapBuckle);
   for (const f of [fL, fR]) { const s = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.014, 8, 20), leather); s.position.set(f.x, f.y + 0.09, f.z - 0.05); s.rotation.y = Math.PI / 2; s.scale.set(1, 1.2, 1); s.castShadow = true; chair.add(s);
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.012), metal); b.position.set(f.x, f.y + 0.09, f.z + 0.015); chair.add(b); }   // ankle straps
-  // the headgear: a sponge-rimmed metal cap with its stud, and the chin strap, ride on the head (children of the Head bone,
-  // so they turn and wander with it: the cap is on him, not over him); the bracket stays on the frame and its arm is a
-  // hinged, telescoping link from the bracket to the cap; the two head cables re-anchor to the stud as it moves
-  const clamp = new THREE.Group(); chair.add(clamp);
-  const capY = top.y - 0.06;                                                                  // the rim round the crown where the skull is as wide as the ring, the cap over the hair
-  const headUp = bones.Head ? V(0, 1, 0).applyQuaternion(bones.Head.getWorldQuaternion(new THREE.Quaternion())).normalize() : V(0, 1, 0);
-  const capG = new THREE.Group(); capG.position.set(top.x, capY, top.z); capG.quaternion.setFromUnitVectors(V(0, 1, 0), headUp); clamp.add(capG);   // the cap sits square on the skull's axis
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 0.06, 24), metal); cap.position.set(0, 0.035, 0); cap.castShadow = true; capG.add(cap);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 10, 32), sponge); rim.position.set(0, -0.005, 0); rim.rotation.x = Math.PI / 2; capG.add(rim);
-  const stud = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, emissive: 0x3a7fc0, emissiveIntensity: 0.0, roughness: 0.3, metalness: 0.6 }));
-  stud.position.set(0, 0.07, 0); capG.add(stud);
-  const studW = new THREE.Vector3(), capW = new THREE.Vector3(), armTo = new THREE.Vector3();
-  const bracketTop = V(top.x, capY + 0.06, backZ + 0.05);                                     // where the arm hinges on the frame
-  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.03, backH - 0.12 - (capY + 0.055), 0.03), dark); bracket.position.set(top.x, (capY + 0.055 + backH - 0.12) / 2, backZ + 0.05); clamp.add(bracket);
-  const armLen0 = top.z - backZ - 0.03;
-  const bArm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, armLen0), dark); bArm.castShadow = true; clamp.add(bArm);
-  const chinAt = skull ? V(top.x, skull.chin.y + 0.085, skull.chin.z - 0.025) : V(head.x, head.y - 0.03, head.z);   // under the jaw, ear to ear
-  const chin = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 30, Math.PI), leather); chin.position.copy(chinAt); chin.rotation.set(0, 0, Math.PI); chin.scale.set(1, 0.9, 1); clamp.add(chin);
+  // the electrodes: two small flat pads at the temples, children of the Head bone (they turn and wander with it), the two
+  // head cables run from them and re-anchor as the head moves. No cap, no strap (owner, 2026-11-04: "remove that thing on his head")
+  const padMat = new THREE.MeshStandardMaterial({ color: 0x9fd3ff, emissive: 0x3a7fc0, emissiveIntensity: 0.0, roughness: 0.3, metalness: 0.6 });
+  const tL = skull && skull.tL ? skull.tL : head.clone().add(V(0.075, 0.03, 0.01)), tR = skull && skull.tR ? skull.tR : head.clone().add(V(-0.075, 0.03, 0.01));
+  const electrode = at => { const g = new THREE.Group(); g.position.copy(at); chair.add(g);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.006, 20), padMat); m.rotation.z = Math.PI / 2; m.castShadow = true; g.add(m); return g; };
+  const padL = electrode(tL.clone().add(V(0.004, 0, 0))), padR = electrode(tR.clone().add(V(-0.004, 0, 0)));
   boy.updateMatrixWorld(true); chair.updateMatrixWorld(true);
-  if (bones.Head) for (const o of [capG, chin]) bones.Head.attach(o);                         // world transforms kept; from now on they move with the head
+  if (bones.Head) for (const o of [padL, padR]) bones.Head.attach(o);                        // world transforms kept; from now on they move with the head
+  const stud = padL, studW = new THREE.Vector3(), padW = new THREE.Vector3();                   // the glow and the sparks come off the left pad
   stud.getWorldPosition(studW); glow.position.copy(studW).add(V(0, 0.05, 0.05));
-  const cables = [];                                                                          // {mesh, pts, r, off, anchor}: the head cables, re-anchored to the stud
-  const tube = (pts, r, mat, follow = false) => { const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, r, 7, false), mat); m.castShadow = true; chair.add(m);
-    if (follow) cables.push({ mesh: m, pts, r, off: pts[0].clone().sub(studW), anchor: pts[0].clone() }); return m; };
+  const cables = [];                                                                          // {mesh, pts, r, pad, off, anchor}: the head cables, re-anchored to their pad
+  const tube = (pts, r, mat, follow = null) => { const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, r, 7, false), mat); m.castShadow = true; chair.add(m);
+    if (follow) { follow.getWorldPosition(padW); cables.push({ mesh: m, pts, r, pad: follow, off: pts[0].clone().sub(padW), anchor: pts[0].clone() }); } return m; };
   const tmpA = new THREE.Vector3();
-  function headgear() {                                                                       // each frame: the arm from the bracket to the cap, the cables from the stud
-    cap.getWorldPosition(capW); stud.getWorldPosition(studW);
+  function headgear() {                                                                       // each frame: the cables from the pads, the glow at the left one
+    stud.getWorldPosition(studW);
     glow.position.copy(studW).add(tmpA.set(0, 0.05, 0.05));
-    armTo.copy(capW); chair.worldToLocal(armTo); armTo.y += 0.01; armTo.z -= 0.075;            // the arm meets the cap at its back edge
-    bArm.position.copy(bracketTop).add(armTo).multiplyScalar(0.5); bArm.lookAt(chair.localToWorld(tmpA.copy(armTo)));
-    bArm.scale.z = Math.max(0.3, bracketTop.distanceTo(armTo) / armLen0);
-    for (const c of cables) { tmpA.copy(studW).add(c.off); chair.worldToLocal(tmpA);
+    for (const c of cables) { c.pad.getWorldPosition(padW); tmpA.copy(padW).add(c.off); chair.worldToLocal(tmpA);
       if (tmpA.distanceTo(c.anchor) > 0.003) { c.anchor.copy(tmpA); c.pts[0].copy(tmpA); c.mesh.geometry.dispose(); c.mesh.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(c.pts), 48, c.r, 7, false); } }
   }
   const junction = box(0.2, 0.28, 0.07, dark, -1.55, 1.7, -1.26);
   const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.03), metal); lever.position.set(-1.55, 1.78, -1.2); lever.rotation.x = -0.5; scene.add(lever);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 10), new THREE.MeshStandardMaterial({ color: 0x7a1a1a, roughness: 0.4 })); knob.position.set(-1.55, 1.87, -1.15); scene.add(knob);
-  tube([V(top.x, capY + 0.065, top.z), V(top.x - 0.1, capY + 0.3, top.z - 0.12), V(-0.7, 2.3, -0.7), V(-1.45, 2.1, -1.2), V(-1.55, 1.85, -1.23)], 0.013, dark, true);
-  tube([V(top.x + 0.03, capY + 0.06, top.z + 0.02), V(top.x + 0.25, capY + 0.14, top.z - 0.1), V(0.45, 1.3, -0.8), V(0.6, 0.2, -0.9), V(-1.4, 0.06, -1.15), V(-1.55, 1.55, -1.23)], 0.011, dark, true);
+  tube([V(tL.x + 0.008, tL.y, tL.z), V(tL.x + 0.12, tL.y + 0.02, tL.z - 0.16), V(-0.7, 2.3, -0.7), V(-1.45, 2.1, -1.2), V(-1.55, 1.85, -1.23)], 0.011, dark, padL);
+  tube([V(tR.x - 0.008, tR.y, tR.z), V(tR.x - 0.12, tR.y + 0.02, tR.z - 0.16), V(0.45, 1.3, -0.8), V(0.6, 0.2, -0.9), V(-1.4, 0.06, -1.15), V(-1.55, 1.55, -1.23)], 0.011, dark, padR);
   tube([V(hL.x - 0.05, hL.y - 0.03, hL.z), V(hL.x - 0.35, hL.y - 0.35, hL.z + 0.1), V(-1.0, 0.06, -0.5), V(-1.55, 1.57, -1.23)], 0.008, dark);
   const plate = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.24, 0.02), new THREE.MeshStandardMaterial({ color: 0x1b1b1f, roughness: 0.5 })); plate.position.set(0, 2.8, -1.28); scene.add(plate);
 
-  // --- the sparks at delivery: a short burst of additive points from the cap -------------------------------------------
+  // --- the sparks at delivery: a short burst of additive points from the left electrode -------------------------------------------
   const N_SPARK = 90, spPos = new Float32Array(N_SPARK * 3), spVel = [];
   const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute("position", new THREE.BufferAttribute(spPos, 3));
   const sparks = new THREE.Points(spGeo, new THREE.PointsMaterial({ color: 0xcfe8ff, size: 0.018, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -372,7 +360,7 @@ export async function createScene({ canvas, lite = false, small = false, reduced
     X.twitchT -= dt; if (X.twitchT <= 0 && !reduced && li < 0.5) { X.twitch = { spec: TWITCHES[Math.random() * TWITCHES.length | 0], left: 0.12 }; X.twitchT = (3 + Math.random() * 7) / (1 + 2 * hv + 1.5 * worn + 1.2 * pa); }
     if (X.twitch) { const w = Math.sin((1 - X.twitch.left / 0.12) * Math.PI), [n, x, y, z] = X.twitch.spec; bend(n, x * w, y * w, z * w); X.twitch.left -= dt; if (X.twitch.left <= 0) X.twitch = null; }
     const hd = X.look, sd = X.side;
-    // head: pressed back into the cap with tension, dropped forward when slack, heavy or worn, hanging when flat; the
+    // head: pressed back against the chair with tension, dropped forward when slack, heavy or worn, hanging when flat; the
     // startle snaps it back and to one side; the gasp throws it back; the swallow and the speech nod it
     bend("Head", -9 * te + 7 * sl + 5 * hv + 26 * li + 4 * worn + tr + sh - 14 * jo - 10 * ss - 12 * ga + 2.5 * sw + 1.5 * X.speak + hd.x * awake + 0.5 * ws,
          tr2 * 0.6 + 8 * li + hd.y * awake + sd * 6 * ss, tr * 0.4 + 9 * li + sd * 9 * ss - 0.6 * ws);
@@ -403,7 +391,7 @@ export async function createScene({ canvas, lite = false, small = false, reduced
     if (lampDip > 0) { lampDip = Math.max(0, lampDip - dt / 0.35); lamp.intensity = base.lamp * lampK * (1 - 0.35 * Math.sin(lampDip * Math.PI)); } else lamp.intensity = base.lamp * lampK;
     bulb.material.emissiveIntensity = base.bulb * lampK; haze.material.opacity = base.haze * lampK;
     glowT = Math.max(glowT - dt / 0.6, 0); const gl = Math.max(glowT, te * 0.6);
-    glow.intensity = 4 * gl; stud.material.emissiveIntensity = 2.5 * gl;
+    glow.intensity = 4 * gl; padMat.emissiveIntensity = 2.5 * gl;
     doorLight.intensity = 1.6 + 1.4 * li;                                                   // the cold light from the door takes over when flat
     // the face: a blink every few seconds (quicker when wary, slower and heavier when worn), a squint with tension,
     // clenched shut at a strong response, shut while flat, wide at a startle or the gasp; the mouth opens with the
