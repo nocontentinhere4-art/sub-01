@@ -5,11 +5,11 @@
 // The crossfade between pages is CSS (ui.css: @view-transition). Missing elements are fine: nothing here throws.
 (() => {
   "use strict";
-  const DECK = ["/", "/brain", "/room", "/diary", "/world.html", "/about.html"];
+  const DECK = ["/", "/brain", "/room", "/diary", "/world.html", "/about.html", "/chair"];
   // other spellings of the same pages (the server serves or redirects all of them)
   const ALIAS = {"/index.html":"/brain", "/brain.html":"/brain", "/room.html":"/room", "/diary.html":"/diary",
     "/live":"/", "/live.html":"/", "/home":"/", "/index":"/", "/sees":"/world.html", "/world":"/world.html",
-    "/about":"/about.html", "/life":"/life.html", "/map":"/life.html", "/tastes":"/tastes.html", "/fibres":"/fibres.html"};
+    "/about":"/about.html", "/chair.html":"/chair", "/life":"/life.html", "/map":"/life.html", "/tastes":"/tastes.html", "/fibres":"/fibres.html"};
   const norm = p => {
     p = String(p || "/");
     if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);

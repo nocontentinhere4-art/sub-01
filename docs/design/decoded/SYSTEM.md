@@ -9,13 +9,13 @@ mono tags, hairlines), Julia Krantz (contact sheet with 1 px seams), Luma Genie 
 Dovetail (compact command-center density), plus the owner's "Humans Decoded" screenshots in ref/.
 
 ## Deck order and the header (identical markup on every page)
-01 live `/` · 02 brain `/brain` · 03 room `/room` · 04 diary `/diary` · 05 sees `/world.html` · 06 about `/about.html`.
+01 live `/` · 02 brain `/brain` · 03 room `/room` · 04 diary `/diary` · 05 sees `/world.html` · 06 about `/about.html` · 07 chair `/chair` (added 11-03).
 Secondary pages (`/life.html`, `/tastes.html`, `/fibres.html`) are notes: they declare no `data-deck`.
 The page declares itself with `<body data-deck="02" data-pulse>` (`data-pulse` = show the pulse strip; `/` omits it).
 
     <header class="ui-hdr" id="hdr">
       <a class="ui-lockup" href="/"><b>SUB-01</b><small>brain model</small></a>
-      <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a></nav>
+      <nav class="ui-nav" aria-label="pages"><a href="/">live</a><a href="/brain">brain</a><a href="/room">room</a><a href="/diary">diary</a><a href="/world.html">sees</a><a href="/about.html">about</a><a href="/chair">chair</a></nav>
       <div class="ui-spacer"></div>
       <div class="ui-state">
         <span class="ui-chip live" id="ui-live"><i class="ui-dot"></i><span id="ui-live-t">live</span></span>
