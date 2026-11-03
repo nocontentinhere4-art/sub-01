@@ -3,7 +3,8 @@
 // (chair.py Drive: tension, slack, heavy, flat), never from the button: the only things that follow the button are the
 // lamp dip and the sparks at delivery. The procedural layer is additive on the seated clip and bounded by the restraints
 // (the head stays in the cap, the wrists under the straps, the torso against the belt), with springs for the body's own
-// inertia. Flat (the rule of the piece): the body hangs, the lamp sinks; revival: a jolt from the measured burst.
+// inertia; on top, what a body does on its own (the idle, the panting after, twitches, a swallow), none of it from the button.
+// Flat (the rule of the piece): the body hangs, the lamp sinks; revival: a gasp and a jolt from the measured burst.
 // Artistic mappings of simulated signals, not physiology. Everything here is procedural geometry: no bought model.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -14,10 +15,15 @@ import { prep, fixClip } from "./room/char_mixamo.js";
 
 const D2R = Math.PI / 180;
 
-// a spring that follows its target faster up than down: the body tenses at once and lets go slowly
+// a spring that follows its target faster up than down: the body tenses at once and lets go slowly. Critically damped;
+// integrated in sub-steps so a slow frame (a background tab, a phone) cannot make it overshoot or blow up
 class Spring {
   constructor(up = 10, down = 2) { this.x = 0; this.v = 0; this.t = 0; this.up = up; this.down = down; }
-  step(dt) { const k = this.t > this.x ? this.up : this.down, a = k * k * (this.t - this.x) - 2 * k * this.v; this.v += a * dt; this.x += this.v * dt; return this.x; }
+  step(dt) {
+    const n = Math.min(24, Math.max(1, Math.ceil(dt * Math.max(this.up, this.down) / 0.15))), h = dt / n;
+    for (let i = 0; i < n; i++) { const k = this.t > this.x ? this.up : this.down, a = k * k * (this.t - this.x) - 2 * k * this.v; this.v += a * h; this.x += this.v * h; }
+    return this.x;
+  }
 }
 
 // --- procedural materials -----------------------------------------------------------------------------------------------
@@ -119,41 +125,70 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   // The face: the model has no face rig (no morph targets, no jaw or eye bones), so expression is painted into the head
   // material's shader from masks drawn in the head texture's own UV space (the eye and mouth islands of the atlas in
   // room/char_mixamo.glb, located by hand): eyelids that close from the top (a blink, a squint under tension, clenched at
-  // a strong response, shut while flat, heavy with the adaptation) and the mouth opening (with the tension, the jolt;
-  // slack while flat). Driven by the same measured numbers as the body, never by the button.
-  const face = { sh: null, blink: 0, nextBlink: 2.0, force: null };
+  // a strong response, shut while flat, heavy with the adaptation), the mouth opening (with the tension, the jolt, the
+  // panting, a line being said; slack while flat), the gaze (the eye opening's pixels slide under the lids), the teeth
+  // bared when clenched, a flush, sweat (a sheen) and the pallor of the flatline. Driven by the same measured numbers
+  // as the body, never by the button.
+  const face = { sh: null, blink: 0, blinkLen: 0.16, nextBlink: 2.0, force: null };
+  const MS = 2048 / 4096;                                                                                         // the masks are drawn at half the atlas
+  const ellipse = (g, cx, cy, rx, ry, rot, fill) => { g.save(); g.translate(cx * MS, cy * MS); g.rotate(rot); g.scale(rx * MS, ry * MS); g.fillStyle = fill(g); g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); g.restore(); };
+  const EYES = [[1762, 655, 150, 68, -0.1, 1], [2575, 648, 160, 62, -0.1, -1]];      // cx, cy, rx, ry, tilt, the island's u direction (the two islands mirror each other)
+  const MOUTH = [2385, 2290, Math.atan2(160, 130), 110, 42];                        // cx, cy, the lip line's angle, rx, ry
+  // red: the eyelid, 1 at the upper lid, ~0 at the lower; green: the mouth, 1 at the centre; blue: the eye opening (the
+  // white and the iris), what slides under the lids with the gaze, above 0.5 on one island and below on the mirrored one
   const faceMask = canvasTex(2048, 2048, (g, W) => {
-    const s = W / 4096;
-    g.fillStyle = "#000"; g.fillRect(0, 0, W, W);
-    const eye = (cx, cy, rx, ry, rot) => { g.save(); g.translate(cx * s, cy * s); g.rotate(rot); g.scale(rx * s, ry * s);
-      const gr = g.createLinearGradient(0, -1, 0, 1); gr.addColorStop(0, "rgb(255,0,0)"); gr.addColorStop(1, "rgb(14,0,0)");   // red: 1 at the upper lid, ~0 at the lower
-      g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); g.restore(); };
-    eye(1762, 655, 150, 68, -0.1); eye(2575, 648, 160, 62, -0.1);
-    g.save(); g.translate(2385 * s, 2290 * s); g.rotate(Math.atan2(160, 130)); g.scale(110 * s, 42 * s);                     // green: the mouth, 1 at the centre
-    const gm = g.createRadialGradient(0, 0, 0, 0, 0, 1); gm.addColorStop(0, "rgb(0,255,0)"); gm.addColorStop(0.7, "rgb(0,210,0)"); gm.addColorStop(1, "rgb(0,0,0)");
-    g.fillStyle = gm; g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); g.restore();
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, W); g.globalCompositeOperation = "lighter";
+    for (const [cx, cy, rx, ry, rot, dir] of EYES) {
+      ellipse(g, cx, cy, rx, ry, rot, g => { const gr = g.createLinearGradient(0, -1, 0, 1); gr.addColorStop(0, "rgb(255,0,0)"); gr.addColorStop(1, "rgb(14,0,0)"); return gr; });
+      ellipse(g, cx, cy, rx * 0.8, ry * 0.62, rot, g => { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1), hi = dir > 0 ? 255 : 125, lo = dir > 0 ? 132 : 0;
+        gr.addColorStop(0, `rgb(0,0,${hi})`); gr.addColorStop(0.7, `rgb(0,0,${hi})`); gr.addColorStop(1, `rgb(0,0,${lo})`); return gr; });
+    }
+    ellipse(g, MOUTH[0], MOUTH[1], MOUTH[3], MOUTH[4], MOUTH[2], g => { const gm = g.createRadialGradient(0, 0, 0, 0, 0, 1); gm.addColorStop(0, "rgb(0,255,0)"); gm.addColorStop(0.7, "rgb(0,210,0)"); gm.addColorStop(1, "rgb(0,0,0)"); return gm; });
   });
-  faceMask.flipY = false; faceMask.colorSpace = THREE.NoColorSpace; faceMask.needsUpdate = true;
+  // the skin: red where the face flushes (round the eye islands and the mouth island: cheeks, lids, chin), green where it
+  // sweats (the same, wider), blue the mouth's own across-the-lips coordinate (0.5 on the lip line) for the teeth band
+  const skinMask = canvasTex(2048, 2048, (g, W) => {
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, W); g.globalCompositeOperation = "lighter";
+    const soft = (cx, cy, rx, ry, rot, r, gg) => ellipse(g, cx, cy, rx, ry, rot, g => { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, `rgb(${r},${gg},0)`); gr.addColorStop(0.4, `rgb(${r},${gg},0)`); gr.addColorStop(1, "rgb(0,0,0)"); return gr; });
+    for (const [cx, cy, , , rot] of EYES) soft(cx, cy + 40, 420, 300, rot, 235, 255);
+    soft(MOUTH[0], MOUTH[1], 560, 460, MOUTH[2], 255, 200);
+    ellipse(g, MOUTH[0], MOUTH[1], MOUTH[3] * 1.1, MOUTH[4] * 1.1, MOUTH[2], g => { const gr = g.createLinearGradient(0, -1, 0, 1); gr.addColorStop(0, "rgb(0,0,8)"); gr.addColorStop(1, "rgb(0,0,255)"); return gr; });
+  });
+  for (const m of [faceMask, skinMask]) { m.flipY = false; m.colorSpace = THREE.NoColorSpace; m.needsUpdate = true; }
   const faceShader = m => {
     m.onBeforeCompile = sh => {
-      sh.uniforms.uFaceMask = { value: faceMask }; sh.uniforms.uLid = { value: 0 }; sh.uniforms.uMouth = { value: 0 };
+      sh.uniforms.uFaceMask = { value: faceMask }; sh.uniforms.uSkinMask = { value: skinMask }; sh.uniforms.uLid = { value: 0 }; sh.uniforms.uMouth = { value: 0 };
+      sh.uniforms.uGaze = { value: new THREE.Vector2(0, 0) }; sh.uniforms.uFlush = { value: 0 }; sh.uniforms.uPale = { value: 0 }; sh.uniforms.uSweat = { value: 0 }; sh.uniforms.uTeeth = { value: 0 };
       sh.uniforms.uSkin = { value: new THREE.Color("#e6b89c") };
       sh.fragmentShader = sh.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform sampler2D uFaceMask; uniform float uLid; uniform float uMouth; uniform vec3 uSkin;")
-        .replace("#include <map_fragment>", `#include <map_fragment>
+        .replace("#include <common>", "#include <common>\nuniform sampler2D uFaceMask; uniform sampler2D uSkinMask; uniform float uLid; uniform float uMouth; uniform vec2 uGaze; uniform float uFlush; uniform float uPale; uniform float uSweat; uniform float uTeeth; uniform vec3 uSkin;")
+        .replace("#include <map_fragment>", `
           vec4 fm = texture2D(uFaceMask, vMapUv);
+          vec4 sk = texture2D(uSkinMask, vMapUv);
+          float eyeMag = fm.b > 0.5 ? (fm.b - 0.5) * 2.0 : fm.b * 2.0;
+          float eyeSgn = fm.b > 0.5 ? 1.0 : -1.0;
+          vec2 uvm = vMapUv - vec2(uGaze.x * eyeSgn, uGaze.y) * eyeMag;                      // the eye opening slides under the lids with the gaze
+          diffuseColor *= texture2D(map, uvm);
+          float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(1.12, 0.84, 0.82), uFlush * sk.r);                            // the flush
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(lum) * vec3(0.88, 0.92, 1.0), 0.55 * uPale * sk.r);      // pale and cold while flat
           if (fm.r > 0.02) {
             float edge = 1.02 - uLid;
             float covered = smoothstep(edge - 0.04, edge + 0.04, fm.r);
             vec3 lidSkin = texture2D(map, vMapUv + vec2(0.0, 0.016 * (2.0 * fm.r - 2.35))).rgb;   // the skin just above the upper lid, with its own shading
+            lidSkin *= 1.0 - 0.2 * uLid * smoothstep(0.35, 1.0, fm.r);                              // the crease deepens as the lid closes
             diffuseColor.rgb = mix(diffuseColor.rgb, lidSkin * (0.9 + 0.1 * fm.r), covered);
             float lash = (1.0 - smoothstep(0.0, 0.05, abs(fm.r - edge))) * smoothstep(0.03, 0.12, uLid);
             diffuseColor.rgb = mix(diffuseColor.rgb, uSkin * 0.22, lash * 0.75);
           }
           if (fm.g > 0.02) {
             float open = smoothstep(1.0 - uMouth, 1.0 - uMouth + 0.2, fm.g) * step(0.01, uMouth);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.015, 0.012), open);
-          }`);
+            float band = (1.0 - smoothstep(0.07, 0.15, abs(sk.b - 0.5))) * step(0.02, sk.b) * uTeeth;         // the teeth, bared when clenched
+            vec3 inside = mix(vec3(0.05, 0.015, 0.012), vec3(0.82, 0.76, 0.66), band);
+            diffuseColor.rgb = mix(diffuseColor.rgb, inside, open);
+          }`)
+        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+          roughnessFactor = mix(roughnessFactor, 0.3, uSweat * sk.g * smoothstep(0.12, 0.35, dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))));   // sweat: a sheen on the skin, the hair stays matte`);
       face.sh = sh;
     };
     m.needsUpdate = true;
@@ -248,41 +283,82 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   }
 
   // --- the body layer -------------------------------------------------------------------------------------------------------
-  const S = { tension: new Spring(14, 2.2), slack: new Spring(3, 1.2), heavy: new Spring(2.5, 0.8), limp: new Spring(1.6, 1.4) };
-  const target = { tension: 0, slack: 0, heavy: 0, measured: false, flat: false };
+  // springs for the measured numbers (fast up, slow down): the trunk and the head follow the whole network's tension,
+  // the limbs the motor regions' own number
+  const S = { tension: new Spring(14, 2.2), slack: new Spring(3, 1.2), heavy: new Spring(2.5, 0.8), limp: new Spring(1.6, 1.4), motor: new Spring(16, 2.6) };
+  const target = { tension: 0, slack: 0, heavy: 0, motor: 0, measured: false, flat: false, register: "fresh" };
+  const clamp01 = v => Math.min(1, Math.max(0, +v || 0));
+  // the layer's own state, each piece downstream of a measurement or of nothing at all (the idle): a startle when the
+  // measured tension jumps between two traces (the onset), the side the head goes and a per-side gain from the delivered
+  // count, panting after a strong response, twitches, the quiet idle (a weight shift, the head wandering, finger taps,
+  // a swallow), attention to the camera, the gasp at a revival, the mouth while a line plays
+  const X = { startle: 0, lastTarget: 0, side: 1, gain: { Left: 1, Right: 1 }, pant: 0, lastTe: 0, twitch: null, twitchT: 3, wanderT: 2, look: { x: 0, y: 0 }, lookTo: { x: 0, y: 0 },
+    gaze: { x: 0, y: 0 }, attend: 0, swallow: 0, swallowT: 20, fidget: 0, fidgetT: 6, fidgetHand: "L", gasp: 0, speak: 0, creakT: 0 };
+  const TWITCHES = [["Head", 0, 0, 2.5], ["Head", 1.5, 0, 0], ["LeftShoulder", 0, 0, 3], ["RightShoulder", 0, 0, -3], ["LeftFoot", 4, 0, 0], ["RightFoot", 4, 0, 0], ["LeftHand", 5, 0, 0], ["RightHand", 5, 0, 0],
+    ["finger2-2.L", 0, 0, 12], ["finger3-2.R", 0, 0, -12], ["finger4-2.L", 0, 0, 10], ["finger2-2.R", 0, 0, -12], ["LeftArm", 2, 0, 0], ["RightArm", 2, 0, 0]];
+  const LOOKS = { camera: { x: 0, y: 0 }, door: { x: 2, y: -28 }, down: { x: 14, y: 4 }, away: { x: -2, y: 18 }, lamp: { x: -10, y: 2 } };   // head degrees: x down, y toward his left
   const rest = {}; const keep = ["Head", "neck", "Spine", "Spine01", "Spine02", "LeftShoulder", "RightShoulder", "LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand", "RightHand", "LeftFoot", "RightFoot", "LeftUpLeg", "RightUpLeg"];
   for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) keep.push(`finger${f}-${j}.${s}`);
   const q = new THREE.Quaternion(), e = new THREE.Euler();
   const bend = (name, x, y = 0, z = 0) => { const b = bones[name]; if (!b) return; q.setFromEuler(e.set(x * D2R, y * D2R, z * D2R)); b.quaternion.multiply(q); };
-  let t = 0, lampDip = 0, glowT = 0, breath = 0, jolt = 0, flicker = 0;
+  let t = 0, lampDip = 0, glowT = 0, breath = 0, jolt = 0, flicker = 0, sound = null;
   const chairRest = chair.position.clone();
   function body(dt) {
     t += dt;
-    const te = S.tension.step(dt), sl = S.slack.step(dt), hv = S.heavy.step(dt), li = S.limp.step(dt);
+    const te = S.tension.step(dt), sl = S.slack.step(dt), hv = S.heavy.step(dt), li = S.limp.step(dt), mo = S.motor.step(dt);
+    const worn = target.register === "worn" ? 1 : 0, wary = target.register === "wary" ? 1 : 0, awake = 1 - li;
+    X.pant = Math.max(0, X.pant - dt / 12); const pa = X.pant * awake;
+    X.startle = Math.max(0, X.startle - dt / 0.45); const ss = reduced ? 0 : X.startle * X.startle;
+    X.gasp = Math.max(0, X.gasp - dt / 0.7); const ga = X.gasp;
+    X.speak = Math.max(0, X.speak - dt / 0.12);
+    jolt = Math.max(0, jolt - dt / 0.9); const jo = reduced ? 0 : jolt * jolt;
     const tr = reduced ? 0 : te * te * Math.sin(t * 2 * Math.PI * 9.0) * 0.9;              // physiological-tremor band, 9 Hz
     const tr2 = reduced ? 0 : te * te * Math.sin(t * 2 * Math.PI * 7.3 + 1.1) * 0.7;
-    breath += dt * (li > 0.5 ? 0.0 : (0.22 + 0.55 * te)) * 2 * Math.PI;                   // 13 to 46 breaths a minute; none when flat
-    const br = Math.sin(breath) * (0.6 + 0.6 * te) * (1 - li);
-    jolt = Math.max(0, jolt - dt / 0.9); const jo = reduced ? 0 : jolt * jolt;
-    // head: pressed back into the cap with tension, dropped forward when slack or heavy, hanging when flat
-    bend("Head", -9 * te + 7 * sl + 5 * hv + 26 * li + tr - 14 * jo, tr2 * 0.6 + 8 * li, tr * 0.4 + 9 * li);
-    bend("neck", -4 * te + 3 * sl + 2 * hv + 10 * li, 0, 3 * li);
-    // torso: arched back against the strap with tension, slumped forward after, folded when flat
-    bend("Spine01", -5 * te + 4 * sl + 3 * hv + 9 * li + br * 0.4 - 6 * jo, 0, tr2 * 0.3 + 2 * li);
-    bend("Spine02", -3 * te + 3 * sl + 2 * hv + 6 * li + br * 0.6, 0, 0);
-    bend("Spine", br * 0.5 + 3 * li, 0, 0);
-    // shoulders up and in, forearms pressing into the armrests, fingers gripping; everything open and heavy when flat
-    for (const s of ["Left", "Right"]) { const k = s === "Left" ? 1 : -1;
-      bend(s + "Shoulder", 0, 0, k * (7 * te - 2 * sl - 5 * li));
-      bend(s + "Arm", -4 * te + 2 * hv + 5 * li - 5 * jo, 0, k * (3 * te - 4 * li));
-      bend(s + "ForeArm", 6 * te + tr * 0.5 + 1 * li, 0, 0);                              // flat: the forearm stays on the armrest
-      bend(s + "Hand", -8 * te + 3 * sl + tr - 3 * li, 0, k * tr2 * 0.5);                  // flat: the wrist droops, no cocked hand
-      bend(s + "UpLeg", -2 * te + 2 * li, 0, k * (1.5 * te + 3 * li));
-      bend(s + "Foot", 8 * te - 2 * sl - 6 * li, 0, 0); }
-    for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) bend(`finger${f}-${j}.${s}`, 0, 0, (s === "L" ? 1 : -1) * ((f === 1 ? 10 : 28) * te - 6 * sl + 4 * li));   // flat: a resting curl
-    // the chair takes it: the straps pull, the frame rattles under tension (not under reduced motion)
+    const sh = reduced ? 0 : pa * (1 - te) * Math.sin(t * 2 * Math.PI * 5.0) * 0.55;        // the shiver after, 5 Hz, while the panting lasts
+    breath += dt * (li > 0.5 ? 0.0 : (0.22 + 0.55 * te + 0.45 * pa)) * 2 * Math.PI;         // 13 to 46 a minute, more while panting; none when flat
+    const br = Math.sin(breath) * (0.6 + 0.6 * te + 0.9 * pa) * awake;
+    // the quiet idle: a slow weight shift; the head wandering between the camera, the door, the floor, the lamp (more
+    // at the camera when wary, more at the floor when worn), the eyes leading and the head following part of the way;
+    // a swallow every 20-40 s; a finger tap now and then when fresh and quiet
+    const ws = awake * (Math.sin(t * 0.13) * 0.5 + Math.sin(t * 0.071 + 2) * 0.5);
+    X.wanderT -= dt; if (X.wanderT <= 0) { X.wanderT = 4 + Math.random() * 5; const r = Math.random();
+      X.lookTo = wary && r < 0.5 ? LOOKS.camera : worn && r < 0.5 ? LOOKS.down : r < 0.3 ? LOOKS.camera : r < 0.5 ? LOOKS.door : r < 0.7 ? LOOKS.down : r < 0.85 ? LOOKS.away : LOOKS.lamp; }
+    X.attend = Math.max(0, X.attend - dt);
+    const to = X.attend > 0 ? LOOKS.camera : X.lookTo, lk = Math.min(1, dt * (X.attend > 0 ? 6 : 1.6));
+    X.look.x += (to.x - X.look.x) * lk; X.look.y += (to.y - X.look.y) * lk;
+    const gk = Math.min(1, dt * 12); X.gaze.x += (-to.y / 28 - X.gaze.x) * gk; X.gaze.y += (to.x / 14 - X.gaze.y) * gk;   // gaze x: toward his right (the door side), y: down
+    X.swallowT -= dt; if (X.swallowT <= 0 && li < 0.5) { X.swallow = 0.5; X.swallowT = 20 + Math.random() * 20; }
+    const sw = X.swallow > 0 ? Math.sin((1 - X.swallow / 0.5) * Math.PI) : 0; X.swallow = Math.max(0, X.swallow - dt);
+    X.fidgetT -= dt; if (X.fidgetT <= 0) { X.fidget = X.fidget > 0 ? 0 : 3; X.fidgetT = X.fidget > 0 ? 3 : 8 + Math.random() * 14; X.fidgetHand = Math.random() < 0.5 ? "L" : "R"; }
+    const fi = (reduced || target.register !== "fresh" || te > 0.1 || li > 0.1 || X.fidget <= 0) ? 0 : 1;
+    // a twitch: one limb, 120 ms, a few degrees; more often with the adaptation, the register worn, the panting
+    X.twitchT -= dt; if (X.twitchT <= 0 && !reduced && li < 0.5) { X.twitch = { spec: TWITCHES[Math.random() * TWITCHES.length | 0], left: 0.12 }; X.twitchT = (3 + Math.random() * 7) / (1 + 2 * hv + 1.5 * worn + 1.2 * pa); }
+    if (X.twitch) { const w = Math.sin((1 - X.twitch.left / 0.12) * Math.PI), [n, x, y, z] = X.twitch.spec; bend(n, x * w, y * w, z * w); X.twitch.left -= dt; if (X.twitch.left <= 0) X.twitch = null; }
+    const hd = X.look, sd = X.side;
+    // head: pressed back into the cap with tension, dropped forward when slack, heavy or worn, hanging when flat; the
+    // startle snaps it back and to one side; the gasp throws it back; the swallow and the speech nod it
+    bend("Head", -9 * te + 7 * sl + 5 * hv + 26 * li + 4 * worn + tr + sh - 14 * jo - 10 * ss - 12 * ga + 2.5 * sw + 1.5 * X.speak + hd.x * awake + 0.5 * ws,
+         tr2 * 0.6 + 8 * li + hd.y * awake + sd * 6 * ss, tr * 0.4 + 9 * li + sd * 9 * ss - 0.6 * ws);
+    bend("neck", -4 * te + 3 * sl + 2 * hv + 10 * li + 2 * worn - 2 * sw - 4 * ss + 0.3 * hd.x * awake, 0.3 * hd.y * awake, 3 * li);
+    // torso: arched back against the strap with tension, slumped forward after, folded when flat, heaving while panting
+    bend("Spine01", -5 * te + 4 * sl + 3 * hv + 9 * li + br * 0.4 - 6 * jo - 4 * ss - 5 * ga + 2 * worn, 0, tr2 * 0.3 + 2 * li + 1.2 * ws);
+    bend("Spine02", -3 * te + 3 * sl + 2 * hv + 6 * li + br * 0.6, 0, 0.6 * ws);
+    bend("Spine", br * 0.5 + 3 * li, 0, 0.4 * ws);
+    // the limbs follow the motor regions, each side with its own gain from the delivered count: shoulders up and in,
+    // forearms pressing into the armrests, fingers gripping; everything open and heavy when flat
+    for (const s of ["Left", "Right"]) { const k = s === "Left" ? 1 : -1, g = X.gain[s], m = mo * g;
+      bend(s + "Shoulder", 0, 0, k * (7 * m - 2 * sl - 5 * li - 3 * worn + 5 * ss * g));
+      bend(s + "Arm", -4 * m + 2 * hv + 5 * li - 5 * jo - 3 * ss * g, 0, k * (3 * m - 4 * li));
+      bend(s + "ForeArm", 6 * m + (tr * 0.5 + sh) * g + 1 * li, 0, 0);                     // flat: the forearm stays on the armrest
+      bend(s + "Hand", -8 * m + 3 * sl + tr * g - 3 * li, 0, k * tr2 * 0.5 * g);           // flat: the wrist droops, no cocked hand
+      bend(s + "UpLeg", -2 * m + 2 * li, 0, k * (1.5 * m + 3 * li));
+      bend(s + "Foot", 8 * m - 2 * sl - 6 * li + 4 * ss * g, 0, 0); }
+    for (let f = 1; f <= 5; f++) for (let j = 2; j <= 3; j++) for (const s of ["L", "R"]) {
+      const g = X.gain[s === "L" ? "Left" : "Right"], tap = fi && s === X.fidgetHand && f > 1 ? 7 * Math.max(0, Math.sin(2 * Math.PI * 1.7 * t - f * 1.1)) : 0;
+      bend(`finger${f}-${j}.${s}`, 0, 0, (s === "L" ? 1 : -1) * ((f === 1 ? 10 : 28) * mo * g - 6 * sl + 4 * li + tap)); }   // flat: a resting curl
+    // the chair takes it: the straps pull, the frame rattles under tension and at the startle (not under reduced motion)
     chest.scale.set(1 + 0.03 * te, 1 + 0.03 * te, 0.78); lap.scale.set(1 + 0.02 * te, 1 + 0.02 * te, 0.9);
-    const ra = reduced ? 0 : 0.004 * te * te;
+    const ra = reduced ? 0 : 0.004 * te * te + 0.003 * ss;
     chair.position.set(chairRest.x + ra * Math.sin(t * 61), chairRest.y + ra * 0.4 * Math.abs(Math.sin(t * 37)), chairRest.z + ra * Math.sin(t * 53 + 1));
     // light: a single soft dip at delivery; the lamp sinks and flickers while flat; the electrode glow rides the tension
     flicker = reduced ? 0 : li * (0.5 + 0.5 * Math.sin(t * 2.1)) * (Math.random() < 0.02 ? 0.5 : 0);
@@ -292,19 +368,33 @@ export async function createScene({ canvas, lite = false, small = false, reduced
     glowT = Math.max(glowT - dt / 0.6, 0); const gl = Math.max(glowT, te * 0.6);
     glow.intensity = 4 * gl; stud.material.emissiveIntensity = 2.5 * gl;
     doorLight.intensity = 1.6 + 1.4 * li;                                                   // the cold light from the door takes over when flat
-    // the face: a blink every few seconds, a squint with tension, clenched shut at a strong response, shut while flat,
-    // heavy with the adaptation; the mouth opens with the tension and the jolt, hangs a little while flat
+    // the face: a blink every few seconds (quicker when wary, slower and heavier when worn), a squint with tension,
+    // clenched shut at a strong response, shut while flat, wide at a startle or the gasp; the mouth opens with the
+    // tension, the jolt, the gasp, the in-breath while panting and the line being said; the flush, the sweat, the pallor
     if (face.sh) {
-      if (!reduced && li < 0.5) { face.nextBlink -= dt; if (face.nextBlink <= 0) { face.blink = 0.16; face.nextBlink = 2.5 + Math.random() * 4.5; } }
-      const bl = face.blink > 0 ? Math.sin(Math.min(1, (0.16 - face.blink) / 0.16) * Math.PI) : 0; face.blink = Math.max(0, face.blink - dt);
+      const U = face.sh.uniforms;
+      if (!reduced && li < 0.5) { face.nextBlink -= dt; if (face.nextBlink <= 0) { face.blinkLen = worn ? 0.24 : 0.16; face.blink = face.blinkLen; face.nextBlink = wary ? 1.5 + Math.random() * 2.5 : worn ? 4 + Math.random() * 5 : 2.5 + Math.random() * 4.5; } }
+      const bl = face.blink > 0 ? Math.sin(Math.min(1, (face.blinkLen - face.blink) / face.blinkLen) * Math.PI) : 0; face.blink = Math.max(0, face.blink - dt);
       const clench = te > 0.45 ? Math.min(1, (te - 0.45) / 0.35) : 0;
-      const lid = face.force ? face.force.lid : Math.max(li, bl, 0.95 * clench, 0.35 * te * (1 - clench), 0.3 * hv + 0.2 * sl);
-      const mouth = face.force ? face.force.mouth : Math.max(0.9 * te * te, 0.3 * li, 0.7 * jo);   // face.force: a check handle
-      face.sh.uniforms.uLid.value += (lid - face.sh.uniforms.uLid.value) * Math.min(1, dt * 18);
-      face.sh.uniforms.uMouth.value += (mouth - face.sh.uniforms.uMouth.value) * Math.min(1, dt * 14);
+      const wide = Math.max(ga, ss, X.attend > 0 ? 0.3 : 0) * awake;
+      let lid = Math.max(li, bl, 0.95 * clench, 0.35 * te * (1 - clench), 0.3 * hv + 0.2 * sl + 0.15 * worn) * (1 - wide);
+      let mouth = Math.max(0.9 * te * te, 0.3 * li, 0.7 * jo, ga, 0.6 * X.speak, 0.25 * pa * Math.max(0, Math.sin(breath)));
+      let gaze = { x: X.gaze.x * awake, y: X.gaze.y * awake + 0.6 * li };
+      let flush = Math.min(1, 0.5 * te + 0.5 * pa + 0.3 * hv) * awake, sweat = Math.min(1, 0.6 * hv + 0.5 * pa + 0.5 * worn) * (1 - 0.5 * li), teeth = clench * (1 - ga);
+      if (face.force) { const F = face.force; lid = F.lid ?? lid; mouth = F.mouth ?? mouth; gaze = F.gaze ?? gaze; flush = F.flush ?? flush; sweat = F.sweat ?? sweat; teeth = F.teeth ?? teeth; }   // face.force: a check handle
+      U.uLid.value += (lid - U.uLid.value) * Math.min(1, dt * 18);
+      U.uMouth.value += (mouth - U.uMouth.value) * Math.min(1, dt * 14);
+      U.uGaze.value.set(gaze.x * 0.004, gaze.y * 0.003);                                   // in UV: a few pixels of the atlas
+      U.uFlush.value += (flush - U.uFlush.value) * Math.min(1, dt * 1.2);
+      U.uSweat.value += (sweat - U.uSweat.value) * Math.min(1, dt * 0.5);
+      U.uPale.value += ((face.force && face.force.pale != null ? face.force.pale : li) - U.uPale.value) * Math.min(1, dt * 0.8);
+      U.uTeeth.value += (teeth - U.uTeeth.value) * Math.min(1, dt * 10);
     }
+    // sound: the hum follows the glow; the frame creaks when the tension climbs fast
+    if (sound) { sound.hum(gl); X.creakT -= dt; if (te - X.lastTe > 0.04 && X.creakT <= 0) { sound.creak(Math.min(1, (te - X.lastTe) * 10)); X.creakT = 0.5; } }
+    X.lastTe = te;
     sparkStep(dt);
-    if (!reduced && jo > 0.05) { camera.position.x += (Math.random() - 0.5) * 0.006 * jo; camera.position.y += (Math.random() - 0.5) * 0.004 * jo; }
+    if (!reduced && (jo > 0.05 || ss > 0.2)) { const k = Math.max(jo, ss * 0.6); camera.position.x += (Math.random() - 0.5) * 0.006 * k; camera.position.y += (Math.random() - 0.5) * 0.004 * k; }
   }
   function frame(dt) {
     for (const n of keep) { const b = bones[n]; if (b && rest[n]) b.quaternion.copy(rest[n]); }   // the clip only rewrites a bone when its value changes
@@ -323,11 +413,23 @@ export async function createScene({ canvas, lite = false, small = false, reduced
   resize();
   return {
     setDrive(d) { target.measured = !!(d && d.measured); target.flat = !!(d && d.flat);
-      for (const k of ["tension", "slack", "heavy"]) S[k].t = target.measured && !target.flat ? Math.min(1, Math.max(0, d[k] || 0)) : 0;
+      const on = target.measured && !target.flat;
+      for (const k of ["tension", "slack", "heavy"]) S[k].t = on ? clamp01(d[k]) : 0;
+      S.motor.t = on ? clamp01(d.motor != null ? d.motor : d.tension) : 0;
+      if (on && S.tension.t - X.lastTarget >= 0.25) X.startle = 1;                           // the measured onset: a startle
+      if (on && S.tension.t >= 0.5) X.pant = Math.max(X.pant, S.tension.t);                 // a strong response: panting after
+      X.lastTarget = on ? S.tension.t : 0;
       S.limp.t = target.flat ? 1 : 0; },
-    shock() { if (!reduced) lampDip = 1; glowT = 1; sparkBurst(); },
-    revive() { jolt = 1; glowT = 1; sparkBurst(); S.limp.t = 0; S.limp.x = Math.min(S.limp.x, 0.6); },
+    setRegister(r) { target.register = r || "fresh"; },
+    // delivery (the server's event, not the button): the lamp dip, the glow, the sparks, the sound; which side the head
+    // goes and which side pulls harder come from the delivered count, so each shock is its own
+    shock(ev) { if (!reduced) lampDip = 1; glowT = 1; sparkBurst(); const n = (ev && ev.n_recruited) | 0; X.side = n % 2 ? 1 : -1; X.gain = (n >> 1) % 2 ? { Left: 1, Right: 0.78 } : { Left: 0.78, Right: 1 };
+      if (sound) sound.deliver(ev && ev.dur_ms, ev && ev.level); },
+    revive() { jolt = 1; glowT = 1; sparkBurst(); X.gasp = 1; X.pant = 1; S.limp.t = 0; S.limp.x = Math.min(S.limp.x, 0.6); },
+    attend(s) { X.attend = Math.max(X.attend, s || 2); },                                     // he turns to the camera: someone wrote, someone came, he speaks
+    speak(level) { X.speak = Math.max(X.speak, clamp01(level)); },                            // the line's loudness now, from the page
+    setSound(s) { sound = s; },
     setAvailable(ok) { renderer.toneMappingExposure = ok ? base.exposure : base.exposure * 0.55; },
-    frame, resize, scene, camera, renderer, bones, mixer, springs: S, face,
+    frame, resize, scene, camera, renderer, bones, mixer, springs: S, face, state: X,
   };
 }

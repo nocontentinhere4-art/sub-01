@@ -15,6 +15,8 @@
   #hdr a, #hdr .ui-nav { pointer-events:auto; }
   #hud { position:fixed; left:16px; top:72px; z-index:5; pointer-events:none; max-width:300px; }
   #hud .ui-caption { display:block; line-height:1.6; text-shadow:0 1px 6px #000; }
+  #snd { pointer-events:auto; cursor:pointer; background:none; border:0; padding:0; text-align:left; color:var(--ui-dim); }
+  #snd:hover { color:var(--ui-fg); }
   #src { color:var(--ui-fg); }
   #src.off { color:#ff5b5b; }
   #phase.flat { color:#ff5b5b; }
@@ -133,6 +135,7 @@
   <div class="ui-caption" id="phase">connecting…</div>
   <div class="ui-caption" id="viewers"></div>
   <div class="ui-caption" id="voice"></div>
+  <button type="button" class="ui-caption" id="snd" aria-pressed="true">room sound: tap the page to start</button>
 </div>
 <div id="say" aria-live="polite"></div>
 <div id="dock" class="ui-dock">
@@ -172,16 +175,26 @@
 </script>
 <script type="module">
 import { createScene } from "./chair_scene.js";
+import { createSound } from "./chair_sound.js";
 const $ = id => document.getElementById(id);
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const SMALL = innerWidth < 768, LITE = SMALL || (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency || 8) <= 4 || new URLSearchParams(location.search).has("lite");
-const st = { level: 3, bins: [], last: null, status: null, open: null, cards: [], events: [], scene: null, pending: null, sayT: null, baseline: null };
+const st = { level: 3, bins: [], last: null, status: null, open: null, cards: [], events: [], scene: null, pending: null, sayT: null, baseline: null, lip: null, an: null, viewers: 0 };
+
+// --- the room's sound: synthesized, starts at the first tap (browsers block sound before one), mutable, remembered ---
+const snd = createSound();
+let sndOn = true; try { sndOn = localStorage.getItem("chair_sound") !== "0"; } catch {}
+function sndLabel() { $("snd").textContent = !sndOn ? "room sound: off · tap to unmute" : snd.context() ? "room sound: on · tap to mute" : "room sound: tap the page to start"; $("snd").setAttribute("aria-pressed", sndOn ? "true" : "false"); }
+function sndStart() { if (snd.start()) { snd.mute(!sndOn); if (st.scene) st.scene.setSound(snd); setTimeout(sndLabel, 300); } }
+addEventListener("pointerdown", sndStart, { passive: true });
+$("snd").addEventListener("click", ev => { ev.stopPropagation(); sndOn = !sndOn; try { localStorage.setItem("chair_sound", sndOn ? "1" : "0"); } catch {} snd.mute(!sndOn); sndLabel(); });
+sndLabel();
 
 // --- the scene ---------------------------------------------------------------------------------------------------------
 let FRAME_MS = 1000 / (LITE ? 30 : 60), lastT = 0;
 createScene({ canvas: $("c"), lite: LITE, small: SMALL, reduced: REDUCED, onProgress: (what, e) => { if (e && e.total) $("boot").textContent = `loading ${what.replace(/^.*\//, "")} ${Math.round(100 * e.loaded / e.total)}%`; } })
-  .then(sc => { st.scene = sc; window.__chair = { scene: sc, st }; $("boot").hidden = true; addEventListener("resize", sc.resize); sc.setAvailable(!!(st.status && st.status.available));
-    requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (document.hidden) return; const dt = Math.min(0.1, (now - lastT) / 1000); if (now - lastT < FRAME_MS - 2) return; lastT = now; sc.frame(dt); }); })
+  .then(sc => { st.scene = sc; window.__chair = { scene: sc, st }; $("boot").hidden = true; addEventListener("resize", sc.resize); sc.setAvailable(!!(st.status && st.status.available)); if (snd.context()) sc.setSound(snd);
+    requestAnimationFrame(function loop(now) { requestAnimationFrame(loop); if (document.hidden) return; const dt = Math.min(0.1, (now - lastT) / 1000); if (now - lastT < FRAME_MS - 2) return; lastT = now; lips(now); sc.frame(dt); }); })
   .catch(e => { $("boot").textContent = "the scene could not load: " + (e && e.message || e); console.error(e); });
 
 // --- the socket --------------------------------------------------------------------------------------------------------
@@ -197,16 +210,16 @@ function on(m) {
   if (m.type === "hello") { st.status = m.status; st.bins = (m.bins || []).slice(-500); st.last = m.trace; st.open = m.card; st.cards = m.cards || []; st.events = m.events || [];
     levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); chatRender(m.chat || []); $("voice").textContent = m.voice && m.voice.available ? "voice: " + (m.voice.voice ? m.voice.voice + (m.voice.provider === "bank" ? ", his lines rendered ahead" : " through " + m.voice.provider + " (local)") : m.voice.provider) : "voice: none, captions only"; }
   else if (m.type === "trace") { for (const b of m.bins) st.bins.push(b); if (st.bins.length > 520) st.bins.splice(0, st.bins.length - 500); st.last = m; st.open = m.card; st.baseline = m.baseline;
-    if (st.scene) st.scene.setDrive(m.drive); drawTrace(); phaseLine(); if (st.open) cardLine(); }
+    if (st.scene) { st.scene.setDrive(m.drive); st.scene.setRegister(m.register); } drawTrace(); phaseLine(); if (st.open) cardLine(); }
   else if (m.type === "status") { st.status = m; applyStatus(); }
   else if (m.type === "ack") { ack(m); }
   else if (m.type === "event") { st.events.push(m); if (st.events.length > 60) st.events.shift(); eventLine(m);
-    if (m.state === "delivered") { if (st.scene) st.scene.shock(); st.open = { id: m.id, level: m.level }; cardLine(); }
+    if (m.state === "delivered") { if (st.scene) st.scene.shock(m); st.open = { id: m.id, level: m.level }; cardLine(); }
     if (m.state === "flatline") { st.flat = true; setStatus("flatline · the drive collapsed · a shock of level 3 or more brings him back", "bad"); phaseLine(); }
     if (m.state === "revived") { st.flat = false; if (st.scene) st.scene.revive(); setStatus(`back · flat for ${(m.dead_s || 0).toFixed(1)} s · brought back by a level ${m.level}`, "hot"); }
     if (m.state === "measured") { st.cards.push(m); if (st.cards.length > 10) st.cards.shift(); if (st.open && st.open.id === m.id) st.open = null; cardLine(m); } }
   else if (m.type === "say") { say(m); }
-  else if (m.type === "chat") { chatAdd(m); }
+  else if (m.type === "chat") { chatAdd(m); if (m.who !== "him" && st.scene) st.scene.attend(3); }   // he turns to the camera: someone spoke to him
   else if (m.type === "chat_ack") { chatAck(m); }
   else if (m.type === "say_cancel") { if (st.sayT && st.sayT.id === m.id) hideSay(); else stopAudio(); }
   else if (m.type === "full") { setStatus("the chair is full · try again in a minute", "bad"); }
@@ -219,6 +232,8 @@ function applyStatus() {
   if (!ok) setStatus(s.stopped ? "stopped by the operator" : "network unavailable" + (s.why ? " · " + s.why : ""), "bad");
   else if (!st.pending) setStatus(s.running ? "ready" : "waking the network…", "");
   $("viewers").textContent = s.viewers ? `${s.viewers} watching` : "";
+  if (s.viewers > st.viewers && st.scene) st.scene.attend(2.5);                     // someone came in: he looks
+  st.viewers = s.viewers || 0;
   if (st.scene) st.scene.setAvailable(ok);
   phaseLine();
 }
@@ -291,9 +306,25 @@ function drawTrace() {
 function say(m) { const e = $("say"); e.innerHTML = ""; const t = document.createElement("span"); t.textContent = m.text; e.appendChild(t);
   const s = document.createElement("small"); s.textContent = m.kind === "comment" ? "his line" : m.kind === "reply" ? "his answer" : "his reaction"; e.appendChild(s); e.classList.add("on");
   stopAudio();
-  if (m.voice && m.voice.available && m.voice.url) { try { const a = new Audio(m.voice.url); st.audio = a; a.play().catch(() => { s.textContent += " · sound blocked until you tap the page"; }); } catch {} }
+  if (m.voice && m.voice.available && m.voice.url) { try { const a = new Audio(m.voice.url); st.audio = a; lipFrom(a, m.ms); a.play().catch(() => { s.textContent += " · sound blocked until you tap the page"; }); } catch {} }
+  else st.lip = { t0: performance.now(), ms: m.ms || 1200 };
+  if (st.scene) st.scene.attend((m.ms || 1200) / 1000 + 0.5);                                              // he faces the camera while he speaks
   if (st.sayT && st.sayT.h) clearTimeout(st.sayT.h); st.sayT = { id: m.id, h: setTimeout(hideSay, Math.max(1200, m.ms + 600)) }; }
-function stopAudio() { if (st.audio) { try { st.audio.pause(); } catch {} st.audio = null; } }
+function stopAudio() { if (st.audio) { try { st.audio.pause(); } catch {} st.audio = null; } st.lip = null; st.an = null; }
+// the mouth while he speaks: the loudness of the voice, read off the audio element through an analyser (the voice stays
+// on its own path to the speakers); a line without audio moves the mouth to a syllable rhythm for its length
+function lipFrom(a, ms) {
+  const ac = snd.context();
+  if (!ac) { st.lip = { t0: performance.now(), ms: ms || 1200 }; return; }
+  try { const src = ac.createMediaElementSource(a), an = ac.createAnalyser(); an.fftSize = 512; src.connect(an); an.connect(ac.destination); st.an = { an, buf: new Uint8Array(an.fftSize), a }; }
+  catch { st.lip = { t0: performance.now(), ms: ms || 1200 }; }
+}
+function lips(now) {
+  if (!st.scene) return;
+  if (st.an && st.audio === st.an.a && !st.audio.paused) { const { an, buf } = st.an; an.getByteTimeDomainData(buf); let acc = 0; for (let i = 0; i < buf.length; i += 2) { const v = (buf[i] - 128) / 128; acc += v * v; }
+    st.scene.speak(Math.min(1, Math.max(0, (Math.sqrt(acc / (buf.length / 2)) - 0.015) * 7))); }
+  else if (st.lip) { const el = (now - st.lip.t0) / 1000; if (el * 1000 < st.lip.ms) st.scene.speak(0.75 * Math.max(0, Math.sin(2 * Math.PI * 4.2 * el))); else st.lip = null; }
+}
 function hideSay() { $("say").classList.remove("on"); st.sayT = null; stopAudio(); }
 
 // --- the chat: text, or speech through the browser's own recogniser (nothing recorded leaves the device) ---------------

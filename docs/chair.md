@@ -12,7 +12,7 @@ fiction; no living neurons and no hardware are connected. The page says "Simulat
 | validation, limits | `chair.Hub.submit` | level 1-5 only; one every 4 s per visitor (burst 2); 6 waiting at most; one delivery every 2 s; 20 a minute for everyone; the sender gets `queued / throttled / full / unavailable / stopped` |
 | delivery | `chair.Hub.pump_once` → `spiking/alif.py` child | the one process that advances the network injects the pulse train; the request becomes `delivered` with the simulation time, the amplitude, the duration and how many neurons were recruited |
 | measurement | `spiking.alif.Measure` | 20 ms bins: population rate (all, excitatory, inhibitory, per group, per region), the mean adaptation current; a quiet-time baseline; per stimulus a response card (peak against baseline, onset, burst, recruitment, undershoot, time back in the band) → `measured` |
-| the body | `spiking.alif.drive_from` → `web/chair_scene.js` | three numbers read off each bin: tension (rate above baseline, log scale, 1 at 8x), slack (the undershoot), heavy (adaptation above its baseline); springs for inertia; bounded by the restraints. Flat: the body hangs, the forearms stay on the armrests, the wrists droop, the fingers rest curled. The face: the model has no face rig, so eyelids (a blink, a squint with tension, clenched at a strong response, shut while flat, heavy with the adaptation) and the mouth (open with the tension and the jolt, slack while flat) are painted into the head material's shader from masks in the texture's own UV space, driven by the same numbers |
+| the body | `spiking.alif.drive_from` → `web/chair_scene.js` | four numbers read off each bin: tension (rate above baseline, log scale, 1 at 8x), slack (the undershoot), heavy (adaptation above its baseline), motor (the somatomotor regions' rate above their own baseline, same scale: the limbs follow it, the trunk and the head follow tension); critically damped springs for inertia; bounded by the restraints. On top, what the body does downstream of the measurement or on its own, never from the button: a startle (head back and to one side, shoulders up, the frame rattles) when the measured tension jumps by 0.25 between two traces (the onset); which side the head goes and which side pulls harder come from the delivered count, so no two shocks look alike; panting after a strong response (breath rate and chest heave raised, decaying over 12 s, the mouth opening on the in-breath, a 5 Hz shiver while it lasts); twitches (one limb, 120 ms, more often with the adaptation, the register worn and the panting); the quiet idle (a slow weight shift, the head wandering between the camera, the door, the floor and the lamp with the eyes leading, a swallow every 20-40 s, a finger tap when fresh); the register from the trace sets the baseline (worn: head and shoulders down, slower heavier blinks; wary: quicker blinks, more glances at the camera); he turns to the camera when someone writes to him, when the viewer count rises and while he speaks. Flat: the body hangs, the forearms stay on the armrests, the wrists droop, the fingers rest curled. Revival: a gasp (mouth wide, eyes wide, head thrown back) and the panting. The face: the model has no face rig, so it is painted into the head material's shader from masks in the texture's own UV space: eyelids (a blink, a squint with tension, clenched at a strong response, wide at a startle, shut while flat, heavy with the adaptation, a crease that deepens as they close), the mouth (open with the tension, the jolt, the panting and the line being said; the teeth bared when clenched; slack while flat), the gaze (the eye opening's pixels slide under the lids, both islands, one of them mirrored), a flush (tension, panting, adaptation), sweat (a sheen: the skin's roughness drops, the hair stays matte) and the pallor of the flatline |
 | the rest of him | `live_server.Live.chair_shock` | the same delivery stimulates the rate model's motor, salience and relay networks and the sleep circuit, so the brain page and the room feel it too |
 | his lines | `speech.py` | reactions from the response class as the bins come in; a comment at most every 20 s and every 2 shocks, written by the mind's metered model call from the measured numbers (under the chair's own call meter, `CHAIR_MODEL_PER_HOUR` 24 / `CHAIR_MODEL_PER_DAY` 300), or a rule line; one line at a time, reactions interrupt comments, stale lines dropped. Against repetition: ~185 rule lines, none said again while it is among the last 24; a measured register (fresh / rattled / worn / wary, from the adaptation load, the shocks of the last minute and the time since a revival) adds its own lines and goes to the model with his recent lines; per-visitor memory (second, third, fifth shock from the same hand, a run of fives, a new hand); idle lines while people watch and nobody presses; a line when the viewer count rises |
 
@@ -74,8 +74,14 @@ are length and rate. The room chat keeps its own filter.
 
 The movements (head into the clamp, torso against the strap, shoulders, forearms and fingers on the armrests, feet,
 a 9 Hz tremor under tension, breathing from 13 to 46 a minute, the slump when the rate undershoots and the
-adaptation is high), the springs (fast up, slow down), the lamp dip at delivery, the electrode glow, the camera and
-every line he says. Under reduced motion: no tremor, no lamp dip. The character has no face rig: no jaw, no lip sync.
+adaptation is high, the startle, the panting and the shiver after, the twitches, the idle, the swallow, the gasp),
+the springs (fast up, slow down), the lamp dip at delivery, the electrode glow, the camera, the painted face (lids,
+mouth, gaze, teeth, flush, sweat, pallor) and every line he says. The sound of the room (`web/chair_sound.js`,
+synthesized in the browser, no files: a mains hum that rises with the electrode glow, a crackle and a buzz at delivery
+for the length of the train, a creak of the frame when the tension climbs, a low room tone) follows the server's
+delivered events and the measured numbers; it starts at the first tap, the visitor can mute it and the choice is
+remembered in the browser. Under reduced motion: no tremor, no lamp dip, no startle, twitches or shiver; the sound
+stays. The character has no face rig: the mouth is painted, and it moves to the voice (below).
 
 ## Voice
 
@@ -94,7 +100,10 @@ bank: every rule line `speech.bank_lines()` yields (reactions, the rule comments
 visitor, idle, join and no-model lines), rendered ahead with the BREZ profile by `tools/chair_voice_bank.py` and encoded
 with ffmpeg to mono 64 kb/s mp3 into `web/chair_voice/` (~185 files, a few MB, served as static files; `speech.BankVoice`).
 A line that is not in the bank (a model-written comment or chat answer, a rule comment with numbers) is a caption there.
-No lip sync: the character has no face rig.
+Lip sync: the painted mouth follows the loudness of the line's audio, read off the audio element through a WebAudio
+analyser once the page has had its first tap (the voice keeps its own path to the speakers, the room-sound mute does not
+touch it); a caption-only line, or a line before the first tap, moves the mouth to a 4 Hz syllable rhythm for its length.
+While he speaks he faces the camera.
 
 ## Operator
 

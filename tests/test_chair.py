@@ -159,14 +159,22 @@ def test_no_fabricated_response_without_a_baseline():
     run_bins(n, M, 7000)
     c = M.cards[-1]
     assert c["baseline"] is False and c["peak_ratio"] is None and c["distinguishable"] is False
-    assert drive_from({"rate": 40.0}, {"ready": False}) == {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "measured": False, "flat": False}
+    assert drive_from({"rate": 40.0}, {"ready": False}) == {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "motor": 0.0, "measured": False, "flat": False}
 
 
 def test_drive_mapping_is_bounded_and_monotonic():
     base = {"ready": True}
     d = [drive_from({"ratio": r, "w_rel": 0.0}, base)["tension"] for r in (1.0, 2.0, 4.0, 8.0, 50.0)]
     assert d == sorted(d) and d[0] == 0.0 and d[-1] == 1.0
-    assert drive_from({"ratio": 0.5, "w_rel": 0.5}, base) == {"tension": 0.0, "slack": 0.5, "heavy": 0.5, "measured": True, "flat": False}
+    assert drive_from({"ratio": 0.5, "w_rel": 0.5}, base) == {"tension": 0.0, "slack": 0.5, "heavy": 0.5, "motor": 0.0, "measured": True, "flat": False}
+
+
+def test_drive_motor_follows_the_somatomotor_regions():
+    base = {"ready": True, "groups": {"somatomotor": 4.0}}
+    for sm, want in ((4.0, 0.0), (8.0, 1 / 3), (32.0, 1.0), (200.0, 1.0), (1.0, 0.0)):
+        d = drive_from({"ratio": 1.0, "w_rel": 0.0, "groups": {"somatomotor": sm}}, base)
+        assert abs(d["motor"] - want) < 0.002 and 0.0 <= d["motor"] <= 1.0 and d["tension"] == 0.0
+    assert drive_from({"ratio": 4.0, "w_rel": 0.0}, {"ready": True})["motor"] == drive_from({"ratio": 4.0, "w_rel": 0.0}, {"ready": True})["tension"]
 
 
 def test_runtime_is_well_inside_real_time():
@@ -713,7 +721,7 @@ def test_flatline_rule_and_revival_in_the_simulation():
     assert float(n.mu.max()) == 0.0
     b = run_bins(n, M, 1500)
     assert all(x["flat"] for x in b) and b[-1]["rate"] < 0.05       # no spontaneous activity without the drive
-    assert drive_from(b[-1], M.baseline_view()) == {"tension": 0.0, "slack": 1.0, "heavy": 1.0, "measured": True, "flat": True}
+    assert drive_from(b[-1], M.baseline_view()) == {"tension": 0.0, "slack": 1.0, "heavy": 1.0, "motor": 0.0, "measured": True, "flat": True}
     c = n.stimulate(2)
     M.open("weak", c)
     run_bins(n, M, 1500)

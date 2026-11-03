@@ -440,19 +440,26 @@ class Measure:
 
 # --- the body's reading of the measurements (artistic, documented in chair.py) -------------------------------------
 def drive_from(b, base):
-    """Measured bin -> the three numbers the body animates from, all 0..1. tension: how far the rate is above baseline
+    """Measured bin -> the numbers the body animates from, all 0..1. tension: how far the rate is above baseline
     (log scale, 1 at 8x). slack: how far below (the undershoot after a shock). heavy: the adaptation current above its
-    baseline (1 at twice the baseline w). An artistic mapping, not a physiological claim."""
+    baseline (1 at twice the baseline w). motor: the somatomotor regions' rate above their own baseline, the same
+    scale (the limbs). An artistic mapping, not a physiological claim."""
     if b.get("flat"):
-        return {"tension": 0.0, "slack": 1.0, "heavy": 1.0, "measured": True, "flat": True}
+        return {"tension": 0.0, "slack": 1.0, "heavy": 1.0, "motor": 0.0, "measured": True, "flat": True}
     if not base.get("ready") or "ratio" not in b:
-        return {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "measured": False, "flat": False}
+        return {"tension": 0.0, "slack": 0.0, "heavy": 0.0, "motor": 0.0, "measured": False, "flat": False}
     ratio = max(b["ratio"], 1e-6)
     tension = min(1.0, max(0.0, math.log(ratio) / math.log(8.0)))
     slack = min(1.0, max(0.0, 1.0 - ratio)) if ratio < 1 else 0.0
     heavy = min(1.0, max(0.0, b.get("w_rel", 0.0)))
+    # motor: the somatomotor regions' rate against their own quiet rate, the same log scale; the limbs follow it,
+    # the trunk and the head follow the whole network (missing in a bin without groups: the whole network's number)
+    motor = tension
+    bg, gq = (b.get("groups") or {}).get("somatomotor"), (base.get("groups") or {}).get("somatomotor")
+    if bg is not None and gq:
+        motor = min(1.0, max(0.0, math.log(max(bg / max(gq, 1e-6), 1e-6)) / math.log(8.0)))
     return {"tension": round(float(tension), 3), "slack": round(float(slack), 3), "heavy": round(float(heavy), 3),
-            "measured": True, "flat": False}
+            "motor": round(float(motor), 3), "measured": True, "flat": False}
 
 
 def bench(n=N_NEURONS, seconds=2.0):
