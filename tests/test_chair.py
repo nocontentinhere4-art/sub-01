@@ -536,9 +536,28 @@ async def _voicestudio():
             for msg in sp.tick(0.1):
                 await hub._say(msg)
             assert got and got[0]["voice"]["available"] and got[0]["ms"] == 900 and sp.playing["until"] == 0.9
-    assert speech_mod.voice_from_env({}).name == "none" and speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}).name == "voicestudio"
-    assert speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x", "VOICE_STUDIO_PROFILE": "BREZ"}).profile == "BREZ"
+    assert speech_mod.voice_from_env({}, bank={}).name == "none" and speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}, bank={}).name == "voicestudio"
+    assert speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x", "VOICE_STUDIO_PROFILE": "BREZ"}, bank={}).profile == "BREZ"
 
 
 async def _collect(got, msg):
     got.append(msg)
+
+
+def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
+    bank = {"agh|strong": {"file": "a.wav", "ms": 890, "text": "agh", "style": "strong"},
+            "hm|none": {"file": "b.wav", "ms": 830, "text": "hm", "style": "none"}}
+    v = speech_mod.BankVoice(bank)
+    assert v.available() and v.status()["lines"] == 2 and v.status()["voice"] == "BREZ"
+    assert v.synthesize("agh", "strong") == {"url": "/chair_voice/a.wav", "ms": 890}
+    assert v.synthesize("agh", "burst") is None and v.synthesize("nope", "strong") is None
+    assert speech_mod.voice_from_env({}, bank=bank).name == "bank"
+    assert speech_mod.voice_from_env({}, bank={}).name == "none"
+    vs = speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}, bank=bank)
+    assert vs.name == "voicestudio" and vs.synthesize("agh", "strong")["url"] == "/chair_voice/a.wav"   # the bank answers first
+    # the committed bank: every reaction line is in it, with its own file
+    real = speech_mod.load_bank(HERE)
+    for cls, lines in speech_mod.REACTIONS.items():
+        for text in lines:
+            e = real[f"{text}|{cls}"]
+            assert (HERE / speech_mod.BANK_DIR / e["file"]).read_bytes()[:4] == b"RIFF" and 300 < e["ms"] < 4000

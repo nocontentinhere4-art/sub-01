@@ -71,8 +71,10 @@ so the only expressive delivery is its whisper tag on the settling lines; nothin
 cached and the reaction vocabulary is rendered ahead, so a reaction plays at once; a comment renders on demand
 (0.4-0.8 s per line on this Mac's GPU, measured). The hub renders off the event loop with a time limit; a line whose
 audio is late goes out as a caption. The page plays the audio from `/api/chair/voice/<key>.wav`, stops it on
-cancellation, and says when the browser blocks sound before a tap. Production (Railway) cannot reach the app, so it
-stays on captions unless a reachable voice service is configured. No lip sync: the character has no face rig.
+cancellation, and says when the browser blocks sound before a tap. Production cannot reach the app, so it plays the
+bank: every reaction line and every rule comment without a number in it, rendered ahead with the BREZ profile by
+`tools/chair_voice_bank.py` into `web/chair_voice/` (29 files, 1.7 MB, served as static files; `speech.BankVoice`).
+A line that is not in the bank (a model-written comment, a rule comment with numbers) is a caption there. No lip sync: the character has no face rig.
 
 ## Operator
 

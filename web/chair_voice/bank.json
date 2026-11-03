@@ -1,0 +1,176 @@
+{
+ "...|none": {
+  "file": "b43abe304872c090.wav",
+  "ms": 750,
+  "text": "...",
+  "style": "none"
+ },
+ "hm|none": {
+  "file": "89268c555ac55f87.wav",
+  "ms": 830,
+  "text": "hm",
+  "style": "none"
+ },
+ "that it?|none": {
+  "file": "0b7acc9a5fbbb7a4.wav",
+  "ms": 1200,
+  "text": "that it?",
+  "style": "none"
+ },
+ "nothing much|none": {
+  "file": "672a22181afbb2b7.wav",
+  "ms": 1390,
+  "text": "nothing much",
+  "style": "none"
+ },
+ "tss|small": {
+  "file": "3eebd2960e5e32ba.wav",
+  "ms": 930,
+  "text": "tss",
+  "style": "small"
+ },
+ "hh|small": {
+  "file": "88e246d6831ec6d9.wav",
+  "ms": 850,
+  "text": "hh",
+  "style": "small"
+ },
+ "mm|small": {
+  "file": "dcb9391f35a01a23.wav",
+  "ms": 830,
+  "text": "mm",
+  "style": "small"
+ },
+ "ok ok|small": {
+  "file": "98ee50eb3509267e.wav",
+  "ms": 1030,
+  "text": "ok ok",
+  "style": "small"
+ },
+ "agh|strong": {
+  "file": "55cfdecf22b197c4.wav",
+  "ms": 890,
+  "text": "agh",
+  "style": "strong"
+ },
+ "hng|strong": {
+  "file": "2f070c0c5451bfb8.wav",
+  "ms": 930,
+  "text": "hng",
+  "style": "strong"
+ },
+ "ah|strong": {
+  "file": "cd53b19b2e040058.wav",
+  "ms": 830,
+  "text": "ah",
+  "style": "strong"
+ },
+ "nope nope|strong": {
+  "file": "0c32c8d46f232580.wav",
+  "ms": 1240,
+  "text": "nope nope",
+  "style": "strong"
+ },
+ "AGH|burst": {
+  "file": "232326c57ce2c5a8.wav",
+  "ms": 910,
+  "text": "AGH",
+  "style": "burst"
+ },
+ "ghh|burst": {
+  "file": "d0c4326ab3928090.wav",
+  "ms": 930,
+  "text": "ghh",
+  "style": "burst"
+ },
+ "hhhah|burst": {
+  "file": "fc115d29e272603a.wav",
+  "ms": 1070,
+  "text": "hhhah",
+  "style": "burst"
+ },
+ "AH|burst": {
+  "file": "1dd01b2d46c9b4c1.wav",
+  "ms": 850,
+  "text": "AH",
+  "style": "burst"
+ },
+ "...hh|settle": {
+  "file": "8a79c4b10c58b487.wav",
+  "ms": 990,
+  "text": "...hh",
+  "style": "settle"
+ },
+ "give me a sec|settle": {
+  "file": "749890f77c8c7cde.wav",
+  "ms": 1370,
+  "text": "give me a sec",
+  "style": "settle"
+ },
+ "whew|settle": {
+  "file": "b250aeda49f91960.wav",
+  "ms": 1030,
+  "text": "whew",
+  "style": "settle"
+ },
+ "ok. ok.|settle": {
+  "file": "02809bd0eebaa44e.wav",
+  "ms": 1100,
+  "text": "ok. ok.",
+  "style": "settle"
+ },
+ "that barely showed on the trace|none": {
+  "file": "e90ca62b368b2ce3.wav",
+  "ms": 1860,
+  "text": "that barely showed on the trace",
+  "style": "none"
+ },
+ "the line didn't even move|none": {
+  "file": "b13d406636b0f29a.wav",
+  "ms": 1730,
+  "text": "the line didn't even move",
+  "style": "none"
+ },
+ "you can see it: nothing|none": {
+  "file": "3278f324488ce0e9.wav",
+  "ms": 1550,
+  "text": "you can see it: nothing",
+  "style": "none"
+ },
+ "small one. the trace twitched|small": {
+  "file": "b88d2c4ab8b1681a.wav",
+  "ms": 1830,
+  "text": "small one. the trace twitched",
+  "style": "small"
+ },
+ "that lit up a corner, not much more|small": {
+  "file": "5f3ffaecfd40b4c5.wav",
+  "ms": 1900,
+  "text": "that lit up a corner, not much more",
+  "style": "small"
+ },
+ "most of the map lit for that one|strong": {
+  "file": "cfee6b2b8be2fcf2.wav",
+  "ms": 1850,
+  "text": "most of the map lit for that one",
+  "style": "strong"
+ },
+ "that was a burst. the trace is still coming down|burst": {
+  "file": "762ee15e5b3cc697.wav",
+  "ms": 2290,
+  "text": "that was a burst. the trace is still coming down",
+  "style": "burst"
+ },
+ "still coming back down from the last one|settle": {
+  "file": "8a02c9e6710b38f3.wav",
+  "ms": 2020,
+  "text": "still coming back down from the last one",
+  "style": "settle"
+ },
+ "the baseline is a way off yet|settle": {
+  "file": "62f84c930066c5ad.wav",
+  "ms": 1780,
+  "text": "the baseline is a way off yet",
+  "style": "settle"
+ }
+}

@@ -86,6 +86,40 @@ class NoVoice(VoiceProvider):
     name = "none"
 
 
+BANK_DIR = "web/chair_voice"              # the pre-rendered lines (tools/chair_voice_bank.py): served as static files
+BANK_URL = "/chair_voice/"
+
+
+def load_bank(root=None):
+    """{"<text>|<style>": {"file", "ms", "text", "style"}} from the bank's index, or {} when there is none."""
+    import os
+    from pathlib import Path
+    root = Path(root or os.path.dirname(os.path.abspath(__file__)))
+    try:
+        return json.loads((root / BANK_DIR / "bank.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+class BankVoice(VoiceProvider):
+    """His lines rendered ahead with the owner's app and committed as files: the reaction vocabulary and the rule
+    comments without a number in them. Production plays these; anything not in the bank is a caption."""
+    name = "bank"
+
+    def __init__(self, bank, voice="BREZ"):
+        self.bank, self.voice_name = bank, voice
+
+    def available(self):
+        return bool(self.bank)
+
+    def status(self):
+        return {"available": self.available(), "provider": self.name, "voice": self.voice_name, "lines": len(self.bank)}
+
+    def synthesize(self, text, style):
+        e = self.bank.get(f"{text}|{style}") or self.bank.get(f"{text}|")
+        return {"url": BANK_URL + e["file"], "ms": int(e["ms"])} if e else None
+
+
 class VoiceStudio(VoiceProvider):
     """The owner's local VoiceStudio app (github.com/debpalash/VoiceStudio, AGPL-3.0; the OmniVoice engine), through
     its local HTTP API: POST /generate (multipart form: text, instruct, seed, num_step, speed) answers WAV bytes with
@@ -106,10 +140,11 @@ class VoiceStudio(VoiceProvider):
     STEPS = 8                                # draft quality: a short line in ~1-2 s on an Apple GPU
     CACHE = 64
 
-    def __init__(self, base_url, timeout=20.0, clock=time.time, profile=None):
+    def __init__(self, base_url, timeout=20.0, clock=time.time, profile=None, bank=None):
         import urllib.request
         self.base = base_url.rstrip("/")
         self.timeout, self.clock = timeout, clock
+        self.bank = BankVoice(bank or {})          # the committed renders answer first, the app renders the rest
         self.profile, self.profile_id, self.profile_name = (profile or "").strip() or None, None, None
         self._ok, self._checked = False, -1e9
         self.cache = {}                      # (text, tags) -> {"wav": bytes, "ms": int, "id": str}
@@ -130,7 +165,8 @@ class VoiceStudio(VoiceProvider):
 
     def status(self):
         return {"available": self.available(), "provider": self.name, "cached": len(self.cache),
-                "voice": self.profile_name or ("profile " + self.profile if self.profile else "designed"), **self.stats}
+                "voice": self.profile_name or (self.bank.voice_name if self.bank.available() else None)
+                or ("profile " + self.profile if self.profile else "designed"), **self.stats}
 
     def resolve_profile(self):
         """The named profile's id (by name, case-insensitive, or its id), looked up once. None: not found, designed voice."""
@@ -159,8 +195,12 @@ class VoiceStudio(VoiceProvider):
         return hashlib.sha1(f"{text}|{self.tags_for(style)}|{self.SEED}|{self.profile_id or ''}".encode()).hexdigest()[:16]
 
     def synthesize(self, text, style):
-        """-> {"url": "/api/chair/voice/<key>.wav", "ms": int} or None. Blocking (the hub runs it off the loop)."""
+        """-> {"url": ..., "ms": int} or None. Blocking (the hub runs it off the loop)."""
         import uuid
+        banked = self.bank.synthesize(text, style)
+        if banked:
+            self.stats["hits"] += 1
+            return banked
         if self.profile is not None and self.profile_id is None:
             self.resolve_profile()
         k = self.key(text, style)
@@ -209,12 +249,16 @@ class VoiceStudio(VoiceProvider):
         return True
 
 
-def voice_from_env(env=None):
-    """VOICE_STUDIO_URL set -> VoiceStudio (VOICE_STUDIO_PROFILE: a saved profile's name or id), else NoVoice."""
+def voice_from_env(env=None, bank=None):
+    """VOICE_STUDIO_URL set -> VoiceStudio (VOICE_STUDIO_PROFILE: a saved profile's name or id) with the bank in
+    front; no app but a bank -> BankVoice; else NoVoice."""
     import os
     env = env or os.environ
+    bank = load_bank() if bank is None else bank
     url = env.get("VOICE_STUDIO_URL", "").strip()
-    return VoiceStudio(url, profile=env.get("VOICE_STUDIO_PROFILE", "")) if url else NoVoice()
+    if url:
+        return VoiceStudio(url, profile=env.get("VOICE_STUDIO_PROFILE", ""), bank=bank)
+    return BankVoice(bank) if bank else NoVoice()
 
 
 class Speech:

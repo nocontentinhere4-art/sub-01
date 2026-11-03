@@ -125,7 +125,7 @@ function connect() {
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function on(m) {
   if (m.type === "hello") { st.status = m.status; st.bins = (m.bins || []).slice(-500); st.last = m.trace; st.open = m.card; st.cards = m.cards || []; st.events = m.events || [];
-    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); $("voice").textContent = m.voice && m.voice.available ? "voice: " + (m.voice.voice ? m.voice.voice + " through " : "") + m.voice.provider + " (local)" : "voice: none, captions only"; }
+    levelsTable(m.levels, m.limits); applyStatus(); drawTrace(); cardLine(); $("voice").textContent = m.voice && m.voice.available ? "voice: " + (m.voice.voice ? m.voice.voice + (m.voice.provider === "bank" ? ", his lines rendered ahead" : " through " + m.voice.provider + " (local)") : m.voice.provider) : "voice: none, captions only"; }
   else if (m.type === "trace") { for (const b of m.bins) st.bins.push(b); if (st.bins.length > 520) st.bins.splice(0, st.bins.length - 500); st.last = m; st.open = m.card; st.baseline = m.baseline;
     if (st.scene) st.scene.setDrive(m.drive); drawTrace(); phaseLine(); if (st.open) cardLine(); }
   else if (m.type === "status") { st.status = m; applyStatus(); }
@@ -139,7 +139,7 @@ function on(m) {
 }
 function applyStatus() {
   const s = st.status || {}; const ok = !!s.available && !s.stopped;
-  $("send").disabled = !ok || !!st.pending;
+  $("send").disabled = !ok;
   $("src").textContent = (s.label || "Simulated neural activity") + (s.kind && s.kind !== "simulation" ? " · " + s.kind : "");
   $("src").classList.toggle("off", !ok);
   if (!ok) setStatus(s.stopped ? "stopped by the operator" : "network unavailable" + (s.why ? " · " + s.why : ""), "bad");
@@ -166,16 +166,14 @@ function levelsTable(levels, limits) {
 
 // --- sending -------------------------------------------------------------------------------------------------------------
 for (const b of $("level").querySelectorAll("button")) b.addEventListener("click", () => { st.level = +b.dataset.k; for (const x of $("level").querySelectorAll("button")) { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-pressed", on ? "true" : "false"); } });
-$("send").addEventListener("click", () => { if (st.pending) return; st.pending = { t: Date.now() }; $("send").disabled = true; setStatus("submitted…", "hot"); send({ type: "shock", level: st.level });
+// the button stays itself: the request's state shows in the status line, and the server enforces the limits
+$("send").addEventListener("click", () => { if (st.pending) return; st.pending = { t: Date.now() }; setStatus("submitted…", "hot"); send({ type: "shock", level: st.level });
   setTimeout(() => { if (st.pending && Date.now() - st.pending.t > 4900) { st.pending = null; applyStatus(); } }, 5000); });
 function ack(m) {
   st.pending = null;
   const W = { queued: m.pos > 1 ? `queued · ${m.pos} in line · about ${m.eta_s} s` : `queued · next · about ${m.eta_s} s`, throttled: `one every few seconds per visitor · ${m.retry_s} s`,
     full: "the queue is full · try again shortly", unavailable: "network unavailable", stopped: "stopped by the operator", refused: m.why || "refused" };
   setStatus(W[m.state] || m.state, m.state === "queued" ? "hot" : "bad");
-  if (window.SUB01UI && SUB01UI.state) SUB01UI.state($("send"), m.state === "queued" ? "done" : "fail", m.state === "queued" ? "queued ✓" : (m.state === "throttled" ? "wait" : "not sent"));
-  setTimeout(() => { if (!st.pending) $("send").disabled = !(st.status && st.status.available && !st.status.stopped); }, 1200);
-  if (m.state === "queued") st.open = st.open;
 }
 function eventLine(m) {
   if (m.state === "queued") return;
