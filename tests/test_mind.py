@@ -545,7 +545,7 @@ def test_default_provider_reuses_the_eyes_classes(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-key")
     c = M.default_provider()
     kw = c.request("s", "u")
-    assert isinstance(c, E.ClaudeEyes) and kw["model"] == "claude-haiku-4-5"
+    assert isinstance(c, E.ClaudeEyes) and kw["model"] == "claude-haiku-5-5" and kw["output_config"] == {"effort": "low"}
     assert "output_config" not in kw and "thinking" not in kw and "betas" not in kw
 
 

@@ -47,7 +47,7 @@ from interests import topic_of
 from research import BLOCK as TOPIC_BLOCK, STOP, keywords
 from state_io import _write_replace, append_jsonl, load_json, read_jsonl, save_json
 
-MODEL = os.environ.get("MIND_CLAUDE_MODEL") or "claude-haiku-4-5"            # no effort / thinking fields for Haiku
+MODEL = os.environ.get("MIND_CLAUDE_MODEL") or "claude-haiku-5-5"            # with a direct key: Haiku 5.5 at low effort (10x cheaper than 4.5)
 OPENROUTER_MODEL = os.environ.get("MIND_OPENROUTER_MODEL") or "anthropic/claude-haiku-4.5"
 SHARED_USD_PER_DAY = float(os.environ.get("BRAIN_DECIDES_MAX_USD_PER_DAY") or 2.00)
 # the eyes keep their $1.00, the mind gets the rest of the shared $2.00; SUB01_CAP_* are the names in costs.py (#15)
