@@ -44,6 +44,8 @@ COOLDOWN_S = 2.0
 PER_MINUTE = 20
 CLIENT_EVERY_S, CLIENT_BURST = 3.0, 2
 IDLE_PAUSE_S = 45.0
+FLAT_AUTO_S, FLAT_AUTO_LEVEL = 10.0, 3        # flat this long with nobody pressing: the room's own lever sends the shock that brings him back
+ROOM_KEY = "room"                             # the sender of that shock (no visitor's bucket)
 TRACE_KEEP = 500                  # bins kept for a late joiner (10 s at 20 ms)
 EVENTS_KEEP = 60
 MAX_WS = 200
@@ -239,6 +241,7 @@ class Hub:
         self.last_trace = None
         self.stopped = False
         self.flat = False                         # the network flatlined (a rule of the piece: spiking/alif.py)
+        self.flat_since = None                    # when; after FLAT_AUTO_S with nothing queued the room revives him itself
         self.last_viewer = clock()
         self.stats = {"submitted": 0, "delivered": 0, "throttled": 0, "full": 0, "refused": 0}
         source.on_trace, source.on_event, source.on_state = self._trace, self._event, self._state
@@ -322,6 +325,12 @@ class Hub:
             if self.queue and (self.stopped or not st.get("available")):
                 self._drop_all("stopped" if self.stopped else "unavailable")
             return
+        if self.flat and self.flat_since is not None and now - self.flat_since >= FLAT_AUTO_S and not self.queue and self.inflight is None:
+            self.flat_since = None                                     # once per flatline: the room's lever, a level that revives (alif.REVIVE_LEVEL)
+            self.n += 1
+            req = {"id": f"c-{self.n}", "level": FLAT_AUTO_LEVEL, "t_wall": int(now * 1000), "key": ROOM_KEY}
+            self.queue.append(req)
+            self._note({"type": "event", "id": req["id"], "state": "queued", "level": FLAT_AUTO_LEVEL, "t_wall": req["t_wall"], "pos": 1, "room": True})
         if self.inflight is not None or self.open_card is not None and now - self.last_delivery < COOLDOWN_S:
             return
         if not self.queue or now - self.last_delivery < COOLDOWN_S or not self._minute_ok():
@@ -448,16 +457,19 @@ class Hub:
                 self._note({"type": "event", "id": msg.get("id"), "state": "refused", "why": why, "t_wall": int(now * 1000)})
         elif kind == "flatline":
             self.flat = True
+            self.flat_since = now
             self._note({"type": "event", "state": "flatline", "t_wall": int(now * 1000), **{k: v for k, v in msg.items() if k != "type"}})
             if self.speech:
                 self.speech.on_flatline(msg, now)
         elif kind == "revived":
             self.flat = False
+            self.flat_since = None
             self._note({"type": "event", "state": "revived", "t_wall": int(now * 1000), **{k: v for k, v in msg.items() if k != "type"}})
             if self.speech:
                 self.speech.on_revived(msg, now)
         elif kind == "reset_done":
             self.flat = False
+            self.flat_since = None
             self.bins.clear()
             self.cards.clear()
             self.open_card, self.inflight = None, None

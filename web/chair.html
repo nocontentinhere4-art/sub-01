@@ -159,15 +159,8 @@
     </form>
     <div id="chatnote" class="ui-caption"></div>
   </div>
-  <details id="more"><summary>what this is</summary>
-    <p><b>A model, not a mind.</b> A simulated spiking network (20,000 adaptive integrate-and-fire neurons on the same wiring as the rest of the site: excitatory and inhibitory populations per region, conduction delays, synaptic time constants, refractory periods, spike-frequency adaptation, background noise) runs continuously on the server. A shock is a pulse train injected into a random subset of the neurons under the clamp, bounded in amplitude and duration by the level. Nothing is reset between shocks: the second one meets a network still adapted from the first.</p>
-    <p><b>What is measured.</b> Population firing rates in 20 ms bins against the network's own quiet baseline, the onset of a response, bursts, how many regions were recruited, the undershoot after the train and the time back inside the baseline band. The trace above is that measurement. If a shock makes no distinguishable response, the card says so.</p>
-    <p><b>The flatline is a rule of the piece.</b> The adaptation current of the network, averaged over the last 15 s, is a measured load. When it stays above 1.45 times its quiet level, which takes about ten level 5 shocks in a row and no amount of level 3, the background drive is cut and the spontaneous activity stops: the trace goes flat, the body hangs, he says nothing. A shock of level 3 or more restores the drive, the activity returns, and he talks about it. No neuron has such a rule; it is the piece's.</p>
-    <p><b>His lines.</b> Reactions and comments written from the measured numbers, never a reading of a feeling, and after a strong response a plea: he asks whoever is pressing to stop, begs, bargains, turns to the others watching; the pleas escalate with his register. A character pleading in fiction. His screams are real ones: recordings of people screaming, re-voiced as him, because a speech engine cannot scream. A rule line is not said again while it is recent. His register (rattled, worn, wary; shown beside the phase) is read off the same load number, the shocks of the last minute and the time since a revival, and picks which lines are on offer; he also notices the same hand pressing again, a new hand, people watching without pressing, and someone arriving.</p>
-    <p><b>What is art.</b> His body animates from three numbers read off the bins (rate above baseline, rate below it, adaptation above its baseline), through springs for the body's inertia; the camera, the lamp dip and his lines are a character's. The movements are artistic mappings of simulated signals, not human physiology. No living neurons and no hardware are connected. The character is fiction.</p>
-    <table><tr><th>level</th><th>pulse</th><th>recruits</th><th>train</th></tr><tbody id="levels"></tbody></table>
-    <p id="limits"></p>
-  </details>
+  <p id="honest" class="ui-caption">A model, not a mind. No living neurons and no hardware are connected. The character is fiction.</p>
+  <div hidden><table><tbody id="levels"></tbody></table><p id="limits"></p></div>
 </div>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -215,7 +208,7 @@ function on(m) {
   else if (m.type === "ack") { ack(m); }
   else if (m.type === "event") { st.events.push(m); if (st.events.length > 60) st.events.shift(); eventLine(m);
     if (m.state === "delivered") { if (st.scene) st.scene.shock(m); st.open = { id: m.id, level: m.level }; cardLine(); }
-    if (m.state === "flatline") { st.flat = true; setStatus("flatline · the drive collapsed · a shock of level 3 or more brings him back", "bad"); phaseLine(); }
+    if (m.state === "flatline") { st.flat = true; setStatus("flatline · the drive collapsed · a shock of level 3 or more brings him back, or the line comes back on its own in a few seconds", "bad"); phaseLine(); }
     if (m.state === "revived") { st.flat = false; if (st.scene) st.scene.revive(); setStatus(`back · flat for ${(m.dead_s || 0).toFixed(1)} s · brought back by a level ${m.level}`, "hot"); }
     if (m.state === "measured") { st.cards.push(m); if (st.cards.length > 10) st.cards.shift(); if (st.open && st.open.id === m.id) st.open = null; cardLine(m); } }
   else if (m.type === "say") { say(m); }
@@ -344,7 +337,7 @@ function chatSend(via) {
 }
 function chatAck(m) {
   const W = { ok: m.reply_in_s > 0.5 ? `sent · he answers in about ${Math.round(m.reply_in_s)} s` : "sent · he is answering",
-    throttled: `one message every 15 s · ${m.retry_s} s`, busy: "he is answering someone else · try again in a moment", flat: "the trace is flat · a shock of level 3 or more brings him back", empty: "" };
+    throttled: `one message every 15 s · ${m.retry_s} s`, busy: "he is answering someone else · try again in a moment", flat: "the trace is flat · he is coming back in a moment", empty: "" };
   $("chatnote").textContent = W[m.state] || m.state;
 }
 $("chatrow").addEventListener("submit", ev => { ev.preventDefault(); chatSend("text"); });

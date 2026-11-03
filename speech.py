@@ -45,6 +45,7 @@ REACTION_LIFE_S, COMMENT_LIFE_S = 3.0, 12.0
 MAX_QUEUE = 8
 PRIORITY = {"reaction": 2, "reply": 1, "comment": 1, "breath": 1}      # a breath keeps its place in time among the comments
 BREATH_LIFE_S = 12.0
+LINE_GAP_S = 0.35                     # after a line's audio before the next starts: the page cuts a line the moment the next arrives
 BREATH_IDLE_EVERY_S = 16.0            # between idle lines, once rattled or worse: a breath, a sob, a groan
 RECENT_LINES = 24                     # a rule line is not said again while it is among the last 24 said
 MODEL_PER_HOUR = int(os.environ.get("CHAIR_MODEL_PER_HOUR") or 60)    # the chair's own share of the mind's metered calls
@@ -788,7 +789,7 @@ class Speech:
                 return out
         self.queue.pop(0)
         ms = self.duration_ms(nxt)
-        self.playing = {"id": nxt["id"], "until": now + ms / 1000.0, "kind": nxt["kind"]}
+        self.playing = {"id": nxt["id"], "until": now + ms / 1000.0 + LINE_GAP_S, "kind": nxt["kind"]}
         if nxt["kind"] not in ("reaction", "breath"):
             self.recent_said.append(nxt["text"])
         out.append({"type": "say", "id": nxt["id"], "kind": nxt["kind"], "text": nxt["text"], "ms": ms, "about": nxt["about"],
@@ -802,7 +803,7 @@ class Speech:
             if audio.get("ms"):
                 msg["ms"] = int(audio["ms"])
                 if self.playing and self.playing["id"] == msg["id"]:
-                    self.playing["until"] = now + msg["ms"] / 1000.0
+                    self.playing["until"] = now + msg["ms"] / 1000.0 + LINE_GAP_S
         return msg
 
 

@@ -301,6 +301,36 @@ def test_hub_cooldown_and_one_at_a_time():
     assert hub.inflight is None and hub.queue[0]["id"] == "c-2"      # back to the front, not lost
 
 
+def test_hub_revives_him_by_itself_after_a_quiet_flatline():
+    """Owner (2026-11-04): after a run of level-5 shocks he flatlined and "stops speaking". Flat with nothing queued for
+    FLAT_AUTO_S, the room sends the shock that revives him (alif.REVIVE_LEVEL), once per flatline, under no visitor's bucket."""
+    clock = FakeClock()
+    hub, src = hub_with(clock)
+    hub.clients.add(object())
+    asyncio.run(hub._event({"type": "flatline", "t_ms": 5000.0}))
+    assert hub.flat and hub.flat_since == clock.t
+    clock.t += chair.FLAT_AUTO_S - 1
+    asyncio.run(hub.pump_once())
+    assert not src.sent and not hub.queue                               # not yet
+    clock.t += 1.1
+    asyncio.run(hub.pump_once())
+    assert src.sent == [("c-1", chair.FLAT_AUTO_LEVEL)] and hub.inflight["key"] == chair.ROOM_KEY
+    assert hub.events[-1]["state"] == "queued" and hub.events[-1]["room"] is True
+    assert hub.flat_since is None                                       # once: no second one while this flatline lasts
+    clock.t += chair.FLAT_AUTO_S + 1
+    asyncio.run(hub._event({"type": "delivered", "id": "c-1", "level": 3, "t_ms": 100.0, "n_recruited": 5}))
+    asyncio.run(hub.pump_once())
+    assert len(src.sent) == 1
+    asyncio.run(hub._event({"type": "revived", "dead_s": 12.0, "level": 3}))
+    assert not hub.flat and hub.flat_since is None
+    # a visitor's shock while flat: the room stays out of it (the queue is not empty)
+    asyncio.run(hub._event({"type": "flatline", "t_ms": 9000.0}))
+    hub.submit("v9", 4)
+    clock.t += chair.FLAT_AUTO_S + 1
+    asyncio.run(hub.pump_once())
+    assert [r for r in src.sent if r[1] == 4] and all(r.get("key") != chair.ROOM_KEY for r in list(hub.queue))
+
+
 def test_hub_per_minute_cap():
     clock = FakeClock()
     hub, src = hub_with(clock)
@@ -574,7 +604,7 @@ async def _voicestudio():
             sp._line("reaction", "agh", "c-1", speech_mod.REACTION_LIFE_S, 0.0, "strong")
             for msg in sp.tick(0.1):
                 await hub._say(msg)
-            assert got and got[0]["voice"]["available"] and got[0]["ms"] == 900 and sp.playing["until"] == 0.9
+            assert got and got[0]["voice"]["available"] and got[0]["ms"] == 900 and sp.playing["until"] == 0.9 + speech_mod.LINE_GAP_S
     assert speech_mod.voice_from_env({}, bank={}).name == "none" and speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x"}, bank={}).name == "voicestudio"
     assert speech_mod.voice_from_env({"VOICE_STUDIO_URL": "http://x", "VOICE_STUDIO_PROFILE": "BREZ"}, bank={}).profile == "BREZ"
 
