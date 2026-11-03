@@ -299,7 +299,11 @@ function drawTrace() {
 function say(m) { const e = $("say"); e.innerHTML = ""; const t = document.createElement("span"); t.textContent = m.text; e.appendChild(t);
   const s = document.createElement("small"); s.textContent = m.kind === "comment" ? "his line" : m.kind === "reply" ? "his answer" : m.kind === "breath" ? "him" : "his reaction"; e.appendChild(s); e.classList.add("on");
   stopAudio();
-  if (m.voice && m.voice.available && m.voice.url) { try { const a = new Audio(m.voice.url); st.audio = a; lipFrom(a, m.ms); a.play().catch(() => { s.textContent += " · sound blocked until you tap the page"; }); } catch {} }
+  if (m.voice && m.voice.available && (m.voice.urls || m.voice.url)) { const urls = m.voice.urls || [m.voice.url]; let i = 0;   // a composed line: its parts in a row
+    const next = () => { if (i >= urls.length) return; try { const a = new Audio(urls[i++]); st.audio = a; lipFrom(a, m.ms);
+      a.addEventListener("ended", () => { if (st.audio === a && i < urls.length) setTimeout(next, 160); });
+      a.play().catch(() => { s.textContent += " · sound blocked until you tap the page"; }); } catch {} };
+    next(); }
   else st.lip = { t0: performance.now(), ms: m.ms || 1200 };
   if (st.scene) st.scene.attend((m.ms || 1200) / 1000 + 0.5);                                              // he faces the camera while he speaks
   if (st.sayT && st.sayT.h) clearTimeout(st.sayT.h); st.sayT = { id: m.id, h: setTimeout(hideSay, Math.max(1200, m.ms + 600)) }; }

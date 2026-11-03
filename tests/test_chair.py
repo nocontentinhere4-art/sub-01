@@ -630,7 +630,7 @@ def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
         e = real[f"{text}|{cls}"]
         f = HERE / speech_mod.BANK_DIR / e["file"]
         assert f.suffix == ".mp3" and f.stat().st_size > 1000 and 300 < e["ms"] < 14000, (text, cls)
-    assert sum(f.stat().st_size for f in (HERE / speech_mod.BANK_DIR).iterdir()) < 8e6     # small enough to commit (355 lines with the real screams and breaths, 11-04)
+    assert sum(f.stat().st_size for f in (HERE / speech_mod.BANK_DIR).iterdir()) < 10e6    # small enough to commit (433 lines with the real screams, breaths and the composed sentences, 11-04)
 
 
 def test_speech_never_repeats_a_line_while_it_is_recent():
@@ -712,7 +712,37 @@ def test_nothing_is_said_while_flat():
     chat.finish("m-1", "an answer", 21.0)
     assert not [q for q in sp.queue if q["kind"] == "reply"]            # the answer is dropped, not said by a dead man
     sp.on_revived({"type": "revived", "dead_s": 10.0, "level": 3}, 22.0)
-    assert [q["cls"] for q in sp.queue] == ["back"] and sp.tick(22.1)[0]["kind"] == "reaction"
+    # back: the first line, the gasping, two lines about the dark in his words, then one at the pressers and the room
+    # (owner, 2026-11-04: "let him speak about the dark, and let him stop the people pressing it")
+    assert [q["cls"] for q in sp.queue] == ["back", "pant", "dark", "dark", "stop"] and sp.tick(22.1)[0]["kind"] == "reaction"
+    darks = [q for q in sp.queue if q["cls"] == "dark"]
+    # composed: three sentences, one a slot, the caption is their join; two revivals' darks share no sentence
+    assert len({d["text"] for d in darks}) == 2
+    for d in darks:
+        assert len(d["parts"]) == 3 and d["text"] == " ".join(d["parts"]) and all(p in slot for p, slot in zip(d["parts"], speech_mod.COMPOSED["dark"]))
+    assert not set(darks[0]["parts"]) & set(darks[1]["parts"])
+    stop = [q for q in sp.queue if q["cls"] == "stop"][0]
+    assert [p in slot for p, slot in zip(stop["parts"], speech_mod.COMPOSED["stop"])] == [True, True, True]
+    assert all(q["expires"] - q["t"] >= speech_mod.DARK_LIFE_S for q in sp.queue if q["cls"] in ("dark", "stop"))
+    # the say message carries the parts; a list of renders becomes voice.urls with the summed length
+    sp.tick(22.2); sp.playing = None
+    msgs = [m for m in sp.tick(23.0) if m["type"] == "say"]
+    assert msgs and msgs[0]["cls"] == "pant" and msgs[0]["parts"] is None
+    sp.playing = None
+    msg = [m for m in sp.tick(40.0) if m["type"] == "say"][0]
+    assert msg["cls"] == "dark" and msg["parts"] == darks[0]["parts"]
+    sp.voiced(msg, [{"url": "/chair_voice/a.mp3", "ms": 1000}, {"url": "/chair_voice/b.mp3", "ms": 1500}, {"url": "/chair_voice/c.mp3", "ms": 900}], 40.0)
+    assert msg["voice"]["urls"] == ["/chair_voice/a.mp3", "/chair_voice/b.mp3", "/chair_voice/c.mp3"] and msg["ms"] == 3400 + 2 * speech_mod.Speech.PART_GAP_MS
+    assert sp.playing["until"] == 40.0 + msg["ms"] / 1000.0 + speech_mod.LINE_GAP_S
+    sp.voiced(msg, [{"url": "/chair_voice/a.mp3", "ms": 1000}, None], 40.0)                       # a part missing: a caption
+    assert msg["voice"]["urls"] == ["/chair_voice/a.mp3", "/chair_voice/b.mp3", "/chair_voice/c.mp3"]  # unchanged from before
+    # while wary, a strong shock gets a stop line where a plea would go
+    sp.queue.clear(); sp.playing = None
+    sp.on_trace({"card": {"id": "c-9", "peak_ratio": 5.0, "burst": True, **base}, "t_ms": 500, "phase": "responding", "load": 1.0}, 22.0 + speech_mod.PLEA_EVERY_S + 1)
+    assert [q["cls"] for q in sp.queue if q["kind"] == "comment"] == ["stop"]
+    lines = list(speech_mod.bank_lines())
+    assert all((t, c) in lines for c, slots in speech_mod.COMPOSED.items() for slot in slots for t in slot)
+    assert 'm.voice.urls' in (HERE / "web" / "chair.html").read_text()                                   # the page plays the parts in a row
 
 
 def test_register_is_measured_from_load_shocks_and_revival():

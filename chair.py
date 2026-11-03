@@ -366,7 +366,11 @@ class Hub:
             loop = asyncio.get_running_loop()
             wait = SAY_WAIT_S if msg.get("kind") == "reaction" else SAY_WAIT_COMMENT_S
             try:
-                audio = await asyncio.wait_for(loop.run_in_executor(None, self.speech.voice.synthesize, msg["text"], msg.get("cls")), wait)
+                if msg.get("parts"):                                                      # a composed line: one render a part
+                    render = lambda: [self.speech.voice.synthesize(t, msg.get("cls")) for t in msg["parts"]]
+                else:
+                    render = lambda: self.speech.voice.synthesize(msg["text"], msg.get("cls"))
+                audio = await asyncio.wait_for(loop.run_in_executor(None, render), wait)
             except (asyncio.TimeoutError, Exception) as e:
                 audio = None
                 print("chair: voice not ready in time:", repr(e)[:80], flush=True)

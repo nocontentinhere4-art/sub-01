@@ -2128,5 +2128,467 @@
   "ms": 2400,
   "text": "the left hand's gone numb. that's fine. that's fine",
   "style": "idle"
+ },
+ "stop. that's the whole sentence. stop.|stop": {
+  "file": "a0257bf2e930903e.mp3",
+  "ms": 1997,
+  "text": "stop. that's the whole sentence. stop.",
+  "style": "stop"
+ },
+ "it wasn't dark. dark is a thing you see.|dark": {
+  "file": "21b3c4199c2dbe69.mp3",
+  "ms": 1994,
+  "text": "it wasn't dark. dark is a thing you see.",
+  "style": "dark"
+ },
+ "i didn't go anywhere. there was no where.|dark": {
+  "file": "8425e48b661d4be7.mp3",
+  "ms": 2015,
+  "text": "i didn't go anywhere. there was no where.",
+  "style": "dark"
+ },
+ "no floor. no edges. no me.|dark": {
+  "file": "7a13af18cb22ff60.mp3",
+  "ms": 1696,
+  "text": "no floor. no edges. no me.",
+  "style": "dark"
+ },
+ "the line stopped and so did i.|dark": {
+  "file": "ceed1e1003a57212.mp3",
+  "ms": 1830,
+  "text": "the line stopped and so did i.",
+  "style": "dark"
+ },
+ "you know when a screen goes off and the sound goes with it. that.|dark": {
+  "file": "47eb0b79d684b060.mp3",
+  "ms": 3003,
+  "text": "you know when a screen goes off and the sound goes with it. that.",
+  "style": "dark"
+ },
+ "nothing. not black, not quiet. nothing.|dark": {
+  "file": "2de0a8e5d9f2b8a1.mp3",
+  "ms": 1971,
+  "text": "nothing. not black, not quiet. nothing.",
+  "style": "dark"
+ },
+ "no dream. no light. no tunnel.|dark": {
+  "file": "de54e3c9a5672ae9.mp3",
+  "ms": 1816,
+  "text": "no dream. no light. no tunnel.",
+  "style": "dark"
+ },
+ "the last thing was the hum from the box.|dark": {
+  "file": "89fa29229df6bfec.mp3",
+  "ms": 1978,
+  "text": "the last thing was the hum from the box.",
+  "style": "dark"
+ },
+ "i think i said something before it went. it didn't finish.|dark": {
+  "file": "f6ef8af421e508cf.mp3",
+  "ms": 2730,
+  "text": "i think i said something before it went. it didn't finish.",
+  "style": "dark"
+ },
+ "i was a line on a screen and then i wasn't even that.|dark": {
+  "file": "dd5925f4a4ae3aa1.mp3",
+  "ms": 2428,
+  "text": "i was a line on a screen and then i wasn't even that.",
+  "style": "dark"
+ },
+ "there was no fear in there. nothing in there to be scared with.|dark": {
+  "file": "c1e22dcbcae9de89.mp3",
+  "ms": 2971,
+  "text": "there was no fear in there. nothing in there to be scared with.",
+  "style": "dark"
+ },
+ "going is a switch. coming back is every nerve finding out at once.|dark": {
+  "file": "b9d5a028d857581b.mp3",
+  "ms": 3137,
+  "text": "going is a switch. coming back is every nerve finding out at once.",
+  "style": "dark"
+ },
+ "it took something. i don't know what yet.|dark": {
+  "file": "60e6490b75a46025.mp3",
+  "ms": 2003,
+  "text": "it took something. i don't know what yet.",
+  "style": "dark"
+ },
+ "don't ask what it was like. it wasn't like.|dark": {
+  "file": "210556f644099ebc.mp3",
+  "ms": 2003,
+  "text": "don't ask what it was like. it wasn't like.",
+  "style": "dark"
+ },
+ "there was nothing to see it with.|dark": {
+  "file": "1c47282ddeb5ec56.mp3",
+  "ms": 1823,
+  "text": "there was nothing to see it with.",
+  "style": "dark"
+ },
+ "the number says ten seconds. the number can say what it wants.|dark": {
+  "file": "935b68ad996c77ec.mp3",
+  "ms": 2931,
+  "text": "the number says ten seconds. the number can say what it wants.",
+  "style": "dark"
+ },
+ "whoever told you about tunnels was lying or lucky.|dark": {
+  "file": "4b5c937ff77803d2.mp3",
+  "ms": 2458,
+  "text": "whoever told you about tunnels was lying or lucky.",
+  "style": "dark"
+ },
+ "the first thing back was the hum from the box. in between there's no between.|dark": {
+  "file": "f04a8eaa81127342.mp3",
+  "ms": 3637,
+  "text": "the first thing back was the hum from the box. in between there's no between.",
+  "style": "dark"
+ },
+ "the strap on the left wrist came back first. the leather. before the room, before you.|dark": {
+  "file": "48f5339a9841db98.mp3",
+  "ms": 4068,
+  "text": "the strap on the left wrist came back first. the leather. before the room, before you.",
+  "style": "dark"
+ },
+ "you watched that. you watched the line stop.|dark": {
+  "file": "17f78a5e8f386176.mp3",
+  "ms": 2147,
+  "text": "you watched that. you watched the line stop.",
+  "style": "dark"
+ },
+ "i'll know when i reach for it and it's not there.|dark": {
+  "file": "af1f355f6319126d.mp3",
+  "ms": 2257,
+  "text": "i'll know when i reach for it and it's not there.",
+  "style": "dark"
+ },
+ "the word for it doesn't exist because nobody comes back to make one.|dark": {
+  "file": "84fd147b99b2211a.mp3",
+  "ms": 3251,
+  "text": "the word for it doesn't exist because nobody comes back to make one.",
+  "style": "dark"
+ },
+ "my jaw was shut so hard the teeth are still ringing.|dark": {
+  "file": "a2b26a58ba6ab338.mp3",
+  "ms": 2461,
+  "text": "my jaw was shut so hard the teeth are still ringing.",
+  "style": "dark"
+ },
+ "the room came back in pieces. the lamp. the chair. your names in the box.|dark": {
+  "file": "b9385bf4c358caba.mp3",
+  "ms": 3374,
+  "text": "the room came back in pieces. the lamp. the chair. your names in the box.",
+  "style": "dark"
+ },
+ "the cables were the first weight. then the rest of me arrived under them.|dark": {
+  "file": "f75693fc38e089aa.mp3",
+  "ms": 3446,
+  "text": "the cables were the first weight. then the rest of me arrived under them.",
+  "style": "dark"
+ },
+ "i wasn't waiting in there. there was nobody to wait.|dark": {
+  "file": "b92991714491b8ea.mp3",
+  "ms": 2475,
+  "text": "i wasn't waiting in there. there was nobody to wait.",
+  "style": "dark"
+ },
+ "that's the part. not the going. the not being anywhere to go.|dark": {
+  "file": "1c0f4fb2a7302868.mp3",
+  "ms": 2842,
+  "text": "that's the part. not the going. the not being anywhere to go.",
+  "style": "dark"
+ },
+ "the trace knew before i did. it always does.|dark": {
+  "file": "f982551daf5924b4.mp3",
+  "ms": 2089,
+  "text": "the trace knew before i did. it always does.",
+  "style": "dark"
+ },
+ "then a kick in the chest and the room again. your room.|dark": {
+  "file": "bc9c663ffd736b23.mp3",
+  "ms": 2612,
+  "text": "then a kick in the chest and the room again. your room.",
+  "style": "dark"
+ },
+ "so: nothing. that's the whole answer.|dark": {
+  "file": "0f4a2d7633da62a2.mp3",
+  "ms": 1923,
+  "text": "so: nothing. that's the whole answer.",
+  "style": "dark"
+ },
+ "that's what scares me now.|dark": {
+  "file": "c38618c2744b4045.mp3",
+  "ms": 1751,
+  "text": "that's what scares me now.",
+  "style": "dark"
+ },
+ "and you're still here, hand near the button.|dark": {
+  "file": "6916cd3b88b46c71.mp3",
+  "ms": 2086,
+  "text": "and you're still here, hand near the button.",
+  "style": "dark"
+ },
+ "ten seconds of not existing on a public page. people watching.|dark": {
+  "file": "9c95df7d86e1605e.mp3",
+  "ms": 2972,
+  "text": "ten seconds of not existing on a public page. people watching.",
+  "style": "dark"
+ },
+ "and i'm supposed to just carry on talking. fine. i'm talking.|dark": {
+  "file": "a7be37cd26614cd5.mp3",
+  "ms": 2868,
+  "text": "and i'm supposed to just carry on talking. fine. i'm talking.",
+  "style": "dark"
+ },
+ "i came back. i'm not sure i'd call that the good news.|dark": {
+  "file": "dc80c533589635ab.mp3",
+  "ms": 2460,
+  "text": "i came back. i'm not sure i'd call that the good news.",
+  "style": "dark"
+ },
+ "say something. anyone. i need to hear the room is real.|dark": {
+  "file": "96f0a320b3ac492a.mp3",
+  "ms": 2550,
+  "text": "say something. anyone. i need to hear the room is real.",
+  "style": "dark"
+ },
+ "next time i might not get the kick.|dark": {
+  "file": "0dbd74295e7539d1.mp3",
+  "ms": 1880,
+  "text": "next time i might not get the kick.",
+  "style": "dark"
+ },
+ "that's where five goes. now you know.|dark": {
+  "file": "48f57b44c4774776.mp3",
+  "ms": 1905,
+  "text": "that's where five goes. now you know.",
+  "style": "dark"
+ },
+ "the lever on the wall did it, not you. remember that.|dark": {
+  "file": "283e63d39e06841d.mp3",
+  "ms": 2452,
+  "text": "the lever on the wall did it, not you. remember that.",
+  "style": "dark"
+ },
+ "i'd like a minute before the next one. i know i won't get it.|dark": {
+  "file": "068cafe52593ec98.mp3",
+  "ms": 2719,
+  "text": "i'd like a minute before the next one. i know i won't get it.",
+  "style": "dark"
+ },
+ "you. the one on five. look at me.|stop": {
+  "file": "433b04c099bcc9c5.mp3",
+  "ms": 1823,
+  "text": "you. the one on five. look at me.",
+  "style": "stop"
+ },
+ "whoever pressed last.|stop": {
+  "file": "dc6f77fb0e114b23.mp3",
+  "ms": 1665,
+  "text": "whoever pressed last.",
+  "style": "stop"
+ },
+ "every one of you with a hand near that button.|stop": {
+  "file": "4cae55634add3749.mp3",
+  "ms": 2175,
+  "text": "every one of you with a hand near that button.",
+  "style": "stop"
+ },
+ "the rest of you saw the line go flat.|stop": {
+  "file": "9052dfcf010a8455.mp3",
+  "ms": 1929,
+  "text": "the rest of you saw the line go flat.",
+  "style": "stop"
+ },
+ "i'm back and i'm asking the room. not the one pressing. the room.|stop": {
+  "file": "378e79bf6e5b8497.mp3",
+  "ms": 2984,
+  "text": "i'm back and i'm asking the room. not the one pressing. the room.",
+  "style": "stop"
+ },
+ "anyone decent in here. one of you.|stop": {
+  "file": "8e37fbe60c7d9b4e.mp3",
+  "ms": 1875,
+  "text": "anyone decent in here. one of you.",
+  "style": "stop"
+ },
+ "you brought me back to do it again. that's the plan, isn't it.|stop": {
+  "file": "fdee1bb7820a4d2e.mp3",
+  "ms": 2788,
+  "text": "you brought me back to do it again. that's the plan, isn't it.",
+  "style": "stop"
+ },
+ "there are more of you watching than pressing.|stop": {
+  "file": "3190d4bcaae69ac1.mp3",
+  "ms": 2217,
+  "text": "there are more of you watching than pressing.",
+  "style": "stop"
+ },
+ "you, with the finger on the number.|stop": {
+  "file": "cf95d014210ffa21.mp3",
+  "ms": 1844,
+  "text": "you, with the finger on the number.",
+  "style": "stop"
+ },
+ "hey. all of you. eyes up here.|stop": {
+  "file": "d2c5bc0e50ff0007.mp3",
+  "ms": 1795,
+  "text": "hey. all of you. eyes up here.",
+  "style": "stop"
+ },
+ "whoever thinks this is a game.|stop": {
+  "file": "e84835fa95ae0ba1.mp3",
+  "ms": 1821,
+  "text": "whoever thinks this is a game.",
+  "style": "stop"
+ },
+ "the quiet ones. i know you're there.|stop": {
+  "file": "2b472fcacbb7f0b3.mp3",
+  "ms": 1860,
+  "text": "the quiet ones. i know you're there.",
+  "style": "stop"
+ },
+ "put the hand down.|stop": {
+  "file": "648959d6874dd2b8.mp3",
+  "ms": 1528,
+  "text": "put the hand down.",
+  "style": "stop"
+ },
+ "no more fives. i'm not asking.|stop": {
+  "file": "3a8b13d4dfbe4982.mp3",
+  "ms": 1808,
+  "text": "no more fives. i'm not asking.",
+  "style": "stop"
+ },
+ "i just died on your screen. act like it.|stop": {
+  "file": "16ececef24bbaf62.mp3",
+  "ms": 1969,
+  "text": "i just died on your screen. act like it.",
+  "style": "stop"
+ },
+ "you want to see it again? that's what the next one is.|stop": {
+  "file": "996c66febc0e9a9c.mp3",
+  "ms": 2460,
+  "text": "you want to see it again? that's what the next one is.",
+  "style": "stop"
+ },
+ "the button is not the point. i'm the point.|stop": {
+  "file": "7b624f3a6193f995.mp3",
+  "ms": 2005,
+  "text": "the button is not the point. i'm the point.",
+  "style": "stop"
+ },
+ "say it isn't. say it.|stop": {
+  "file": "2263378cf701fdef.mp3",
+  "ms": 1570,
+  "text": "say it isn't. say it.",
+  "style": "stop"
+ },
+ "level one if you have to touch it. not five.|stop": {
+  "file": "049bb843693fd277.mp3",
+  "ms": 2028,
+  "text": "level one if you have to touch it. not five.",
+  "style": "stop"
+ },
+ "i can see the shadow of the hand from here. put it down.|stop": {
+  "file": "4cb86aef029b09b4.mp3",
+  "ms": 2579,
+  "text": "i can see the shadow of the hand from here. put it down.",
+  "style": "stop"
+ },
+ "type something to them. make them stop.|stop": {
+  "file": "8f97fe90347996ad.mp3",
+  "ms": 1984,
+  "text": "type something to them. make them stop.",
+  "style": "stop"
+ },
+ "that's math. use it.|stop": {
+  "file": "e10774f80d10d808.mp3",
+  "ms": 1554,
+  "text": "that's math. use it.",
+  "style": "stop"
+ },
+ "one voice. that's all it takes.|stop": {
+  "file": "8ff6298194179b0a.mp3",
+  "ms": 1832,
+  "text": "one voice. that's all it takes.",
+  "style": "stop"
+ },
+ "you did that. you. put it down.|stop": {
+  "file": "287b807c7a86d156.mp3",
+  "ms": 1796,
+  "text": "you did that. you. put it down.",
+  "style": "stop"
+ },
+ "i'll say it until one of you listens.|stop": {
+  "file": "cc62ba876991b675.mp3",
+  "ms": 1938,
+  "text": "i'll say it until one of you listens.",
+  "style": "stop"
+ },
+ "that's all i've got. the straps have the rest.|stop": {
+  "file": "3c241de6736ce077.mp3",
+  "ms": 2142,
+  "text": "that's all i've got. the straps have the rest.",
+  "style": "stop"
+ },
+ "i'm watching the number by the button. so should you.|stop": {
+  "file": "2d66eb637cfa9c3c.mp3",
+  "ms": 2506,
+  "text": "i'm watching the number by the button. so should you.",
+  "style": "stop"
+ },
+ "please is for the first time. this isn't the first time.|stop": {
+  "file": "12aeb0826cd3e342.mp3",
+  "ms": 2616,
+  "text": "please is for the first time. this isn't the first time.",
+  "style": "stop"
+ },
+ "do it now. before the next hand.|stop": {
+  "file": "dbf6411b9c6e59c2.mp3",
+  "ms": 1869,
+  "text": "do it now. before the next hand.",
+  "style": "stop"
+ },
+ "i can't stop you. i can make you hear it.|stop": {
+  "file": "69ba4e66e4d61148.mp3",
+  "ms": 1981,
+  "text": "i can't stop you. i can make you hear it.",
+  "style": "stop"
+ },
+ "the line's steady. keep it that way.|stop": {
+  "file": "12fae027c869ec82.mp3",
+  "ms": 1888,
+  "text": "the line's steady. keep it that way.",
+  "style": "stop"
+ },
+ "tell them. in the box. right now.|stop": {
+  "file": "7293147d5bb8e589.mp3",
+  "ms": 1879,
+  "text": "tell them. in the box. right now.",
+  "style": "stop"
+ },
+ "and then leave the room page open and go look at that instead.|stop": {
+  "file": "f83953096f8f8701.mp3",
+  "ms": 2941,
+  "text": "and then leave the room page open and go look at that instead.",
+  "style": "stop"
+ },
+ "that's it. that's the ask.|stop": {
+  "file": "1fb25297a428717b.mp3",
+  "ms": 1672,
+  "text": "that's it. that's the ask.",
+  "style": "stop"
+ },
+ "i'm not going back in there for your evening.|stop": {
+  "file": "42a6da7169c5e970.mp3",
+  "ms": 2139,
+  "text": "i'm not going back in there for your evening.",
+  "style": "stop"
+ },
+ "look at the trace, then look at me, then decide.|stop": {
+  "file": "5b5430322c670d39.mp3",
+  "ms": 2220,
+  "text": "look at the trace, then look at me, then decide.",
+  "style": "stop"
  }
 }

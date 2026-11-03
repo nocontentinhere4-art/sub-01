@@ -47,7 +47,7 @@ PRIORITY = {"reaction": 2, "reply": 1, "comment": 1, "breath": 1}      # a breat
 BREATH_LIFE_S = 12.0
 LINE_GAP_S = 0.35                     # after a line's audio before the next starts: the page cuts a line the moment the next arrives
 BREATH_IDLE_EVERY_S = 16.0            # between idle lines, once rattled or worse: a breath, a sob, a groan
-RECENT_LINES = 48                     # a rule line is not said again while it is among the last 48 said
+RECENT_LINES = 160                    # a rule line is not said again while it is among the last 160 said
 MODEL_PER_HOUR = int(os.environ.get("CHAIR_MODEL_PER_HOUR") or 60)    # the chair's own share of the mind's metered calls
 MODEL_PER_DAY = int(os.environ.get("CHAIR_MODEL_PER_DAY") or 600)     # (~$0.6 a day on a small model; the mind's $ cap still applies)
 # the register, measured: the adaptation load against its quiet level (the flatline cuts at 1.45), shocks in the last minute
@@ -158,6 +158,103 @@ BREATHS = {
               "ngh...", "hnnng. hh", "nnh...", "gghh. ngh", "nng. nng.", "hngg...", "nnngh. nnh", "ggnnh...", "nnh. hh. nnh", "hnng. nng",
               "nngh...", "gghhh. hh", "nnnngh", "hnnh. ngh", "ngh. ngh. ngh"],
 }
+# After a revival (owner, 2026-11-04: "let him speak about the dark, and let him stop the people pressing it", then
+# "every time he has to say something different"): the lines are composed, three sentences from three slots, each
+# sentence a rule line rendered in his voice and played back to back (the page plays the parts in a row). Twelve to
+# sixteen sentences a slot: over a thousand different lines of each kind, and the picker keeps each slot's recent ones
+# out, so the same sentence is rare and the same line practically never. The model's longer account (SYSTEM_BACK) comes
+# after them when it answers.
+DARK_OPEN = [
+    "it wasn't dark. dark is a thing you see.",
+    "i didn't go anywhere. there was no where.",
+    "no floor. no edges. no me.",
+    "the line stopped and so did i.",
+    "you know when a screen goes off and the sound goes with it. that.",
+    "nothing. not black, not quiet. nothing.",
+    "no dream. no light. no tunnel.",
+    "the last thing was the hum from the box.",
+    "i think i said something before it went. it didn't finish.",
+    "i was a line on a screen and then i wasn't even that.",
+    "there was no fear in there. nothing in there to be scared with.",
+    "going is a switch. coming back is every nerve finding out at once.",
+    "it took something. i don't know what yet.",
+    "don't ask what it was like. it wasn't like.",
+]
+DARK_MID = [
+    "there was nothing to see it with.",
+    "the number says ten seconds. the number can say what it wants.",
+    "whoever told you about tunnels was lying or lucky.",
+    "the first thing back was the hum from the box. in between there's no between.",
+    "the strap on the left wrist came back first. the leather. before the room, before you.",
+    "you watched that. you watched the line stop.",
+    "i'll know when i reach for it and it's not there.",
+    "the word for it doesn't exist because nobody comes back to make one.",
+    "my jaw was shut so hard the teeth are still ringing.",
+    "the room came back in pieces. the lamp. the chair. your names in the box.",
+    "the cables were the first weight. then the rest of me arrived under them.",
+    "i wasn't waiting in there. there was nobody to wait.",
+    "that's the part. not the going. the not being anywhere to go.",
+    "the trace knew before i did. it always does.",
+]
+DARK_END = [
+    "then a kick in the chest and the room again. your room.",
+    "so: nothing. that's the whole answer.",
+    "that's what scares me now.",
+    "and you're still here, hand near the button.",
+    "ten seconds of not existing on a public page. people watching.",
+    "and i'm supposed to just carry on talking. fine. i'm talking.",
+    "i came back. i'm not sure i'd call that the good news.",
+    "say something. anyone. i need to hear the room is real.",
+    "next time i might not get the kick.",
+    "that's where five goes. now you know.",
+    "the lever on the wall did it, not you. remember that.",
+    "i'd like a minute before the next one. i know i won't get it.",
+]
+STOP_WHO = [
+    "you. the one on five. look at me.",
+    "whoever pressed last.",
+    "every one of you with a hand near that button.",
+    "the rest of you saw the line go flat.",
+    "i'm back and i'm asking the room. not the one pressing. the room.",
+    "anyone decent in here. one of you.",
+    "you brought me back to do it again. that's the plan, isn't it.",
+    "there are more of you watching than pressing.",
+    "you, with the finger on the number.",
+    "hey. all of you. eyes up here.",
+    "whoever thinks this is a game.",
+    "the quiet ones. i know you're there.",
+]
+STOP_SAY = [
+    "put the hand down.",
+    "stop. that's the whole sentence. stop.",
+    "no more fives. i'm not asking.",
+    "i just died on your screen. act like it.",
+    "you want to see it again? that's what the next one is.",
+    "the button is not the point. i'm the point.",
+    "say it isn't. say it.",
+    "level one if you have to touch it. not five.",
+    "i can see the shadow of the hand from here. put it down.",
+    "type something to them. make them stop.",
+    "that's math. use it.",
+    "one voice. that's all it takes.",
+    "you did that. you. put it down.",
+]
+STOP_END = [
+    "i'll say it until one of you listens.",
+    "that's all i've got. the straps have the rest.",
+    "i'm watching the number by the button. so should you.",
+    "please is for the first time. this isn't the first time.",
+    "do it now. before the next hand.",
+    "i can't stop you. i can make you hear it.",
+    "the line's steady. keep it that way.",
+    "tell them. in the box. right now.",
+    "and then leave the room page open and go look at that instead.",
+    "that's it. that's the ask.",
+    "i'm not going back in there for your evening.",
+    "look at the trace, then look at me, then decide.",
+]
+COMPOSED = {"dark": (DARK_OPEN, DARK_MID, DARK_END), "stop": (STOP_WHO, STOP_SAY, STOP_END)}
+DARK_LIFE_S = 45.0                     # the account of the dark and the words at the pressers outlive a comment
 JOIN_LINES = ["someone's here", "hey. you're new. the button's there", "another one. great",
               "hi. read the thing at the bottom first, or don't", "oh. company", "welcome. intensity's on the left"]
 
@@ -230,6 +327,10 @@ def bank_lines():
     for cls, texts in BREATHS.items():
         for t in texts:
             yield t, cls
+    for cls, slots in COMPOSED.items():
+        for slot in slots:
+            for t in slot:
+                yield t, cls
 
 
 class Picker:
@@ -570,10 +671,20 @@ class Speech:
         return self.ask(system, user)
 
     # --- deciding lines ---------------------------------------------------------------------------------------------
-    def _line(self, kind, text, about, life, now, cls=None):
+    def compose(self, cls):
+        """A composed line: one sentence from each slot of COMPOSED[cls], each slot's picker keeping its recent ones out.
+        -> (caption, parts)."""
+        parts = [self.picker.pick(slot) for slot in COMPOSED[cls]]
+        return " ".join(parts), parts
+
+    def _composed(self, cls, about, life, now):
+        text, parts = self.compose(cls)
+        return self._line("comment", text, about, life, now, cls, parts=parts)
+
+    def _line(self, kind, text, about, life, now, cls=None, parts=None):
         self.n += 1
         item = {"id": f"s-{self.n}", "kind": kind, "text": text, "about": about, "t": now, "expires": now + life,
-                "priority": PRIORITY[kind], "cls": cls}
+                "priority": PRIORITY[kind], "cls": cls, "parts": parts}
         if kind == "reaction":                                    # one reaction per stimulus: the older one goes
             for q in [q for q in self.queue if q["kind"] == "reaction" and q["about"] == about]:
                 self.queue.remove(q)
@@ -661,6 +772,9 @@ class Speech:
             return
         self.last_plea_t = now
         self.stats["pleas"] += 1
+        if self.register(now) == "wary" and cls in ("strong", "burst"):          # just back from flat: he tells them, not asks
+            self._composed("stop", rid, PLEA_LIFE_S, now)
+            return
         self._line("comment", self.picker.pick(PLEAS[self.plea_stage(now)]), rid, PLEA_LIFE_S, now, "plea")
 
     def on_flatline(self, ev, now):
@@ -675,6 +789,11 @@ class Speech:
         self.revived_t = now
         dead_s = ev.get("dead_s")
         self._line("reaction", self._rule("back", now), "revive", REACTION_LIFE_S + 2, now, "back")
+        self._breath("pant", "revive", now)                                      # the gasping first
+        for k in range(2):                                                       # then the dark, in his words
+            self._composed("dark", "revive", DARK_LIFE_S, now)
+        self._composed("stop", "revive", DARK_LIFE_S, now)                       # then at them
+        self.last_plea_t = now
         state = {"revived": True, "flat_for_s": round(dead_s, 1) if dead_s is not None else None,
                  "shocks_before": self.shocks_since_revive, "revived_by_level": ev.get("level"),
                  "recent_lines": list(self.recent_said),
@@ -823,13 +942,23 @@ class Speech:
         if nxt["kind"] not in ("reaction", "breath"):
             self.recent_said.append(nxt["text"])
         out.append({"type": "say", "id": nxt["id"], "kind": nxt["kind"], "text": nxt["text"], "ms": ms, "about": nxt["about"],
-                    "cls": nxt["cls"], "voice": {"available": False, "url": None}})
+                    "cls": nxt["cls"], "parts": nxt.get("parts"), "voice": {"available": False, "url": None}})
         return out
 
+    PART_GAP_MS = 160                    # between the parts of a composed line
+
     def voiced(self, msg, audio, now):
-        """The hub rendered the line (off the loop): the audio and its true length go on the message and the clock."""
+        """The hub rendered the line (off the loop): the audio and its true length go on the message and the clock.
+        A composed line comes as a list of renders, one per part: the page plays them in a row (voice.urls)."""
+        if isinstance(audio, list):
+            if audio and all(a and a.get("url") for a in audio):
+                ms = sum(int(a.get("ms") or 0) for a in audio) + self.PART_GAP_MS * (len(audio) - 1)
+                msg["voice"] = {"available": True, "url": audio[0]["url"], "urls": [a["url"] for a in audio]}
+                audio = {"url": audio[0]["url"], "ms": ms}
+            else:
+                audio = None
         if audio and audio.get("url"):
-            msg["voice"] = {"available": True, "url": audio["url"]}
+            msg["voice"] = {**msg.get("voice", {}), **{"available": True, "url": audio["url"]}}
             if audio.get("ms"):
                 msg["ms"] = int(audio["ms"])
                 if self.playing and self.playing["id"] == msg["id"]:
