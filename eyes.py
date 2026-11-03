@@ -57,7 +57,7 @@ REPLICATE_MODEL = os.environ.get("BRAIN_DECIDES_REPLICATE_MODEL") or "meta/meta-
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL") or "anthropic/claude-haiku-4.5"
 # which models take which request fields (Haiku 4.5 rejects `effort`; refusal fallbacks exist on the newest only)
 EFFORT_MODELS = ("claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-mythos-5", "claude-opus-4-8",
-                 "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6")
+                 "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-5")   # Haiku 5.5 thinks unless told low
 FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1")
 
 
@@ -68,6 +68,7 @@ def takes_effort(model):
 OPENROUTER_URL = (os.environ.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
 PRICES = {  # USD per million tokens (input, output), for the spend log
     "claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-4-5": (1.0, 5.0),
+    "claude-haiku-5-5": (0.10, 0.50), "anthropic/claude-haiku-5.5": (0.10, 0.50),
     "meta/meta-llama-3-70b-instruct": (0.65, 2.75), "meta/meta-llama-3-8b-instruct": (0.05, 0.25),
     # OpenRouter (estimate only when a response carries no cost)
     "anthropic/claude-opus-5.5": (4.0, 20.0), "anthropic/claude-sonnet-5.5": (2.0, 10.0),
