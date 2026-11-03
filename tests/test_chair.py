@@ -561,3 +561,10 @@ def test_bank_voice_plays_committed_lines_and_captions_the_rest(tmp_path):
         for text in lines:
             e = real[f"{text}|{cls}"]
             assert (HERE / speech_mod.BANK_DIR / e["file"]).read_bytes()[:4] == b"RIFF" and 300 < e["ms"] < 4000
+
+
+def test_every_voice_provider_survives_the_startup_log_line():
+    """live_server prints one line about the voice at start; it crashed production once (2026-11-03) on the bank."""
+    for v in (speech_mod.NoVoice(), speech_mod.BankVoice({"a|b": {"file": "a.wav", "ms": 1}}), speech_mod.VoiceStudio("http://127.0.0.1:1")):
+        line = f"{v.name} at {getattr(v, 'base', '?')} ({'up' if v.available() else 'not answering yet'}; profile {getattr(v, 'profile', None) or 'none, designed'})"
+        assert v.name in line

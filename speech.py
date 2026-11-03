@@ -106,6 +106,8 @@ class BankVoice(VoiceProvider):
     comments without a number in them. Production plays these; anything not in the bank is a caption."""
     name = "bank"
 
+    base, profile = "committed files", None       # what the startup line prints (a VoiceStudio has an address and a profile)
+
     def __init__(self, bank, voice="BREZ"):
         self.bank, self.voice_name = bank, voice
 

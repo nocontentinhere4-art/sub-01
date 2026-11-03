@@ -2298,9 +2298,10 @@ async def main(args):
             os.environ["VOICE_STUDIO_PROFILE"] = args.voice_profile
         voice = speech_mod.Speech(ask=lambda sy, us: live.mind._ask("chair", sy, us) if live.mind else None,
                                   voice=speech_mod.voice_from_env())
-        if voice.voice.name != "none":
-            print(f"chair: voice through {voice.voice.name} at {voice.voice.base} ({'up' if voice.voice.available() else 'not answering yet'}; "
-                  f"profile {voice.voice.profile or 'none, designed'})", flush=True)
+        if voice.voice.name != "none":                # (never let a log line stop the start: every provider is duck-typed here)
+            print(f"chair: voice through {voice.voice.name} at {getattr(voice.voice, 'base', '?')} "
+                  f"({'up' if voice.voice.available() else 'not answering yet'}; "
+                  f"profile {getattr(voice.voice, 'profile', None) or 'none, designed'})", flush=True)
         chair_hub = chair.Hub(chair.SimSource(), key_of=live.client_ip, on_delivered=live.chair_shock, speech=voice,
                               admin_ok=lambda r: admin_ok(r) or bool(r.app.get(GATED)))
         chair.attach(app, chair_hub, nocache=NOCACHE)
