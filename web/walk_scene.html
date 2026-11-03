@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SUB-01 · walk (prototype)</title>
+<style>
+  html, body { margin:0; height:100%; background:#0d0e13; color:#d8d8e2; font:13px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; touch-action:none; }
+  #tag { position:fixed; left:12px; bottom:12px; padding:6px 10px; border-radius:8px; background:rgba(8,8,11,.6); color:#a9a9bb; pointer-events:none; }
+  #tag b { color:#e8e8f0; font-weight:600; }
+  #err { position:fixed; inset:0; display:none; place-items:center; padding:24px; text-align:center; color:#e88; }
+</style>
+</head>
+<body>
+<div id="tag"><b id="title">walk</b> · prototype · <span id="what">loading…</span></div>
+<div id="err"></div>
+<!-- A walk outside as a Gaussian-splat scene (Lyra 1 / placeholder; walk_scenes/README.md) with the room's boy walking a
+     path in it. Prototype page: not linked from the room. ?scene=bakery (web/walk/<scene>.json), ?free (orbit camera),
+     ?grid (a 1 m grid on the street, for tuning a scene's scale/offset/path), ?t=<s> (freeze at that time: screenshots). -->
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+               "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.3.1/dist/spark.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
+
+const Q = new URLSearchParams(location.search);
+const SCENE = (Q.get("scene") || "bakery").replace(/[^a-z0-9_-]/gi, "");
+const FREE = Q.has("free"), GRID = Q.has("grid"), FIXED_T = Q.has("t") ? parseFloat(Q.get("t")) : null;
+const STRIDE_V = 0.65;                         // the ARDY walk's feet move back at 0.65 m/s (room_build/ardy/README.md)
+const $ = id => document.getElementById(id);
+const fail = e => { console.error(e); $("err").style.display = "grid"; $("err").textContent = "walk scene failed: " + (e?.message || e); };
+
+const cfg = await fetch(`walk/${SCENE}.json`).then(r => r.json()).catch(fail);
+$("title").textContent = cfg.title || SCENE;
+
+const renderer = new THREE.WebGLRenderer({antialias: false, powerPreference: "high-performance"});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));          // as the room: phones stay smooth
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;                       // the splats carry their own (baked) look
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(cfg.background || "#bcd3ea");
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 400);
+camera.position.set(0, 1.55, 1.5);
+scene.add(new SparkRenderer({renderer}));
+
+// ---------- the scene: Lyra's frame -> three.js (y up, -z forward), scaled, the street put at y = 0
+const splat = new SplatMesh({url: cfg.splat});
+if ((cfg.frame || "opencv") === "opencv") splat.quaternion.set(1, 0, 0, 0);
+splat.scale.setScalar(cfg.scale ?? 1);
+splat.position.fromArray(cfg.offset || [0, 0, 0]);
+scene.add(splat);
+splat.initialized?.then(() => { $("what").textContent = cfg.splat.split("/").pop(); }).catch(fail);
+if (GRID) { const g = new THREE.GridHelper(40, 40, 0xff3366, 0xffffff); g.material.opacity = .35; g.material.transparent = true; scene.add(g); }
+
+// ---------- light for the boy only (the splats are not lit): match the scene's sun by eye in the json
+const L = cfg.light || {};
+scene.add(new THREE.HemisphereLight(L.sky || "#cfe0ff", L.ground || "#5a5650", L.hemi_intensity ?? 1.1));
+const sun = new THREE.DirectionalLight(L.sun_color || "#fff1dc", L.sun_intensity ?? 2.2);
+sun.position.fromArray(L.sun || [-4, 8, 3]);
+scene.add(sun, sun.target);
+
+// a soft contact shadow under him (no shadow map: splats cannot receive one)
+const blob = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(0,0,0,.55)"); g.addColorStop(.6, "rgba(0,0,0,.22)"); g.addColorStop(1, "rgba(0,0,0,0)");
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false}));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.01; m.renderOrder = 2; scene.add(m); return m;
+})();
+
+// ---------- the boy: the room's rig and its ARDY walk / idle clips (retargeted onto this rig)
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const load = url => new Promise((ok, no) => loader.load(url, ok, undefined, no));
+const [g, walkG, idleG] = await Promise.all(["room/boy.glb", "room/boy_m_walk.glb", `room/boy_m_${cfg.arrive_clip || "idle"}.glb`].map(load)).catch(fail);
+const boy = g.scene;
+boy.traverse(o => { if (o.isMesh) { o.frustumCulled = false; const m = o.material; if (m.emissive) m.emissive.setRGB(0, 0, 0); m.roughness = 0.8; } });
+scene.add(boy);
+const mixer = new THREE.AnimationMixer(boy);
+const walk = mixer.clipAction(walkG.animations[0]), idle = mixer.clipAction(idleG.animations[0]);
+walk.play();
+
+// ---------- the path: constant speed along the polyline, turning smoothly; arrive, face the shop, stand, loop
+const P = cfg.path.map(([x, z]) => new THREE.Vector3(x, 0, z));
+const seg = P.slice(1).map((p, i) => p.distanceTo(P[i]));
+const total = seg.reduce((a, b) => a + b, 0), V = cfg.speed || 0.9, WALK_S = total / V, STAND_S = 5;
+walk.timeScale = V / STRIDE_V;
+const at = d => { let i = 0; while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
+  return P[i].clone().lerp(P[i + 1], Math.min(1, d / seg[i])); };
+const face = new THREE.Vector3(...[cfg.face?.[0] ?? 0, 0, cfg.face?.[1] ?? -1]);
+let yaw = Math.atan2(P[1].x - P[0].x, P[1].z - P[0].z), arrived = false;
+
+const C = cfg.camera || {};
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), tmp = new THREE.Vector3();
+let controls = null;
+if (FREE) { controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, -6); camera.position.set(4, 4, 4); }
+
+function place(t, dt){
+  const cyc = t % (WALK_S + STAND_S), d = Math.min(total, cyc * V);
+  const pos = at(d), ahead = at(Math.min(total, d + 0.6));
+  const walking = cyc < WALK_S;
+  if (walking && arrived) { arrived = false; idle.fadeOut(0.3); walk.reset().fadeIn(0.3).play(); }
+  if (!walking && !arrived) { arrived = true; walk.fadeOut(0.4); idle.reset().fadeIn(0.4).play(); }
+  const want = walking && ahead.distanceToSquared(pos) > 1e-6 ? Math.atan2(ahead.x - pos.x, ahead.z - pos.z)
+                                                             : Math.atan2(face.x - pos.x, face.z - pos.z);
+  let dy = ((want - yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  yaw += dy * Math.min(1, dt * 4);
+  boy.position.copy(pos); boy.rotation.y = yaw;
+  blob.position.set(pos.x, 0.01, pos.z);
+  if (controls) return;
+  // follow camera: behind him and a little to the side, eased; looks a bit ahead of him
+  const fwd = tmp.set(Math.sin(yaw), 0, Math.cos(yaw)), far = camera.aspect < 1 ? 1.5 : 1;   // portrait phones: further back
+  const want_cam = pos.clone().addScaledVector(fwd, -(C.behind ?? 3.2) * far).add(new THREE.Vector3(fwd.z, 0, -fwd.x).multiplyScalar(-(C.side ?? 1.1)));
+  want_cam.y = C.height ?? 1.55;
+  const look = pos.clone().addScaledVector(fwd, C.look_ahead ?? 1.5); look.y = 1.1;
+  const k = dt > 0.5 ? 1 : Math.min(1, dt * 2.5);
+  camPos.lengthSq() ? camPos.lerp(want_cam, k) : camPos.copy(want_cam);
+  camLook.lengthSq() ? camLook.lerp(look, k) : camLook.copy(look);
+  camera.position.copy(camPos); camera.lookAt(camLook);
+}
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const clock = new THREE.Clock();
+if (FIXED_T != null) {                                            // deterministic frame: step there in small steps
+  for (let t = 0, h = 1 / 30; t < FIXED_T; t += h) { mixer.update(h); place(t + h, h); }
+  window.__walkReady = splat.initialized ? splat.initialized.then(() => true) : Promise.resolve(true);
+}
+let T = FIXED_T ?? 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (FIXED_T == null) { T += dt; mixer.update(dt); place(T, dt); }
+  controls?.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

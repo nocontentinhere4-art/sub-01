@@ -4,7 +4,7 @@
         --upload /path/5tt.nii.gz ... --fetch connectome.tar.gz --tag tract
 
 Hard rules (enforced here):
-- only an RTX A5000 GPU pod or a CPU pod; one pod at a time (refuses if one of OUR pods is still alive);
+- only an RTX A5000 GPU pod, a CPU pod, or (--kind h100) one 80 GB H100/A100 for Lyra (walk_scenes/README.md); one pod at a time (refuses if one of OUR pods is still alive);
 - pods are only ever created, read and deleted by id from data/analysis/my_pods.json - pods we did not create
   (e.g. "BRAIN") are never touched;
 - the pod is deleted when the job finishes, fails, on Ctrl-C / SIGTERM, and at the latest after --max-min (<= 60) minutes;
@@ -33,6 +33,7 @@ LEDGER = ROOT / "data" / "analysis" / "costs.jsonl"
 MINE = ROOT / "data" / "analysis" / "my_pods.json"
 TOTAL_CAP_MIN = 120.0
 PREVIEW_TAG, PREVIEW_CAP_MIN = "gpu-preview", 600.0   # tools/gpu_preview.py runs: their own pod-minute budget (owner OK 2026-10-04)
+BIG_GPUS = ["NVIDIA H100 80GB HBM3", "NVIDIA H100 PCIe", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"]   # --kind h100
 UA = "sub01-analysis/1.0 (curl-compatible)"          # Cloudflare rejects the default Python-urllib agent
 
 
@@ -82,8 +83,8 @@ def http(method, url, data=None, timeout=120, tries=1):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--kind", choices=["cpu", "a5000", "auto"], required=True,
-                   help="auto: first available of CPU 32/16/8 vCPU, then RTX A5000")
+    p.add_argument("--kind", choices=["cpu", "a5000", "h100", "auto"], required=True,
+                   help="auto: first available of CPU 32/16/8 vCPU, then RTX A5000; h100: one 80 GB H100 or A100 (Lyra)")
     p.add_argument("--wait-min", type=float, default=0, help="keep retrying while RunPod has no capacity")
     p.add_argument("--image", required=True)
     p.add_argument("--script", required=True, help="bash script run on the pod after the uploads")
@@ -130,14 +131,16 @@ def main():
                for v in ([a.vcpu] if a.kind == "cpu" else [32, 16, 8])]
         gpu = [dict(computeType="GPU", gpuTypeIds=["NVIDIA RTX A5000"], gpuCount=1, cloudType=c, minVCPUPerGPU=8,
                     minRAMPerGPU=30) for c in ("SECURE", "COMMUNITY")]
-        return {"cpu": cpu, "a5000": gpu, "auto": cpu + gpu}[a.kind]
+        big = [dict(computeType="GPU", gpuTypeIds=BIG_GPUS, gpuCount=1, cloudType=c, minVCPUPerGPU=16,
+                    minRAMPerGPU=80) for c in ("SECURE", "COMMUNITY")]
+        return {"cpu": cpu, "a5000": gpu, "h100": big, "auto": cpu + gpu}[a.kind]
 
     pod, waited0 = None, time.time()
     while pod is None:
         for v in variants():
             try:
                 pod = api("POST", "/pods", body | v)
-                kind = "cpu" if v["computeType"] == "CPU" else "a5000"
+                kind = "cpu" if v["computeType"] == "CPU" else a.kind if a.kind == "h100" else "a5000"
                 break
             except urllib.error.HTTPError as e:
                 msg = e.read().decode(errors="replace")
