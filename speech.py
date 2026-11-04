@@ -407,6 +407,8 @@ def classify(card):
 
 class VoiceProvider:
     name = "none"
+    base = ""                            # where the voice lives (a URL or a directory); logged at startup
+    profile = None                       # the saved voice profile, if any; logged at startup
 
     def available(self):
         return False
@@ -443,6 +445,7 @@ class BankVoice(VoiceProvider):
     """His lines rendered ahead with the owner's app and committed as files: the reaction vocabulary and the rule
     comments without a number in them. Production plays these; anything not in the bank is a caption."""
     name = "bank"
+    base = BANK_DIR                      # where the lines live; live_server's startup log prints voice.voice.base
 
     base, profile = "committed files", None       # what the startup line prints (a VoiceStudio has an address and a profile)
 
